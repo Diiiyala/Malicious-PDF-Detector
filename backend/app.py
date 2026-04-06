@@ -40,7 +40,7 @@ def upload_file():
     findings += analyze_content(text)
     findings += analyze_structure(reader)
     findings += analyze_metadata(reader)
-    findings = list(set(findings))
+    findings = sorted(list(set(findings)))
 
     from analysis.risk import calculate_risk
     score, risk_percentage, level = calculate_risk(findings, reader)
