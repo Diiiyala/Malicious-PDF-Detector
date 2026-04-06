@@ -3,7 +3,7 @@ def analyze_structure(reader):
     try:
         root = reader.trailer.get("/Root")
         if root:
-            findings.append("Valid PDF structure")
+            findings.append("INFO: Valid PDF structure")
             try:
                 if hasattr(root, 'get') and "/Names" in root:
                     findings.append("Names dictionary present")
