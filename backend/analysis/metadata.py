@@ -1,13 +1,180 @@
+import re, base64, codecs, urllib.parse
+
+
 def analyze_metadata(reader):
     findings = []
+    decoded_values = []
+
+    suspicious_words = [
+        "exploit", "payload", "shell", "malware",
+        "hack", "xss", "script", "eval",
+    ]
+    
+    hacking_tools = [
+        "metasploit", "cobalt strike", "empire", "veil", "mimikatz",
+        "powersploit", "nishang", "bloodhound", "beacon", "sherlock"
+    ]
+  
     try:
         metadata = reader.metadata
-        if metadata:
-            for key, value in metadata.items():
-                if value:
-                    val = str(value).lower()
-                    if any(x in val for x in ["hack", "exploit", "payload", "malware"]):
-                        findings.append(f"Suspicious metadata: {key}")
+        if not metadata:
+            findings.append("No metadata found")
+            return findings
+        
+        all_keywords = set()
+
+        for key, value in metadata.items():
+            if not value:
+                continue
+            val = str(value).strip()
+            val_lower = val.lower()
+
+            # -----------------------
+            # Suspicious keywords
+            # -----------------------
+            for word in suspicious_words:
+                if word in val_lower:
+                    all_keywords.add(word)
+                    
+            # -----------------------
+            #  URLs
+            # -----------------------                    
+            urls = re.findall(r'https?://\S+', val)
+            for url in urls:
+                clean_url = url.strip('()<>[]"\'')
+                
+                malicious_params = ["php", "exe", "sh", "py", "cmd", "cookie", "steal", "script"]
+                
+                if any(x in clean_url.lower() for x in malicious_params):
+                    findings.append(f"ALERT: Suspicious link detected ({clean_url})")
+                else:
+                    findings.append(f"INFO: Link found ({clean_url})")
+                    
+            # -----------------------
+            #  XSS
+            # -----------------------
+            if re.search(r'<\s*script', val_lower) or "javascript:" in val_lower:
+                findings.append(f"ALERT: XSS injection attempt detected ({val[:50]}...)")
+                all_keywords.add("xss")
+
+            # -----------------------
+            #  Base64
+            # -----------------------
+            if len(val) > 50 and is_base64(val):
+                try:
+                    decoded = base64.b64decode(val).decode("utf-8", errors="ignore")
+                    if readable_text(decoded):
+                        findings.append(f"ALERT: Encoded Base64 payload detected ({decoded})")
+                except:
+                    pass
+
+            # -----------------------
+            # Hex decoding
+            # -----------------------
+            try:
+                hex_clean = re.sub(r'[^0-9a-fA-F]', '', val)
+                
+                if len(hex_clean) >= 8 and len(hex_clean) % 2 == 0: 
+                    try:
+                        hex_bytes = bytes.fromhex(hex_clean)
+                        hex_decoded = hex_bytes.decode("utf-8", errors="ignore")
+                        
+                        if readable_text(hex_decoded, threshold=0.8):
+                            if any(x in hex_decoded.lower() for x in ["http", "cmd", "script", "powershell"]):
+                                findings.append(f"ALERT: Encoded Hex payload detected ({hex_decoded})")
+                    except:
+                        pass
+            except:
+                pass
+
+            # -----------------------
+            # ROT13 decoding
+            # -----------------------
+            try:
+                val_stripped = val.strip()
+                if re.fullmatch(r'[A-Za-z0-9_:/.-]+', val_stripped):
+                    if not val_stripped.lower().startswith(('http', 'www', '<script')):                      
+                        rot13_decoded = codecs.decode(val_stripped, 'rot_13')                    
+                        if readable_text(rot13_decoded) and rot13_decoded.lower() != val_stripped.lower():
+                            if any(x in rot13_decoded.lower() for x in ["http", "cmd", "script", "admin"]):
+                                findings.append(f"ALERT: Encoded ROT13 payload detected ({rot13_decoded})")
+            except Exception:
+                pass
+
+            # -----------------------
+            # URL decoding
+            # -----------------------
+            try:
+                url_decoded = urllib.parse.unquote(val)
+                if url_decoded != val and readable_text(url_decoded):
+                    decoded_values.append(f"URL decoded: {url_decoded}")
+                    if any(x in url_decoded.lower() for x in ["cmd", "powershell", "script"]):
+                        findings.append(f"ALERT: Encoded URL payload detected ({url_decoded})")
+            except:
+                pass
+            
+            # -----------------------
+            #  Length and Obfuscation
+            # -----------------------
+            if len(val) > 200:
+                findings.append("INFO: Long metadata field detected")
+
+            non_ascii_ratio = sum(1 for c in val if ord(c) > 127) / len(val)
+            if non_ascii_ratio > 0.3:
+                percentage = int(non_ascii_ratio * 100)
+                findings.append(f"ALERT: Potential obfuscation detected ({percentage}% non-ASCII characters)")
+
+
+        if all_keywords:
+            findings.append(f"ALERT: Suspicious keywords detected ({', '.join(sorted(all_keywords))})")
+            
+        # -----------------------
+        #  Hacking tools
+        # ----------------------- 
+        for value in metadata.values():
+            if value:
+                val_str = str(value).lower()
+                for tool in hacking_tools:
+                    if tool.lower() in val_str:
+                        findings.append(f"ALERT: Hacking tool detected ({tool.capitalize()})")
+                        break
+
+        # -----------------------
+        #  Suspicious sources
+        # ----------------------- 
+        for field in ["/Author", "/Creator", "/Producer"]:
+            if field in metadata:
+                val = str(metadata[field]).lower()
+                suspicious_indicators = ["attacker", "malicious", "script"]
+                found_indicators = [x for x in suspicious_indicators if x in val]
+                if found_indicators:
+                    indicators_str = "/".join([i.capitalize() for i in found_indicators])
+                    findings.append(f"ALERT: Suspicious metadata source detected ({indicators_str})")
+                    break
+         
+        findings.extend(decoded_values)
+                            
     except Exception as e:
         findings.append(f"Metadata error: {str(e)}")
+
     return findings
+
+# -----------------------
+#  Helpers
+# -----------------------
+
+def is_base64(s):
+    try:
+        if not re.fullmatch(r'[A-Za-z0-9+/=]+', s):
+            return False
+        return base64.b64encode(base64.b64decode(s)) == s.encode()
+    except:
+        return False
+
+
+def readable_text(s, threshold=0.6):
+    """Return True if at least `threshold` fraction of chars are printable ASCII"""
+    if not s:
+        return False
+    ratio = sum(1 for c in s if 32 <= ord(c) <= 126) / len(s)
+    return ratio >= threshold
