@@ -1,5 +1,5 @@
 import re, base64, codecs, urllib.parse
-
+from datetime import datetime
 
 def analyze_metadata(reader):
     findings = []
@@ -36,6 +36,32 @@ def analyze_metadata(reader):
                 if word in val_lower:
                     all_keywords.add(word)
                     
+            # -----------------------
+            #  Timestamp Anomaly & Future Date
+            # -----------------------
+            try:
+                creation_date = metadata.get("/CreationDate")
+                mod_date = metadata.get("/ModDate")   
+                today_str = datetime.now().strftime('%Y%m%d')
+                today_int = int(today_str)
+
+                if creation_date:
+                    c_raw = re.sub(r'[^0-9]', '', str(creation_date))[:8]
+                    if len(c_raw) == 8:
+                        c_pretty = f"{c_raw[:4]}-{c_raw[4:6]}-{c_raw[6:]}"                    
+                        if int(c_raw) > today_int:
+                            findings.append(f"ALERT: Future creation date detected ({c_pretty})")
+                        if mod_date:
+                            m_raw = re.sub(r'[^0-9]', '', str(mod_date))[:8]
+                            if len(m_raw) == 8:
+                                m_pretty = f"{m_raw[:4]}-{m_raw[4:6]}-{m_raw[6:]}"
+                                if int(m_raw) < int(c_raw):
+                                    findings.append(f"ALERT: Timestamp anomaly detected (Created: {c_pretty}, Modified: {m_pretty})")                             
+                                if int(m_raw) > today_int:
+                                    findings.append(f"ALERT: Future modification date detected ({m_pretty})")
+            except Exception:
+                pass
+            
             # -----------------------
             #  URLs
             # -----------------------                    
