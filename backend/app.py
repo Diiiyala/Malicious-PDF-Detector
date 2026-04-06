@@ -1,44 +1,61 @@
 from flask import Flask, request, jsonify
-import PyPDF2
+import logging
+from analysis.text import extract_text
+from analysis.content import analyze_content
+from analysis.structure import analyze_structure
+from analysis.metadata import analyze_metadata
+from analysis.risk import calculate_risk
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
 
-def analyze_pdf(file):
-    reader = PyPDF2.PdfReader(file)
-    text = ""
 
-    for page in reader.pages:
-        text += page.extract_text() or ""
-
-    findings = []
-
-    if "/JavaScript" in text:
-        findings.append("JavaScript detected")
-
-    if "/OpenAction" in text:
-        findings.append("Auto action detected")
-
-    if "http://" in text or "https://" in text:
-        findings.append("Contains links")
-
-    if not findings:
-        findings.append("No obvious threats detected")
-
-    return findings
-
-@app.route("/")
+@app.route("/", methods=["GET"])
 def home():
-    return "API is running"
+    return jsonify({"message": "Malicious PDF Detector API is running", "status": "OK"})
 
 @app.route("/upload", methods=["POST"])
 def upload_file():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
     file = request.files["file"]
 
-    results = analyze_pdf(file)
+    if file.filename == "":
+        return jsonify({"error": "Empty filename"}), 400
+
+    if not file.filename.lower().endswith(".pdf"):
+        return jsonify({"error": "Only PDF files allowed"}), 400
+
+    logging.info(f"Analyzing file: {file.filename}")
+
+    try:
+        from PyPDF2 import PdfReader
+        reader = PdfReader(file)
+    except Exception as e:
+        return jsonify({"error": f"Invalid PDF file: {str(e)}"}), 400
+
+    text = extract_text(reader)
+    findings = []
+    findings += analyze_content(text)
+    findings += analyze_structure(reader)
+    findings += analyze_metadata(reader)
+    findings = list(set(findings))
+
+    from analysis.risk import calculate_risk
+    score, risk_percentage, level = calculate_risk(findings, reader)
 
     return jsonify({
-        "results": results
+        "filename": file.filename,
+        "findings": findings,
+        "risk_score": score,
+        "risk_percentage": risk_percentage,
+        "risk_level": level
     })
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "healthy"})
 
 if __name__ == "__main__":
     app.run(debug=True)
