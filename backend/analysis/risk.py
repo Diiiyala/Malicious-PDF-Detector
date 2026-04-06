@@ -1,19 +1,31 @@
 def calculate_risk(findings, reader):
     score = 0
+
     weights = {
         "JavaScript detected": 3,
         "Auto action detected": 3,
         "Embedded files detected": 4,
-        "Suspicious keywords": 2,
-        "Contains": 1,
-        "Very little text": 2,
+        "ALERT: Suspicious keywords": 2,
+        "ALERT: Hacking tool": 4,
+        "ALERT: XSS injection": 3,
+        "ALERT: Suspicious link": 3,
+        "ALERT: Encoded": 4,
+        "ALERT: Suspicious metadata source": 2,
+        "ALERT: Potential obfuscation": 2,
+        "INFO: Link found": 1,
+        "INFO: Long metadata": 1,
+        "little text": 2,
         "Names dictionary present": 1,
     }
+
+    used = set()
 
     for finding in findings:
         for key in weights:
             if key in finding:
-                score += weights[key]
+                if key not in used:
+                    score += weights[key]
+                    used.add(key)
 
     try:
         if reader.is_encrypted:
@@ -22,12 +34,12 @@ def calculate_risk(findings, reader):
     except:
         pass
 
-    max_score = 15
-    risk_percentage = int((score / max_score) * 100)
+    max_score = 20
+    risk_percentage = min(int((score / max_score) * 100), 100)
 
-    if score >= 7:
+    if score >= 10:
         level = "HIGH RISK"
-    elif score >= 4:
+    elif score >= 5:
         level = "MEDIUM RISK"
     else:
         level = "LOW RISK"
