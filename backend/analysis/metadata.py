@@ -31,9 +31,9 @@ def analyze_metadata(reader):
         
         full_metadata_text = " ".join([str(v) for v in metadata.values() if v]).lower()
         
-        # -----------------------
-        #  Timestamp Anomaly & Future Date
-        # -----------------------
+        # -------------------------------------------------------------------------
+        # 1. Timestamp Anomaly & Future Date
+        # -------------------------------------------------------------------------
             
         try:
             creation_date = metadata.get("/CreationDate")
@@ -57,9 +57,9 @@ def analyze_metadata(reader):
                                 findings.append(f"ALERT: Future modification date detected ({m_pretty})")
         except Exception: pass
         
-        # -----------------------
-        #   Individual Metadata Field Analysis
-        # -----------------------  
+        # -------------------------------------------------------------------------
+        # 2. Individual Metadata Field Analysis
+        # -------------------------------------------------------------------------
           
         for key, value in metadata.items():
             if not value:
@@ -67,17 +67,17 @@ def analyze_metadata(reader):
             val = str(value).strip()
             val_lower = val.lower()
 
-            # -----------------------
-            # Suspicious keywords
-            # -----------------------
+            # -------------------------------------------------------------------------
+            # 2.1 Suspicious keywords
+            # -------------------------------------------------------------------------
             
             for word in SUSPICIOUS_WORDS:
                 if word in val_lower:
                     all_keywords.add(word)
                     
-            # -----------------------
-            #  URLs
-            # -----------------------     
+            # -------------------------------------------------------------------------
+            #  2.2 URLs
+            # -------------------------------------------------------------------------     
                            
             urls = re.findall(r'https?://\S+', val)
             for url in urls:
@@ -88,17 +88,17 @@ def analyze_metadata(reader):
                 else:
                     findings.append(f"INFO: Link found ({clean_url})")
                     
-            # -----------------------
-            #  XSS
-            # -----------------------
+            # -------------------------------------------------------------------------
+            # 2.3 XSS
+            # -------------------------------------------------------------------------
             
             if re.search(r'<\s*script', val_lower) or "javascript:" in val_lower:
                 findings.append(f"ALERT: XSS injection attempt detected ({val})")
                 all_keywords.add("xss")
 
-            # -----------------------
-            #  Base64
-            # -----------------------
+            # -------------------------------------------------------------------------
+            # 2.4 Base64
+            # -------------------------------------------------------------------------
             
             if len(val) > 50 and is_base64(val):
                 try:
@@ -107,9 +107,9 @@ def analyze_metadata(reader):
                         findings.append(f"ALERT: Encoded Base64 payload detected ({decoded})")
                 except: pass
 
-            # -----------------------
-            # Hex decoding
-            # -----------------------
+            # -------------------------------------------------------------------------
+            # 2.5 Hex decoding
+            # -------------------------------------------------------------------------
             
             try:
                 hex_clean = re.sub(r'[^0-9a-fA-F]', '', val)
@@ -125,9 +125,9 @@ def analyze_metadata(reader):
                     except: pass
             except: pass
 
-            # -----------------------
-            # ROT13 decoding
-            # -----------------------
+            # -------------------------------------------------------------------------
+            # 2.6 ROT13 decoding
+            # -------------------------------------------------------------------------
             
             try:
                 val_stripped = val.strip()
@@ -139,9 +139,9 @@ def analyze_metadata(reader):
                                 findings.append(f"ALERT: Encoded ROT13 payload detected ({rot13_decoded})")
             except Exception: pass
 
-            # -----------------------
-            # URL decoding
-            # -----------------------
+            # -------------------------------------------------------------------------
+            # 2.7 URL decoding
+            # -------------------------------------------------------------------------
             
             try:
                 url_decoded = urllib.parse.unquote(val)
@@ -151,9 +151,9 @@ def analyze_metadata(reader):
                         findings.append(f"ALERT: Encoded URL payload detected ({url_decoded})")
             except: pass
             
-            # -----------------------
-            #  Length and Obfuscation
-            # -----------------------
+            # -------------------------------------------------------------------------
+            # 2.8 Length and Obfuscation
+            # -------------------------------------------------------------------------
             
             if len(val) > 200:
                 findings.append("INFO: Long metadata field detected")
@@ -167,9 +167,9 @@ def analyze_metadata(reader):
         if all_keywords:
             findings.append(f"ALERT: Suspicious keywords detected ({', '.join(all_keywords)})")
             
-        # -----------------------
-        #  Hacking tools
-        # ----------------------- 
+        # -------------------------------------------------------------------------
+        # 3. Hacking tools
+        # -------------------------------------------------------------------------
         
         found_tools = [tool.capitalize() for tool in HACKING_TOOLS if tool.lower() in full_metadata_text]
         
@@ -177,9 +177,9 @@ def analyze_metadata(reader):
             tools_str = "/".join(found_tools)
             findings.append(f"ALERT: Hacking tools detected ({tools_str})")
 
-        # -----------------------
-        #  Suspicious sources
-        # ----------------------- 
+        # -------------------------------------------------------------------------
+        # 4. Suspicious sources
+        # -------------------------------------------------------------------------
         
         sources_found = set()
         
@@ -205,9 +205,9 @@ def analyze_metadata(reader):
 
     return findings
 
-# -----------------------
+# -------------------------------------------------------------------------
 #  Helpers
-# -----------------------
+# -------------------------------------------------------------------------
 
 def is_base64(s):
     try:
