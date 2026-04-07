@@ -165,7 +165,7 @@ def analyze_metadata(reader):
 
 
         if all_keywords:
-            findings.append(f"ALERT: Suspicious keywords detected ({', '.join(sorted(all_keywords))})")
+            findings.append(f"ALERT: Suspicious keywords detected ({', '.join(all_keywords)})")
             
         # -----------------------
         #  Hacking tools
@@ -194,7 +194,7 @@ def analyze_metadata(reader):
                         sources_found.add(indicator.capitalize())
 
         if sources_found:
-            indicators_str = "/".join(sorted(sources_found))
+            indicators_str = "/".join(sources_found)
             findings.append(f"ALERT: Suspicious metadata source detected ({indicators_str})")
          
          

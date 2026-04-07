@@ -37,9 +37,9 @@ def upload_file():
 
     text = extract_text(reader)
     
-    res_content = analyze_content(text)
-    res_structure = analyze_structure(reader)
-    res_metadata = analyze_metadata(reader)
+    res_content = sorted(list(set(analyze_content(text))))
+    res_structure = sorted(list(set(analyze_structure(reader))))
+    res_metadata = sorted(list(set(analyze_metadata(reader))))
     
     all_findings = sorted(list(set(res_content + res_structure + res_metadata)))
     
