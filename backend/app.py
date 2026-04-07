@@ -36,18 +36,31 @@ def upload_file():
         return jsonify({"error": f"Invalid PDF file: {str(e)}"}), 400
 
     text = extract_text(reader)
-    findings = []
-    findings += analyze_content(text)
-    findings += analyze_structure(reader)
-    findings += analyze_metadata(reader)
-    findings = sorted(list(set(findings)))
-
-    from analysis.risk import calculate_risk
-    score, risk_percentage, level = calculate_risk(findings, reader)
-
+    
+    res_content = analyze_content(text)
+    res_structure = analyze_structure(reader)
+    res_metadata = analyze_metadata(reader)
+    
+    all_findings = sorted(list(set(res_content + res_structure + res_metadata)))
+    
+    score, risk_percentage, level = calculate_risk(all_findings, reader)
+    
     return jsonify({
         "filename": file.filename,
-        "findings": findings,
+        "findings": {
+            "content": {
+                "results": res_content,
+                "count": len(res_content)
+            },
+            "structure": {
+                "results": res_structure,
+                "count": len(res_structure)
+            },
+            "metadata": {
+                "results": res_metadata,
+                "count": len(res_metadata)
+            }
+        },
         "risk_score": score,
         "risk_percentage": risk_percentage,
         "risk_level": level
