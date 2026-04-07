@@ -57,5 +57,13 @@ def analyze_structure(reader):
                 
     except Exception as e:
         findings.append(f"Root Analysis Error: {str(e)}")
+        
+    # -------------------------------------------------------------------------
+    # 3. ENCRYPTION ANALYSIS
+    # -------------------------------------------------------------------------            
+    try:
+        if reader.is_encrypted:
+            findings.append("ALERT: Encrypted PDF (Restricted access)")
+    except Exception: pass
 
     return findings
