@@ -2,19 +2,28 @@ def calculate_risk(findings, reader):
     score = 0
 
     weights = {
-        "JavaScript detected": 3,
         "Auto action detected": 3,
-        "Embedded files detected": 4,
-        "ALERT: Suspicious keywords": 2,
-        "ALERT: Hacking tool": 4,
-        "ALERT: XSS injection": 3,
-        "ALERT: Suspicious link": 3,
-        "ALERT: Encoded": 4,
-        "ALERT: Suspicious metadata source": 2,
-        "ALERT: Potential obfuscation": 2,
-        "ALERT: Future creation date": 3,
+        
+        "ALERT: Launch action detected": 8,
+        "ALERT: OpenAction": 7,
+        "ALERT: JavaScript detected": 6,
+        "ALERT: Hacking tools": 7,
+        "ALERT: Encoded": 5,
+        "ALERT: XSS injection": 5,
+        
+        "ALERT: Embedded files detected": 4,
+        "ALERT: Suspicious link": 4,
+        "ALERT: Suspicious keywords": 3,
+        "ALERT: Future creation date": 3,         
         "ALERT: Future modification date": 3,
         "ALERT: Timestamp anomaly": 3,
+        "ALERT: Many stream objects": 4,
+        "ALERT: Large number of objects": 3,
+        "ALERT: Potential obfuscation": 3,
+        
+        "ALERT: Suspicious metadata source": 2,
+        "ALERT: Missing Root object": 2,
+        "ALERT: No pages found": 2,
         "INFO: Link found": 1,
         "INFO: Long metadata": 1,
         "little text": 2,
@@ -32,17 +41,18 @@ def calculate_risk(findings, reader):
 
     try:
         if reader.is_encrypted:
-            score += 3
-            findings.append("Encrypted PDF")
-    except:
-        pass
+            if "Encrypted PDF" not in used:
+                score += 3
+                findings.append("Encrypted PDF")
+                used.add("Encrypted PDF")
+    except: pass
 
-    max_score = 20
+    max_score = 25
     risk_percentage = min(int((score / max_score) * 100), 100)
 
-    if score >= 10:
+    if score >= 12:
         level = "HIGH RISK"
-    elif score >= 5:
+    elif score >= 6:
         level = "MEDIUM RISK"
     else:
         level = "LOW RISK"
