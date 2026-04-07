@@ -1,7 +1,8 @@
 
 def analyze_structure(reader):
     findings = []
-    
+    root = None
+       
     # -----------------------
     # 1. Header Analysis
     # -----------------------
@@ -32,5 +33,29 @@ def analyze_structure(reader):
 
     except Exception as e:
         findings.append(f"Header Analysis Error: {str(e)}")
+
+    # -------------------------------------------------------------------------
+    # 2. ROOT ANALYSIS
+    # -------------------------------------------------------------------------
+    try:
+        root_obj = reader.trailer.get("/Root")
+        if root_obj:
+            root = root_obj.get_object()
+            findings.append("INFO: Valid PDF structure")
+            
+            catalog_version = root.get("/Version")
+            if catalog_version and header_version:
+                cat_v_str = str(catalog_version).replace("/", "")
+                if cat_v_str != header_version:
+                    findings.append(f"ALERT: Version mismatch (Header: {header_version}, Catalog: {cat_v_str})")
+            
+            if "/OpenAction" in root:
+                findings.append("ALERT: Auto-executable action detected (/OpenAction)")
+            
+            if "/AA" in root:
+                findings.append("ALERT: Automatic triggers detected in Catalog (/AA)")
+                
+    except Exception as e:
+        findings.append(f"Root Analysis Error: {str(e)}")
 
     return findings
