@@ -1,11 +1,13 @@
 
+WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
+
 def analyze_structure(reader):
     findings = []
     root = None
        
-    # -----------------------
+    # -------------------------------------------------------------------------
     # 1. Header Analysis
-    # -----------------------
+    # -------------------------------------------------------------------------
     try:
         stream = reader.stream
         stream.seek(0)
@@ -35,7 +37,7 @@ def analyze_structure(reader):
         findings.append(f"Header Analysis Error: {str(e)}")
 
     # -------------------------------------------------------------------------
-    # 2. ROOT ANALYSIS
+    # 2. Root Analysis
     # -------------------------------------------------------------------------
     try:
         root_obj = reader.trailer.get("/Root")
@@ -59,7 +61,55 @@ def analyze_structure(reader):
         findings.append(f"Root Analysis Error: {str(e)}")
         
     # -------------------------------------------------------------------------
-    # 3. ENCRYPTION ANALYSIS
+    # 3. Names Analysis
+    # -------------------------------------------------------------------------
+    try:
+        if root and "/Names" in root:
+            names = root["/Names"].get_object()
+            found_keys = names.keys()
+            
+            for key in found_keys:
+                if key not in WHITELIST:
+
+                    if key in ["/JavaScript", "/JS"]:
+                            try:
+                                js_node = names[key].get_object()
+                                if "/Names" in js_node:
+                                    js_list = js_node["/Names"]
+                                    script_names = [str(js_list[i]) for i in range(0, len(js_list), 2)]
+                                    if script_names:
+                                        findings.append(f"ALERT: Suspicious Scripting section found in Names ({key}) with scripts: [{', '.join(script_names)}]")
+                                    else:
+                                        findings.append(f"ALERT: Suspicious Scripting section found in Names ({key}) but no script names identified")
+                                else:
+                                    findings.append(f"ALERT: Suspicious Scripting section found in Names ({key}) but structure is unusual")
+                            except:
+                                findings.append(f"ALERT: Suspicious Scripting section found in Names ({key}) with obfuscated/unreadable script names")
+                    
+                    elif key == "/EmbeddedFiles":
+                        try:
+                            emb_files = names["/EmbeddedFiles"].get_object()
+                            if "/Names" in emb_files:
+                                file_list = emb_files["/Names"]
+                                embedded_names = [str(file_list[i]) for i in range(0, len(file_list), 2)]
+                                
+                                if embedded_names:
+                                    findings.append(f"ALERT: Embedded Files section detected ({key}) with files: [{', '.join(embedded_names)}]")
+                                else:
+                                    findings.append(f"ALERT: Embedded Files section detected ({key}) but no files identified")
+                            else:
+                                findings.append(f"ALERT: Embedded Files section detected ({key}) but structure is unusual")
+                        except:
+                            findings.append(f"ALERT: Embedded Files section detected ({key}) with obfuscated/unreadable content")
+                            
+                    else:
+                        findings.append(f"ALERT: Unexpected/Hidden section found in NameTree: {key}")
+                            
+    except Exception as e:
+        findings.append(f"NameTree Analysis Error: {str(e)}")
+
+    # -------------------------------------------------------------------------
+    # 4. Encryption Analysis
     # -------------------------------------------------------------------------            
     try:
         if reader.is_encrypted:
