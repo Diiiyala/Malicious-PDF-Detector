@@ -13,6 +13,7 @@ def analyze_structure(reader):
         stream.seek(0)
         raw_start = stream.read(100)
         
+        # Check for PDF Signature
         header_index = raw_start.find(b"%PDF-")
         
         if header_index == -1:
@@ -29,6 +30,7 @@ def analyze_structure(reader):
             else:
                 findings.append(f"INFO: PDF Header detected (Version: {header_version})")
 
+        # Check for Multiple Headers
         header_count = raw_start.count(b"%PDF-")
         if header_count > 1:
             findings.append(f"ALERT: Multiple PDF headers detected ({header_count} found - potential spoofing)")
@@ -40,20 +42,24 @@ def analyze_structure(reader):
     # 2. Root Analysis
     # -------------------------------------------------------------------------
     try:
+        # Verify Catalog Object
         root_obj = reader.trailer.get("/Root")
         if root_obj:
             root = root_obj.get_object()
             findings.append("INFO: Valid PDF structure")
             
+            # Check for Version Mismatch
             catalog_version = root.get("/Version")
             if catalog_version and header_version:
                 cat_v_str = str(catalog_version).replace("/", "")
                 if cat_v_str != header_version:
                     findings.append(f"ALERT: Version mismatch (Header: {header_version}, Catalog: {cat_v_str})")
             
+            # Check for Auto-Execution
             if "/OpenAction" in root:
                 findings.append("ALERT: Auto-executable action detected (/OpenAction)")
             
+            # Check for Automatic Triggers
             if "/AA" in root:
                 findings.append("ALERT: Automatic triggers detected in Catalog (/AA)")
                 
@@ -64,6 +70,8 @@ def analyze_structure(reader):
     # 3. Names Analysis
     # -------------------------------------------------------------------------
     try:
+        
+        # Verify Names Dictionary
         if root and "/Names" in root:
             names = root["/Names"].get_object()
             found_keys = names.keys()
@@ -71,6 +79,7 @@ def analyze_structure(reader):
             for key in found_keys:
                 if key not in WHITELIST:
 
+                    # Analyze JavaScript Sections
                     if key in ["/JavaScript", "/JS"]:
                             try:
                                 js_node = names[key].get_object()
@@ -86,6 +95,7 @@ def analyze_structure(reader):
                             except:
                                 findings.append(f"ALERT: Suspicious Scripting section found in Names ({key}) with obfuscated/unreadable script names")
                     
+                    # Analyze Embedded Files
                     elif key == "/EmbeddedFiles":
                         try:
                             emb_files = names["/EmbeddedFiles"].get_object()
@@ -101,7 +111,8 @@ def analyze_structure(reader):
                                 findings.append(f"ALERT: Embedded Files section detected ({key}) but structure is unusual")
                         except:
                             findings.append(f"ALERT: Embedded Files section detected ({key}) with obfuscated/unreadable content")
-                            
+                        
+                    # Check for Hidden NameTree Sections    
                     else:
                         findings.append(f"ALERT: Unexpected/Hidden section found in NameTree: {key}")
                             
@@ -112,6 +123,7 @@ def analyze_structure(reader):
     # 4. Encryption Analysis
     # -------------------------------------------------------------------------            
     try:
+        # Check for File Encryption
         if reader.is_encrypted:
             findings.append("ALERT: Encrypted PDF (Restricted access)")
     except Exception: pass
