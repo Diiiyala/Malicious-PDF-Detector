@@ -70,52 +70,15 @@ def analyze_structure(reader):
     # 3. Names Analysis
     # -------------------------------------------------------------------------
     try:
-        
         # Verify Names Dictionary
         if root and "/Names" in root:
             names = root["/Names"].get_object()
-            found_keys = names.keys()
             
-            for key in found_keys:
-                if key not in WHITELIST:
-
-                    # Analyze JavaScript Sections
-                    if key in ["/JavaScript", "/JS"]:
-                            try:
-                                js_node = names[key].get_object()
-                                if "/Names" in js_node:
-                                    js_list = js_node["/Names"]
-                                    script_names = [str(js_list[i]) for i in range(0, len(js_list), 2)]
-                                    if script_names:
-                                        findings.append(f"ALERT: Suspicious Scripting section found in Names ({key}) with scripts: [{', '.join(script_names)}]")
-                                    else:
-                                        findings.append(f"ALERT: Suspicious Scripting section found in Names ({key}) but no script names identified")
-                                else:
-                                    findings.append(f"ALERT: Suspicious Scripting section found in Names ({key}) but structure is unusual")
-                            except:
-                                findings.append(f"ALERT: Suspicious Scripting section found in Names ({key}) with obfuscated/unreadable script names")
-                    
-                    # Analyze Embedded Files
-                    elif key == "/EmbeddedFiles":
-                        try:
-                            emb_files = names["/EmbeddedFiles"].get_object()
-                            if "/Names" in emb_files:
-                                file_list = emb_files["/Names"]
-                                embedded_names = [str(file_list[i]) for i in range(0, len(file_list), 2)]
-                                
-                                if embedded_names:
-                                    findings.append(f"ALERT: Embedded Files section detected ({key}) with files: [{', '.join(embedded_names)}]")
-                                else:
-                                    findings.append(f"ALERT: Embedded Files section detected ({key}) but no files identified")
-                            else:
-                                findings.append(f"ALERT: Embedded Files section detected ({key}) but structure is unusual")
-                        except:
-                            findings.append(f"ALERT: Embedded Files section detected ({key}) with obfuscated/unreadable content")
-                        
-                    # Check for Hidden NameTree Sections    
-                    else:
-                        findings.append(f"ALERT: Unexpected/Hidden section found in NameTree: {key}")
-                            
+            # Iterate through all categories in the NameTree
+            for category_key in names.keys():
+                # Perform Recursive Walk for each category
+                walk_names_tree(names[category_key], findings, WHITELIST, category=category_key)
+                
     except Exception as e:
         findings.append(f"NameTree Analysis Error: {str(e)}")
 
@@ -129,3 +92,57 @@ def analyze_structure(reader):
     except Exception: pass
 
     return findings
+
+# -------------------------------------------------------------------------
+#  Helpers
+# -------------------------------------------------------------------------
+
+def walk_names_tree(node, findings, whitelist, category=None):
+
+    if not node:
+        return
+
+    # Verify Node Object
+    node = node.get_object()
+
+    # Check for Child Nodes
+    if "/Kids" in node:
+        for kid in node["/Kids"]:
+            walk_names_tree(kid, findings, whitelist, category)
+
+    # Check for Leaf Nodes with Data
+    if "/Names" in node:
+        names_list = node["/Names"]
+        for i in range(0, len(names_list), 2):
+            key = str(names_list[i])
+            value_obj = names_list[i+1]   
+            # Process each found name entry      
+            process_name_node(key, value_obj, findings, whitelist, category)
+    
+    # Check for Direct Hidden Sections
+    if category not in whitelist:
+        if category not in ["/JavaScript", "/JS", "/EmbeddedFiles"]:
+             findings.append(f"ALERT: Unexpected/Hidden section found in NameTree: {category}")
+            
+            
+def process_name_node(key, value_obj, findings, whitelist, category):
+
+    # Verify Object Integrity and Access
+    try:
+        if value_obj.get_object() is None:
+            findings.append(f"INFO: Entry [{key}] points to an empty object")
+    except:
+        findings.append(f"ALERT: Could not parse object for [{key}] - potential corruption")
+        
+    # Analyze JavaScript Payloads
+    if category in ["/JavaScript", "/JS"]:
+        findings.append(f"ALERT: Suspicious Scripting found in Names ({category}) with script: [{key}]")
+    
+    # Analyze Embedded File Payloads
+    elif category == "/EmbeddedFiles":
+        findings.append(f"ALERT: Embedded Files detected in Names ({category}) with file: [{key}]")
+    
+    # Check against Whitelist for Leaves
+    elif key not in whitelist:
+        findings.append(f"ALERT: Unexpected/Hidden section found in NameTree: {key}") 
+        
