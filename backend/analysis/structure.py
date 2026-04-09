@@ -3,6 +3,7 @@ WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 
 def analyze_structure(reader):
     findings = []
+    untrusted_items = set()
     root = None
        
     # -------------------------------------------------------------------------
@@ -85,7 +86,11 @@ def analyze_structure(reader):
             # Iterate through all categories in the NameTree
             for category_key in names.keys():
                 # Perform Recursive Walk for each category
-                walk_names_tree(names[category_key], findings, WHITELIST, category=category_key)
+                walk_names_tree(names[category_key], findings, WHITELIST, untrusted_items, category=category_key)
+                
+            if untrusted_items:
+                items_str = ", ".join(sorted(untrusted_items))
+                findings.append(f"ALERT: Unexpected/Hidden sections found in NameTree: [{items_str}]")
                 
     except Exception as e:
         findings.append(f"NameTree Analysis Error: {str(e)}")
@@ -112,18 +117,15 @@ def is_version_older(current, target):
             return False
         
 
-def walk_names_tree(node, findings, whitelist, category=None):
+def walk_names_tree(node, findings, whitelist, untrusted_items, category=None):
 
-    if not node:
-        return
-
-    # Verify Node Object
+    if not node: return
     node = node.get_object()
 
     # Check for Child Nodes
     if "/Kids" in node:
         for kid in node["/Kids"]:
-            walk_names_tree(kid, findings, whitelist, category)
+            walk_names_tree(kid, findings, whitelist, untrusted_items, category)
 
     # Check for Leaf Nodes with Data
     if "/Names" in node:
@@ -132,15 +134,15 @@ def walk_names_tree(node, findings, whitelist, category=None):
             key = str(names_list[i])
             value_obj = names_list[i+1]   
             # Process each found name entry      
-            process_name_node(key, value_obj, findings, whitelist, category)
+            process_name_node(key, value_obj, findings, whitelist, untrusted_items, category)
     
     # Check for Direct Hidden Sections
-    if category not in whitelist:
+    if category and category not in whitelist:
         if category not in ["/JavaScript", "/JS", "/EmbeddedFiles"]:
-             findings.append(f"ALERT: Unexpected/Hidden section found in NameTree: {category}")
+             untrusted_items.add(category)
             
             
-def process_name_node(key, value_obj, findings, whitelist, category):
+def process_name_node(key, value_obj, findings, whitelist, untrusted_items, category):
 
     # Verify Object Integrity and Access
     try:
@@ -156,8 +158,8 @@ def process_name_node(key, value_obj, findings, whitelist, category):
     # Analyze Embedded File Payloads
     elif category == "/EmbeddedFiles":
         findings.append(f"ALERT: Embedded Files detected in Names ({category}) with file: [{key}]")
-    
-    # Check against Whitelist for Leaves
+        
+    # Collect Unexpected entries
     elif key not in whitelist:
-        findings.append(f"ALERT: Unexpected/Hidden section found in NameTree: {key}") 
+        untrusted_items.add(key)
         
