@@ -72,15 +72,7 @@ def analyze_structure(reader):
                 cat_v_str = str(catalog_version).replace("/", "")
                 if cat_v_str != header_version:
                     findings.append(f"ALERT: Version mismatch (Header: {header_version}, Catalog: {cat_v_str})")
-            
-            # Check for Auto-Execution
-            if "/OpenAction" in root:
-                findings.append("ALERT: Auto-executable action detected (/OpenAction)")
-            
-            # Check for Automatic Triggers
-            if "/AA" in root:
-                findings.append("ALERT: Automatic triggers detected in Catalog (/AA)")
-                
+                           
     except Exception as e:
         findings.append(f"Root Analysis Error: {str(e)}")
         
@@ -108,9 +100,21 @@ def analyze_structure(reader):
                 
     except Exception as e:
         findings.append(f"NameTree Analysis Error: {str(e)}")
+        
+    
+    # -------------------------------------------------------------------------
+    # 4. Action Analysis
+    # -------------------------------------------------------------------------   
+    
+    try:
+        action_findings = perform_action_analysis(reader, root)
+        findings.extend(action_findings)
+        
+    except Exception as e:
+        findings.append(f"Action Analysis Error: {str(e)}")
 
     # -------------------------------------------------------------------------
-    # 4. Encryption Analysis
+    # 5. Encryption Analysis
     # -------------------------------------------------------------------------            
     try:
         # Check for File Encryption
@@ -129,6 +133,96 @@ def is_version_older(current, target):
             return tuple(map(int, current.split('.'))) < tuple(map(int, target.split('.')))
         except:
             return False
+        
+        
+def perform_action_analysis(reader, root):
+    action_findings = []
+    action_locations = {}
+
+    def add_location(action_type, location):
+        if action_type not in action_locations:
+            action_locations[action_type] = []
+        action_locations[action_type].append(location)
+
+    # Analyze Root Actions
+    if root:
+            if "/OpenAction" in root:
+                add_location("Auto-executable (/OpenAction)", "Catalog")
+            if "/AA" in root:
+                add_location("Automatic triggers (/AA)", "Catalog")
+
+    # Analyze Page-Level Actions and Annotations
+    try:
+        for i, page in enumerate(reader.pages):
+            page_obj = page.get_object()
+            loc_str = f"Page {i+1}"
+            
+            if "/AA" in page_obj:
+                add_location("Automatic triggers (/AA)", loc_str)
+
+            if "/Annots" in page_obj:
+                for annot in page_obj["/Annots"]:
+                    obj = annot.get_object()
+                    if obj and "/A" in obj:
+                        action_dict = obj["/A"].get_object()
+                        a_type = action_dict.get("/S")
+                                              
+                        if a_type == "/URI":
+                            uri_link = action_dict.get("/URI", "Unknown Link")
+                            add_location(f"Annotation (URI: {uri_link})", loc_str)
+                        else:
+                            add_location(f"Annotation ({a_type})", loc_str)
+                
+    except Exception as e:
+        action_findings.append(f"ALERT: Could not fully analyze actions on page {i+1} (Potential obfuscation)")
+
+    # Analyze AcroForm
+    try:
+        if root and "/AcroForm" in root:
+            fields = root["/AcroForm"].get_object().get("/Fields", [])
+            for field in fields:
+                f_obj = field.get_object()
+                field_name = f_obj.get("/T", "Unnamed")
+                
+                if "/AA" in f_obj:
+                    add_location("Automatic triggers (/AA)", f"Field: {field_name}")
+                    
+                elif "/A" in f_obj:
+                    add_location("Form Field Action", f"Field: {field_name}")
+    except: pass
+    
+    # Analyze Outlines
+    try:
+        if root and "/Outlines" in root:
+            check_outlines_recursive(root["/Outlines"].get_object(), add_location)
+    except: pass
+
+    # Aggregate results
+    for action, locations in action_locations.items():
+        from collections import Counter
+        loc_counts = Counter(locations)
+        
+        loc_summary = ", ".join([f"{loc}" + (f" (x{count})" if count > 1 else "") 
+                                for loc, count in loc_counts.items()])
+        
+        action_findings.append(f"ALERT: {action} found in: [{loc_summary}]")
+
+    return action_findings
+
+
+def check_outlines_recursive(node, add_loc_func):
+    if not node: return
+    
+    # Check for Action in current Bookmark node
+    if "/A" in node:
+        title = node.get("/Title", "Untitled Bookmark")
+        add_loc_func(f"Bookmark ({node['/A'].get('/S')})", f"Bookmark: {title}")
+    
+    # Traverse children and siblings
+    if "/First" in node:
+        check_outlines_recursive(node["/First"].get_object(), add_loc_func)
+    if "/Next" in node:
+        check_outlines_recursive(node["/Next"].get_object(), add_loc_func)
         
 
 def walk_names_tree(node, findings, whitelist, untrusted_items, js_scripts, embedded_files, category=None):
