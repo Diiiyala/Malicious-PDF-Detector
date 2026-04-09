@@ -4,6 +4,8 @@ WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 
 def analyze_structure(reader):
     findings = []
+    js_scripts = set()
+    embedded_files = set()
     untrusted_items = set()
     root = None
        
@@ -92,8 +94,13 @@ def analyze_structure(reader):
             
             # Iterate through all categories in the NameTree
             for category_key in names.keys():
-                # Perform Recursive Walk for each category
-                walk_names_tree(names[category_key], findings, WHITELIST, untrusted_items, category=category_key)
+                walk_names_tree(names[category_key], findings, WHITELIST, untrusted_items, js_scripts, embedded_files, category=category_key)               
+                
+            if js_scripts:
+                findings.append(f"ALERT: Suspicious Scripting found in Names: {sorted(list(js_scripts))}")
+            
+            if embedded_files:
+                findings.append(f"ALERT: Embedded Files detected in Names: {sorted(list(embedded_files))}")
                 
             if untrusted_items:
                 items_str = ", ".join(sorted(untrusted_items))
@@ -124,7 +131,7 @@ def is_version_older(current, target):
             return False
         
 
-def walk_names_tree(node, findings, whitelist, untrusted_items, category=None):
+def walk_names_tree(node, findings, whitelist, untrusted_items, js_scripts, embedded_files, category=None):
 
     if not node: return
     node = node.get_object()
@@ -132,16 +139,15 @@ def walk_names_tree(node, findings, whitelist, untrusted_items, category=None):
     # Check for Child Nodes
     if "/Kids" in node:
         for kid in node["/Kids"]:
-            walk_names_tree(kid, findings, whitelist, untrusted_items, category)
-
+            walk_names_tree(kid, findings, whitelist, untrusted_items, js_scripts, embedded_files, category)
+            
     # Check for Leaf Nodes with Data
     if "/Names" in node:
         names_list = node["/Names"]
         for i in range(0, len(names_list), 2):
             key = str(names_list[i])
             value_obj = names_list[i+1]   
-            # Process each found name entry      
-            process_name_node(key, value_obj, findings, whitelist, untrusted_items, category)
+            process_name_node(key, value_obj, findings, whitelist, untrusted_items, js_scripts, embedded_files, category)
     
     # Check for Direct Hidden Sections
     if category and category not in whitelist:
@@ -149,7 +155,7 @@ def walk_names_tree(node, findings, whitelist, untrusted_items, category=None):
              untrusted_items.add(category)
             
             
-def process_name_node(key, value_obj, findings, whitelist, untrusted_items, category):
+def process_name_node(key, value_obj, findings, whitelist, untrusted_items, js_scripts, embedded_files, category):
 
     # Verify Object Integrity and Access
     try:
@@ -160,11 +166,11 @@ def process_name_node(key, value_obj, findings, whitelist, untrusted_items, cate
         
     # Analyze JavaScript Payloads
     if category in ["/JavaScript", "/JS"]:
-        findings.append(f"ALERT: Suspicious Scripting found in Names ({category}) with script: [{key}]")
+        js_scripts.add(key)
     
     # Analyze Embedded File Payloads
     elif category == "/EmbeddedFiles":
-        findings.append(f"ALERT: Embedded Files detected in Names ({category}) with file: [{key}]")
+        embedded_files.add(key)
         
     # Collect Unexpected entries
     elif key not in whitelist:
