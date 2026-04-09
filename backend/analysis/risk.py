@@ -5,18 +5,23 @@ def calculate_risk(findings, reader):
     weights = {
         # Structure
         "ALERT: Malformed PDF header": 10, 
-        "ALERT: Auto-executable action detected": 10,
+        "ALERT: Auto-executable (/OpenAction)": 10,
+        "ALERT: Automatic triggers (/AA)": 9,
         "ALERT: Suspicious Scripting found": 9,      
         "ALERT: Embedded Files detected": 9,
-        "ALERT: Multiple PDF headers": 8,  
-        "ALERT: Automatic triggers detected": 8,     
+        "Annotation (/Launch)": 9,
+        "Annotation (/JS)": 9,
+        "ALERT: Multiple PDF headers": 8,    
+        "ALERT: Could not fully analyze actions": 8,
         "ALERT: PDF version missing or malformed": 7,
         "ALERT: PDF signature is not at the start": 7,
         "ALERT: Could not parse object": 7,
-        "ALERT: Unexpected/Hidden section found": 6,
         "ALERT: Version mismatch": 6,    
-        "ALERT: Embedded files detected in trailer": 6, 
-        "ALERT: Encrypted PDF": 5,            
+        "ALERT: Form Field Action": 5,
+        "Annotation (URI:": 5,
+        "ALERT: Encrypted PDF": 5, 
+        "Annotation (/Named)": 4,     
+        "ALERT: Bookmark (": 4,      
         "ALERT: Old PDF version detected in header": 3,
         "INFO: Entry points to an empty object": 1,
         
@@ -50,12 +55,12 @@ def calculate_risk(findings, reader):
                     score += weights[key]
                     used.add(key)
 
-    max_score = 45
+    max_score = sum(weights.values())
     risk_percentage = min(int((score / max_score) * 100), 100)
 
-    if score >= 20:
+    if risk_percentage >= 50:
         level = "HIGH RISK"
-    elif score >= 10:
+    elif risk_percentage >= 25:
         level = "MEDIUM RISK"
     else:
         level = "LOW RISK"
