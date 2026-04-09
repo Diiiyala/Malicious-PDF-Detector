@@ -19,13 +19,21 @@ def analyze_structure(reader):
         if header_index == -1:
             header_display = "".join([chr(b) if 32 <= b <= 126 else f"\\x{b:02x}" for b in raw_start[:10]])
             findings.append(f"ALERT: Malformed PDF header (Found: '{header_display}' instead of %PDF- signature)")
+            
+        # Check for Signature Offset
         elif header_index > 0:
             findings.append(f"ALERT: PDF signature is not at the start (Offset: {header_index} bytes - potential hiding)")
         
         header_version = None
+        
+        # Extract and Validate PDF Version
         if header_index != -1:
-            header_version = raw_start[header_index+5 : header_index+8].decode('utf-8', errors='ignore')
-            if header_version < "1.4":
+            
+            # Extract version string
+            header_version = raw_start[header_index+5 : header_index+8].decode('utf-8', errors='ignore').strip()
+            
+            # Validate version 
+            if is_version_older(header_version, "1.4"):
                 findings.append(f"ALERT: Old PDF version detected in header ({header_version})")
             else:
                 findings.append(f"INFO: PDF Header detected (Version: {header_version})")
@@ -96,6 +104,13 @@ def analyze_structure(reader):
 # -------------------------------------------------------------------------
 #  Helpers
 # -------------------------------------------------------------------------
+
+def is_version_older(current, target):
+        try:
+            return tuple(map(int, current.split('.'))) < tuple(map(int, target.split('.')))
+        except:
+            return False
+        
 
 def walk_names_tree(node, findings, whitelist, category=None):
 
