@@ -1,3 +1,4 @@
+import re
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 
@@ -27,18 +28,24 @@ def analyze_structure(reader):
         
         header_version = None
         
-        # Extract and Validate PDF Version
+       # Extract and Validate PDF Version
         if header_index != -1:
             
-            # Extract version string
-            header_version = raw_start[header_index+5 : header_index+8].decode('utf-8', errors='ignore').strip()
+            # Extract version
+            version_area = raw_start[header_index+5 : header_index+15]
+            version_match = re.search(b"^[0-9.]+", version_area)
             
-            # Validate version 
-            if is_version_older(header_version, "1.4"):
-                findings.append(f"ALERT: Old PDF version detected in header ({header_version})")
+            if version_match:
+                header_version = version_match.group(0).decode('utf-8', errors='ignore').strip()
+                
+                # Validate version
+                if is_version_older(header_version, "1.4"):
+                    findings.append(f"ALERT: Old PDF version detected in header ({header_version})")
+                else:
+                    findings.append(f"INFO: PDF Header detected (Version: {header_version})")
             else:
-                findings.append(f"INFO: PDF Header detected (Version: {header_version})")
-
+                findings.append("ALERT: PDF version missing or malformed in header")
+                
         # Check for Multiple Headers
         header_count = raw_start.count(b"%PDF-")
         if header_count > 1:
