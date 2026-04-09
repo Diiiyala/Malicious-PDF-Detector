@@ -114,7 +114,17 @@ def analyze_structure(reader):
         findings.append(f"Action Analysis Error: {str(e)}")
 
     # -------------------------------------------------------------------------
-    # 5. Encryption Analysis
+    # 5. Stream & Object Analysis
+    # -------------------------------------------------------------------------  
+    
+    try:
+        stream_findings = analyze_streams_and_objects(reader)
+        findings.extend(stream_findings)
+    except Exception as e:
+        findings.append(f"Stream Analysis Error: {str(e)}")
+   
+    # -------------------------------------------------------------------------
+    # 6. Encryption Analysis
     # -------------------------------------------------------------------------            
     try:
         # Check for File Encryption
@@ -270,3 +280,88 @@ def process_name_node(key, value_obj, findings, whitelist, untrusted_items, js_s
     elif key not in whitelist:
         untrusted_items.add(key)
         
+        
+def analyze_streams_and_objects(reader):
+    stream_findings = []
+    suspicious_filters = ["/JBIG2Decode", "/Crypt"]
+    js_objs = []
+    obfuscated_objs = []
+    filter_objs = {}
+
+    # Retrieve all object numbers from cross-reference table
+    try:
+        all_obj_nums = reader.xref.get_object_numbers()
+    except AttributeError:
+        try:
+            size_obj = reader.trailer.get("/Size", 100)
+            all_obj_nums = range(1, int(size_obj))
+        except:
+            all_obj_nums = range(1, len(reader.pages) * 10)
+
+    # Scan individual objects
+    def process_obj(obj, obj_num):
+        try:
+            if hasattr(obj, "get_object"):
+                obj = obj.get_object()
+                if obj is None: return
+
+            if isinstance(obj, dict):
+
+                # Check for direct Script injection
+                if "/JS" in obj or "/JavaScript" in obj:
+                    js_content = obj.get("/JS") or obj.get("/JavaScript")
+                    js_str = None
+                    try:
+                        js_str = js_content.get_object() if hasattr(js_content, "get_object") else js_content
+                    except:
+                        js_str = None
+
+                    if js_str:
+                        # Check for hex-based obfuscation
+                        if isinstance(js_str, bytes):
+                            if b"0x" in js_str:
+                                obfuscated_objs.append(str(obj_num))
+                            else:
+                                js_objs.append(str(obj_num))
+                        else:
+                            if "0x" in js_str or "\\x" in js_str:
+                                obfuscated_objs.append(str(obj_num))
+                            else:
+                                js_objs.append(str(obj_num))
+
+                # Check for suspicious compression filters
+                filt = obj.get("/Filter")
+                if filt:
+                    filt_list = filt if isinstance(filt, list) else [filt]
+                    for f in filt_list:
+                        f_name = str(f)
+                        for s_filt in suspicious_filters:
+                            if s_filt in f_name:
+                                if f_name not in filter_objs:
+                                    filter_objs[f_name] = []
+                                filter_objs[f_name].append(str(obj_num))
+
+            elif isinstance(obj, list):
+                for item in obj:
+                    process_obj(item, obj_num)
+
+        except: pass
+
+    # Iterate through all objects in the PDF
+    for obj_num in all_obj_nums:
+        try:
+            obj = reader.get_object(obj_num)
+            if obj is not None:
+                process_obj(obj, obj_num)
+        except: continue
+
+    if js_objs:
+        stream_findings.append(f"ALERT: Hidden JavaScript found in Objects: [{', '.join(js_objs)}]")
+
+    if obfuscated_objs:
+        stream_findings.append(f"ALERT: Obfuscated Scripting detected in Objects: [{', '.join(obfuscated_objs)}]")
+
+    for filt, objs in filter_objs.items():
+        stream_findings.append(f"ALERT: Suspicious stream filter ({filt}) detected in Objects: [{', '.join(objs)}]")
+
+    return stream_findings
