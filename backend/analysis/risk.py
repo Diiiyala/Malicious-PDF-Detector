@@ -1,33 +1,43 @@
+
 def calculate_risk(findings, reader):
     score = 0
 
     weights = {
-        "Auto action detected": 3,
+        # Structure
+        "ALERT: Malformed PDF header": 10, 
+        "ALERT: Auto-executable action detected": 10,
+        "ALERT: Suspicious Scripting found": 9,      
+        "ALERT: Embedded Files detected": 9,
+        "ALERT: Multiple PDF headers": 8,  
+        "ALERT: Automatic triggers detected": 8,     
+        "ALERT: PDF signature is not at the start": 7,
+        "ALERT: Could not parse object": 7,
+        "ALERT: Unexpected/Hidden section found": 6,
+        "ALERT: Version mismatch": 6,    
+        "ALERT: Embedded files detected in trailer": 6, 
+        "ALERT: Encrypted PDF": 5,            
+        "ALERT: Old PDF version detected in header": 3,
+        "INFO: Entry points to an empty object": 1,
         
-        "ALERT: Launch action detected": 8,
-        "ALERT: OpenAction": 7,
-        "ALERT: JavaScript detected": 6,
-        "ALERT: Hacking tools": 7,
-        "ALERT: Encoded": 5,
-        "ALERT: XSS injection": 5,
-        
-        "ALERT: Embedded files detected": 4,
-        "ALERT: Suspicious link": 4,
-        "ALERT: Suspicious keywords": 3,
+        # Metadata
+        "INFO: Link found": 1,
+        "INFO: Long metadata field": 1,  
+        "ALERT: Hacking tools detected": 9,      
+        "ALERT: XSS injection attempt": 7,      
+        "ALERT: Encoded Base64 payload": 5,      
+        "ALERT: Encoded Hex payload": 5,         
+        "ALERT: Encoded ROT13 payload": 5,       
+        "ALERT: Encoded URL payload": 5,        
+        "ALERT: Suspicious link detected": 5,    
+        "ALERT: Potential obfuscation detected": 4, 
+        "ALERT: Suspicious keywords detected": 4, 
         "ALERT: Future creation date": 3,         
         "ALERT: Future modification date": 3,
         "ALERT: Timestamp anomaly": 3,
-        "ALERT: Many stream objects": 4,
-        "ALERT: Large number of objects": 3,
-        "ALERT: Potential obfuscation": 3,
+        "ALERT: Suspicious metadata source": 3,
         
-        "ALERT: Suspicious metadata source": 2,
-        "ALERT: Missing Root object": 2,
-        "ALERT: No pages found": 2,
-        "INFO: Link found": 1,
-        "INFO: Long metadata": 1,
-        "little text": 2,
-        "Names dictionary present": 1,
+        # Content      
+        "little text": 2,                       
     }
 
     used = set()
@@ -39,20 +49,12 @@ def calculate_risk(findings, reader):
                     score += weights[key]
                     used.add(key)
 
-    try:
-        if reader.is_encrypted:
-            if "Encrypted PDF" not in used:
-                score += 3
-                findings.append("Encrypted PDF")
-                used.add("Encrypted PDF")
-    except: pass
-
-    max_score = 25
+    max_score = 45
     risk_percentage = min(int((score / max_score) * 100), 100)
 
-    if score >= 12:
+    if score >= 20:
         level = "HIGH RISK"
-    elif score >= 6:
+    elif score >= 10:
         level = "MEDIUM RISK"
     else:
         level = "LOW RISK"
