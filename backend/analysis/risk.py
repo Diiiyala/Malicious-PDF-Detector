@@ -10,6 +10,7 @@ def calculate_risk(findings, reader):
         "ALERT: Embedded Files detected": 9,
         "ALERT: Multiple PDF headers": 8,  
         "ALERT: Automatic triggers detected": 8,     
+        "ALERT: PDF version missing or malformed": 7,
         "ALERT: PDF signature is not at the start": 7,
         "ALERT: Could not parse object": 7,
         "ALERT: Unexpected/Hidden section found": 6,
