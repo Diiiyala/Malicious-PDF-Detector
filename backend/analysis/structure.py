@@ -55,7 +55,7 @@ def analyze_structure(reader):
             findings.append(f"ALERT: Multiple PDF headers detected ({header_count} found - potential spoofing)")
 
     except Exception as e:
-        findings.append(f"Header Analysis Error: {str(e)}")
+        findings.append(f"INFO: Header Analysis failed: {type(e).__name__}")
 
     # -------------------------------------------------------------------------
     # 2. Root Analysis
@@ -75,7 +75,7 @@ def analyze_structure(reader):
                     findings.append(f"ALERT: Version mismatch (Header: {header_version}, Catalog: {cat_v_str})")
                            
     except Exception as e:
-        findings.append(f"Root Analysis Error: {str(e)}")
+        findings.append(f"Root Analysis failed: {type(e).__name__}")
         
     # -------------------------------------------------------------------------
     # 3. Names Analysis
@@ -89,17 +89,12 @@ def analyze_structure(reader):
             for category_key in names.keys():
                 walk_names_tree(names[category_key], findings, WHITELIST, unknown_items, js_scripts, embedded_files, category=category_key)               
                 
-            if js_scripts:
-                findings.append(f"ALERT: Suspicious Scripting found in Names: {sorted(list(js_scripts))}")
-            
-            if embedded_files:
-                findings.append(f"ALERT: Embedded Files detected in Names: {sorted(list(embedded_files))}")
-                
-            if unknown_items:
-                findings.append(f"INFO: Unknown NameTree entries found: {sorted(unknown_items)}")
+            if js_scripts: findings.append(f"ALERT: Suspicious Scripting found in Names: {sorted(list(js_scripts))}")      
+            if embedded_files: findings.append(f"ALERT: Embedded Files detected in Names: {sorted(list(embedded_files))}")              
+            if unknown_items: findings.append(f"INFO: Unknown NameTree entries found: {sorted(unknown_items)}")
                 
     except Exception as e:
-        findings.append(f"NameTree Analysis Error: {str(e)}")
+        findings.append(f"NameTree Analysis incomplete: {type(e).__name__}")
         
     
     # -------------------------------------------------------------------------
@@ -111,7 +106,7 @@ def analyze_structure(reader):
         findings.extend(action_findings)
         
     except Exception as e:
-        findings.append(f"Action Analysis Error: {str(e)}")
+        findings.append(f"Action Analysis collapsed: {type(e).__name__}")
 
     # -------------------------------------------------------------------------
     # 5. Stream & Object Analysis
@@ -121,7 +116,7 @@ def analyze_structure(reader):
         stream_findings = analyze_streams_and_objects(reader)
         findings.extend(stream_findings)
     except Exception as e:
-        findings.append(f"Stream Analysis Error: {str(e)}")
+        findings.append(f"Stream Analysis collapsed: {type(e).__name__}")
    
     # -------------------------------------------------------------------------
     # 6. Encryption Analysis
@@ -130,7 +125,9 @@ def analyze_structure(reader):
         # Check for File Encryption
         if reader.is_encrypted:
             findings.append("ALERT: Encrypted PDF (Restricted access)")
-    except Exception: pass
+            
+    except Exception as e: 
+        findings.append(f"INFO: Encryption check failed: {type(e).__name__}")
 
     return findings
 
