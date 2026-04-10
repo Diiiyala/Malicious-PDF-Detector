@@ -1,4 +1,6 @@
 from flask import Flask, request, jsonify
+from io import BytesIO
+from pypdf import PdfReader
 import logging
 from analysis.text import extract_text
 from analysis.content import analyze_content
@@ -28,17 +30,19 @@ def upload_file():
         return jsonify({"error": "Only PDF files allowed"}), 400
 
     logging.info(f"Analyzing file: {file.filename}")
-
+    
     try:
-        from PyPDF2 import PdfReader
-        reader = PdfReader(file)
+        file_content = file.read()
+        file_stream = BytesIO(file_content)
+        
+        reader = PdfReader(file_stream)
     except Exception as e:
-        return jsonify({"error": f"Invalid PDF file: {str(e)}"}), 400
+        return jsonify({"Error": f"Invalid PDF file: {str(e)}"}), 400
 
     text = extract_text(reader)
     
     res_content = sorted(list(set(analyze_content(text))))
-    res_structure = sorted(list(set(analyze_structure(reader))))
+    res_structure = sorted(list(set(analyze_structure(reader, file_stream))))
     res_metadata = sorted(list(set(analyze_metadata(reader))))
     
     all_findings = sorted(list(set(res_content + res_structure + res_metadata)))

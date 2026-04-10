@@ -3,26 +3,25 @@ import re
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
 
-def analyze_structure(reader):
+def analyze_structure(reader, file_stream):
     findings = []
     js_scripts = set()
     embedded_files = set()
     unknown_items = set()
     root = None
-       
+          
     # -------------------------------------------------------------------------
     # 1. Header Analysis
     # -------------------------------------------------------------------------
     try:
-        stream = reader.stream
-        stream.seek(0)
-        raw_start = stream.read(100)
+        file_stream.seek(0)
+        raw_data = file_stream.read(1024)
         
         # Check for PDF Signature
-        header_index = raw_start.find(b"%PDF-")
+        header_index = raw_data.find(b"%PDF-")
         
         if header_index == -1:
-            header_display = "".join([chr(b) if 32 <= b <= 126 else f"\\x{b:02x}" for b in raw_start[:10]])
+            header_display = "".join([chr(b) if 32 <= b <= 126 else f"\\x{b:02x}" for b in raw_data[:10]])
             findings.append(f"ALERT: Malformed PDF header (Found: '{header_display}' instead of %PDF- signature)")
             
         # Check for Signature Offset
@@ -35,7 +34,7 @@ def analyze_structure(reader):
         if header_index != -1:
             
             # Extract version
-            version_area = raw_start[header_index+5 : header_index+15]
+            version_area = raw_data[header_index+5 : header_index+15]
             version_match = re.search(b"^[0-9.]+", version_area)
             
             if version_match:
@@ -50,7 +49,7 @@ def analyze_structure(reader):
                 findings.append("ALERT: PDF version missing or malformed in header")
                 
         # Check for Multiple Headers
-        header_count = raw_start.count(b"%PDF-")
+        header_count = raw_data.count(b"%PDF-")
         if header_count > 1:
             findings.append(f"ALERT: Multiple PDF headers detected ({header_count} found - potential spoofing)")
 
@@ -297,7 +296,7 @@ def analyze_streams_and_objects(reader):
             size_obj = reader.trailer.get("/Size", 100)
             all_obj_nums = range(1, int(size_obj))
         except:
-            all_obj_nums = range(1, len(reader.pages) * 10)
+            all_obj_nums = range(1, len(reader.pages) * 50)
 
     # Scan individual objects
     def process_obj(obj, obj_num):
