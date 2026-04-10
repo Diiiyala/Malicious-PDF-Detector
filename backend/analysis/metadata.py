@@ -26,7 +26,7 @@ def analyze_metadata(reader):
     try:
         metadata = reader.metadata
         if not metadata:
-            findings.append("No metadata found")
+            findings.append("INFO: No metadata found")
             return findings
         
         full_metadata_text = " ".join([str(v) for v in metadata.values() if v]).lower()
@@ -219,7 +219,6 @@ def is_base64(s):
 
 
 def readable_text(s, threshold=0.6):
-    """Return True if at least `threshold` fraction of chars are printable ASCII"""
     if not s:
         return False
     ratio = sum(1 for c in s if 32 <= ord(c) <= 126) / len(s)
