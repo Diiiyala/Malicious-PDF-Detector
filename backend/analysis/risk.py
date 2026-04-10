@@ -22,7 +22,6 @@ def calculate_risk(findings, reader):
         "ALERT: Encrypted PDF": 5, 
         "Annotation (/Named)": 4,     
         "ALERT: Bookmark (": 4,      
-        "ALERT: Old PDF version detected in header": 3,
         "INFO: Entry points to an empty object": 1,
         
         # Metadata

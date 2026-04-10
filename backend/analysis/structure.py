@@ -42,7 +42,7 @@ def analyze_structure(reader):
                 
                 # Validate version
                 if is_version_older(header_version, "1.4"):
-                    findings.append(f"ALERT: Old PDF version detected in header ({header_version})")
+                    findings.append(f"INFO: Old PDF version detected in header ({header_version})")
                 else:
                     findings.append(f"INFO: PDF Header detected (Version: {header_version})")
             else:
