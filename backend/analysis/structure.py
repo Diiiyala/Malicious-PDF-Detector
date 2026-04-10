@@ -1,12 +1,13 @@
 import re
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
+SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
 
 def analyze_structure(reader):
     findings = []
     js_scripts = set()
     embedded_files = set()
-    untrusted_items = set()
+    unknown_items = set()
     root = None
        
     # -------------------------------------------------------------------------
@@ -86,7 +87,7 @@ def analyze_structure(reader):
             
             # Iterate through all categories in the NameTree
             for category_key in names.keys():
-                walk_names_tree(names[category_key], findings, WHITELIST, untrusted_items, js_scripts, embedded_files, category=category_key)               
+                walk_names_tree(names[category_key], findings, WHITELIST, unknown_items, js_scripts, embedded_files, category=category_key)               
                 
             if js_scripts:
                 findings.append(f"ALERT: Suspicious Scripting found in Names: {sorted(list(js_scripts))}")
@@ -94,9 +95,8 @@ def analyze_structure(reader):
             if embedded_files:
                 findings.append(f"ALERT: Embedded Files detected in Names: {sorted(list(embedded_files))}")
                 
-            if untrusted_items:
-                items_str = ", ".join(sorted(untrusted_items))
-                findings.append(f"ALERT: Unexpected/Hidden sections found in NameTree: [{items_str}]")
+            if unknown_items:
+                findings.append(f"INFO: Unknown NameTree entries found: {sorted(unknown_items)}")
                 
     except Exception as e:
         findings.append(f"NameTree Analysis Error: {str(e)}")
@@ -276,6 +276,10 @@ def process_name_node(key, value_obj, findings, whitelist, untrusted_items, js_s
     elif category == "/EmbeddedFiles":
         embedded_files.add(key)
         
+    # Analyze suspicious NameTree keys
+    if key in SUSPICIOUS_KEYS:
+        findings.append(f"ALERT: Suspicious key detected in NameTree: {key}")
+     
     # Collect Unexpected entries
     elif key not in whitelist:
         untrusted_items.add(key)
