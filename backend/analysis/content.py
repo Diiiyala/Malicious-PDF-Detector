@@ -6,7 +6,7 @@ SUSPICIOUS_URL_EXT = re.compile(r'\.(exe|zip|sh|py|msi|bat|scr)$', re.IGNORECASE
 def analyze_content(text):
     findings = []
     text_clean = text.strip()
-    normalized_text = re.sub(r'\s+', '', text)
+    sanitized_text = re.sub(r'\s{2,}', ' ', text)
     
     # -------------------------------------------------------------------------
     # 1. Contextual Keyword Analysis
@@ -16,18 +16,30 @@ def analyze_content(text):
             "ALERT: Confirmed Malicious Logic": [r"\beval\(", r"\bexec\(", r"String\.fromCharCode"],
             "ALERT: Automatic Trigger": [r"/OpenAction", r"/AA"]
         }
+        obfuscation_patterns = {
+            "ALERT: Obfuscated Scripting (Spaced-out)": [r"e\s*v\s*a\s*l", r"e\s*x\s*e\s*c", r"j\s*s\s*v\s*c\s*r\s*i\s*p\s*t"]
+        }
 
         low_risk_indicators = [r"typeof", r"/JS", r"/JavaScript", r"base64"]
         
+        # 1.1 Scan for High-Risk Logic
         for message, patterns in high_risk_checks.items():
             for pattern in patterns:
-                if re.search(pattern, text, re.IGNORECASE) or re.search(pattern, normalized_text, re.IGNORECASE):
+                if re.search(pattern, sanitized_text, re.IGNORECASE):
                     findings.append(message)
                     break
 
+        # 1.2 Scan for Spaced-out Obfuscation
+        for message, patterns in obfuscation_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, sanitized_text, re.IGNORECASE):
+                    findings.append(message)
+                    break
+
+        # 1.3 Perform Low-Risk Clustering Analysis
         matched_indicators = []
         for pattern in low_risk_indicators:
-            if re.search(pattern, text, re.IGNORECASE):
+            if re.search(pattern, sanitized_text, re.IGNORECASE):
                 matched_indicators.append(pattern)
         
         if len(matched_indicators) >= 2:
