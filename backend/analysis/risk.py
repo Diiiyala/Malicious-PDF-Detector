@@ -42,7 +42,23 @@ def calculate_risk(findings, reader):
         "ALERT: Suspicious metadata source": 3,
         
         # Content      
-        "little text": 2,                       
+        "ALERT: Multi-stage virus detected": 15,                    
+        "ALERT: High-confidence obfuscated script detected": 12, 
+        "Ransomware Indicators": 12,
+        "Security Disabling": 10,
+        "Registry Tampering": 10,
+        "Stealer/Spyware": 10,
+        "ALERT: Dangerous file download detected": 10,          
+        "ALERT: Cryptocurrency address found": 9,
+        "ALERT: Highly Random Data": 8,  
+        "ALERT: Logic obfuscation detected": 8,                
+        "ALERT: Direct IP access detected": 7,                  
+        "ALERT: Malicious parameter key detected in URL": 6,      
+        "ALERT: Suspicious hosts detected": 6,                 
+        "ALERT: Obfuscated Content": 5,                       
+        "ALERT: Minified/Compressed Text": 3,                  
+        "ALERT: Hidden Layer": 4,                               
+        "INFO: Scripting execution pattern detected": 2,                    
     }
 
     used = set()
