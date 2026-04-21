@@ -1,24 +1,33 @@
-import re, math, logging, base64, string
+import re, math, base64, string
 from collections import Counter
 
 IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
+B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
 URL_PATTERN = re.compile(r'https?://[^\s]+', re.IGNORECASE)
-SUSPICIOUS_URL_EXT = re.compile(r'\.(exe|zip|sh|py|msi|bat|scr)$', re.IGNORECASE)
+BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
+
+SHORTENERS = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "is.gd", "buff.ly", "adf.ly"]
+SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost"]
+SUSPICIOUS_PARAMS = ["download", "payload", "cmd", "exec", "bin"]
+
+SYSTEM_THREATS = {
+    "Ransomware Indicators": [r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked"],
+    "Registry Tampering": [r"reg add", r"HKEY_LOCAL_MACHINE", r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"],
+    "Security Disabling": [r"netsh advfirewall", r"Set-MpPreference", r"DisableRealtimeMonitoring", r"taskkill /f /im"],
+    "Stealer/Spyware": [r"cookie", r"password", r"wallet\.dat", r"Login Data", r"autofill"]
+}
 
 def analyze_content(text, depth=0):
+    if depth > 2: return []
+    
     findings = []
     text_clean = text.strip()
+    indicators = { "execution": False, "obfuscation": False, "network": False, "payload": False }
     
     # -------------------------------------------------------------------------
     # 1. Evidence Gathering
     # -------------------------------------------------------------------------
-    indicators = {
-        "execution": False,
-        "obfuscation": False,
-        "network": False,
-        "payload": False
-    }
-
+    
     # 1.1 Scripting/Execution Logic
     exec_patterns = [r"\beval\(", r"\bexec\(", r"String\.fromCharCode"]
     for p in exec_patterns:
@@ -26,63 +35,107 @@ def analyze_content(text, depth=0):
             indicators["execution"] = True
             findings.append(f"INFO: Scripting execution pattern detected ({p.strip(r'|')})")
 
-    # 1.2 Obfuscation Detection (Correlation-based)
-    compact_version = re.sub(r'[\s\W_]+', '', text).lower()
-    obf_keys = ["unescape", "base64", "eval", "exec"] # javascript removed as it's too noisy
-    for key in obf_keys:
-        if key in compact_version and not re.search(rf"\b{key}\b", text, re.IGNORECASE):
-            indicators["obfuscation"] = True
-            findings.append(f"ALERT: Obfuscated logic detected ({key})")
-
+    # 1.2 Obfuscation Detection
+    compact = re.sub(r'\s+', '', text).lower()
+    if check_obfuscation(text, compact):
+        for key in ["eval", "exec", "unescape"]:
+            if key in compact and not re.search(rf"\b{key}\b", text):
+                indicators["obfuscation"] = True
+                findings.append(f"ALERT: Logic obfuscation detected ({key})")
+                
     # 1.3 Auto-Triggers 
-    if re.search(r"/OpenAction", text, re.IGNORECASE):
-        findings.append("ALERT: Automatic execution on file open detected (/OpenAction)")
-        indicators["execution"] = True 
+    has_open_action = bool(re.search(r"/OpenAction", text, re.IGNORECASE))
+    has_aa = bool(re.search(r"/AA", text, re.IGNORECASE))
 
-    if re.search(r"/AA", text, re.IGNORECASE):
-        findings.append("ALERT: Event-based execution trigger detected (/AA - Additional Actions)")
+    if has_open_action and has_aa:
+        findings.append("ALERT: Multiple execution triggers (/OpenAction & /AA)")
         indicators["execution"] = True
+    elif has_open_action:
+        findings.append("ALERT: Automatic execution trigger (/OpenAction)")
+        indicators["execution"] = True
+    elif has_aa:
+        findings.append("ALERT: Event-based execution trigger (/AA)")
+        indicators["execution"] = True
+        
+    # 1.4 Behavioral Pattern Mapping 
+    detected_threats = []
+    for threat_name, patterns in SYSTEM_THREATS.items():
+        if any(re.search(p, text, re.IGNORECASE) for p in patterns):
+            detected_threats.append(threat_name)
+            if "Security" in threat_name or "Registry" in threat_name: indicators["execution"] = True
+            if "Stealer" in threat_name: indicators["payload"] = True
+    
+    if detected_threats:
+        findings.append(f"ALERT: Specific threats detected: {', '.join(detected_threats)}")
+
+    # 1.5 Financial Indicator Check
+    if BTC_ADDRESS.search(text):
+        findings.append(f"ALERT: Cryptocurrency address found (Potential Ransomware)")
 
     # -------------------------------------------------------------------------
     # 2. Smart Layering 
     # -------------------------------------------------------------------------
-    if depth < 2:
-        b64_candidates = re.findall(r'[A-Za-z0-9+/]{40,}[=]{0,2}', text)
-        for candidate in b64_candidates:
-            if calculate_entropy(candidate) > 4.5:
-                try:
-                    decoded = base64.b64decode(candidate, validate=True).decode('utf-8', errors='ignore')
-                    if len(decoded.strip()) > 15:
-                        sub_findings = analyze_content(decoded, depth + 1)
-                        if any("ALERT" in f or "INFO" in f for f in sub_findings):
-                            indicators["payload"] = True
-                            findings.extend([f"SUB-LAYER-{depth+1}: {f}" for f in sub_findings])
-                except: continue
+    candidates = B64_PATTERN.findall(text)
+    for cand in candidates:
+        try:
+            decoded = base64.b64decode(cand, validate=True).decode('utf-8', errors='ignore')
+            
+            if sum(1 for c in decoded if c in string.printable) / len(decoded) > 0.85:
+                sub_res = analyze_content(decoded, depth + 1)
+                
+                inner_urls = URL_PATTERN.findall(decoded)
+                
+                if inner_urls and any("ALERT" in f for f in sub_res):
+                    findings.append(f"ALERT: Dangerous file download detected (Inside Hidden Layer {depth+1}: {inner_urls[0]})")
+                
+                for f in sub_res:
+                    if "ALERT" in f and "Dangerous file" not in f:
+                        findings.append(f"ALERT: Hidden Layer {depth+1}: {f.replace('ALERT: ', '')}")
+                        
+        except: 
+            continue
 
     # -------------------------------------------------------------------------
     # 3. Network Indicators
     # -------------------------------------------------------------------------
     urls = URL_PATTERN.findall(text)
+    suspicious_hosts = []
+    
     for url in urls:
-        clean_url = url.strip('()<>[]"\'')
-        if SUSPICIOUS_URL_EXT.search(clean_url) or IP_PATTERN.search(clean_url):
+        c_url = clean_url_logic(url.strip('()<>[]"\'').lower())
+        domain_match = re.search(r'https?://([^/]+)', c_url)
+        domain = domain_match.group(1) if domain_match else ""
+
+        if IP_PATTERN.search(domain):
+            findings.append(f"ALERT: Direct IP access detected: {domain}")
             indicators["network"] = True
-            findings.append(f"INFO: Suspicious network indicator: {clean_url}")
+
+        if any(s in domain for s in SHORTENERS) or any(k in domain for k in SUSPICIOUS_KEYWORDS):
+            suspicious_hosts.append(domain)
+            indicators["network"] = True
+        
+        query_params = re.findall(r'[?&]([^=&]+)', c_url)
+        if any(p in SUSPICIOUS_PARAMS for p in query_params):
+            findings.append(f"ALERT: Malicious parameter key detected in URL")
+            indicators["network"] = True
+
+    if suspicious_hosts:
+        unique_hosts = sorted(list(set(suspicious_hosts)))
+        findings.append(f"ALERT: Suspicious hosts detected: {', '.join(unique_hosts)}")
 
     # -------------------------------------------------------------------------
-    # 4. The Correlation Engine
+    # 4. Correlation Engine
     # -------------------------------------------------------------------------
     if indicators["execution"] and indicators["obfuscation"]:
-        findings.append("ALERT: High-confidence obfuscated malware script detected")
+        findings.append("ALERT: High-confidence obfuscated script detected")
         
     if indicators["payload"] and (indicators["execution"] or indicators["network"]):
-        findings.append("ALERT: Multi-stage delivery payload detected in decoded layer")
+        findings.append("ALERT: Multi-stage virus detected")
 
-    if len(text_clean) > 200:
-        ent_score = calculate_entropy(text_clean)
-        if ent_score > 5.5:
-            diag = diagnose_content(text_clean, ent_score)
-            findings.append(f"ALERT: {diag} (Entropy: {ent_score:.2f})")
+    ent_score = calculate_entropy(text_clean)
+    if len(text_clean) > 200 and ent_score > 5.5:
+        diag = diagnose_content(text_clean, ent_score)
+        findings.append(f"ALERT: {diag} (Entropy: {ent_score:.2f})")
 
     if any("ALERT" in f for f in findings):
         findings = [f for f in findings if "INFO" not in f]
@@ -99,15 +152,24 @@ def calculate_entropy(data):
     length = len(data)
     return -sum((count/length) * math.log2(count/length) for count in counts.values())
 
+def check_obfuscation(text, compact_text):
+    original_entropy = calculate_entropy(text)
+    compact_entropy = calculate_entropy(compact_text)
+    entropy_jump = compact_entropy - original_entropy
+    symbols = sum(1 for c in text if c in "{}[]();,.$")
+    symbol_density = symbols / len(text) if len(text) > 0 else 0
+    return entropy_jump > 0.5 and symbol_density > 0.15 and original_entropy > 4.5
+
 def diagnose_content(text, score):
-    hex_chars = set(string.hexdigits)
-    if sum(1 for c in text[:100] if c in hex_chars) > 80:
-        return "Possible Shellcode Stream"
-    if score > 6.8:
-        return "Highly Random Data (Encrypted/Compressed)"
+    if not text: return "Empty"
+    sample = text[:200]
+    hex_ratio = sum(1 for c in sample if c in string.hexdigits) / len(sample)
+    
+    if hex_ratio > 0.8: return "Possible Shellcode Stream"
+    if score > 6.5: return "Highly Random Data (Encrypted/Compressed)"
     
     printable_ratio = sum(1 for c in text if c in string.printable) / len(text)
-    if printable_ratio > 0.9:
-        return "Minified/Compressed Text"
-        
-    return "Obfuscated Content"
+    return "Minified/Compressed Text" if printable_ratio > 0.9 else "Obfuscated Content"
+
+def clean_url_logic(url):
+    return url.replace("[.]", ".").replace("hxxp", "http").replace("(.)", ".")
