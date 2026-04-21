@@ -1,6 +1,7 @@
 
 def calculate_risk(findings, reader):
     score = 0
+    DANGER_THRESHOLD = 45
 
     weights = {
         # Structure
@@ -61,21 +62,18 @@ def calculate_risk(findings, reader):
         "INFO: Scripting execution pattern detected": 2,                    
     }
 
-    used = set()
-
+    used_keys = set()
     for finding in findings:
-        for key in weights:
-            if key in finding:
-                if key not in used:
-                    score += weights[key]
-                    used.add(key)
+        for key, weight in weights.items():
+            if key in finding and key not in used_keys:
+                score += weight
+                used_keys.add(key)
 
-    max_score = sum(weights.values())
-    risk_percentage = min(int((score / max_score) * 100), 100)
+    risk_percentage = min(int((score / DANGER_THRESHOLD) * 100), 100)
 
-    if risk_percentage >= 50:
+    if risk_percentage >= 70 or score >= 30:
         level = "HIGH RISK"
-    elif risk_percentage >= 25:
+    elif risk_percentage >= 30:
         level = "MEDIUM RISK"
     else:
         level = "LOW RISK"
