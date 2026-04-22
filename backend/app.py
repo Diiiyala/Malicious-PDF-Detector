@@ -43,7 +43,7 @@ def upload_file():
     
     all_findings = sorted(set(res_content + res_structure + res_metadata + res_visual))
     
-    score, risk_percentage, level = calculate_risk(all_findings, reader)
+    score, risk_percentage, level = calculate_risk(all_findings)
     
     return jsonify({
         "filename": file.filename,
