@@ -9,6 +9,7 @@ from analysis.metadata import analyze_metadata
 from analysis.risk import calculate_risk
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 logging.basicConfig(level=logging.INFO)
 
 
@@ -22,48 +23,35 @@ def upload_file():
         return jsonify({"error": "No file uploaded"}), 400
 
     file = request.files["file"]
+    if file.filename == "" or not file.filename.lower().endswith(".pdf"):
+        return jsonify({"error": "Invalid file type"}), 400
 
-    if file.filename == "":
-        return jsonify({"error": "Empty filename"}), 400
-
-    if not file.filename.lower().endswith(".pdf"):
-        return jsonify({"error": "Only PDF files allowed"}), 400
-
-    logging.info(f"Analyzing file: {file.filename}")
-    
     try:
         file_content = file.read()
         file_stream = BytesIO(file_content)
-        
-        reader = PdfReader(file_stream)
+        reader = PdfReader(file_stream, strict=False)
     except Exception as e:
+        logging.exception("Invalid PDF file")
         return jsonify({"Error": f"Invalid PDF file: {str(e)}"}), 400
 
-    text = extract_text(reader)
+    text, res_visual = extract_text(reader)
+    file_stream.seek(0)
     
-    res_content = sorted(list(set(analyze_content(text))))
-    res_structure = sorted(list(set(analyze_structure(reader, file_stream))))
-    res_metadata = sorted(list(set(analyze_metadata(reader))))
+    res_content = sorted(set(analyze_content(text)))
+    res_structure = sorted(set(analyze_structure(reader, file_stream)))
+    res_metadata = sorted(set(analyze_metadata(reader)))
     
-    all_findings = sorted(list(set(res_content + res_structure + res_metadata)))
+    all_findings = sorted(set(res_content + res_structure + res_metadata + res_visual))
     
     score, risk_percentage, level = calculate_risk(all_findings, reader)
     
     return jsonify({
         "filename": file.filename,
         "findings": {
-            "content": {
-                "results": res_content,
-                "count": len(res_content)
-            },
-            "structure": {
-                "results": res_structure,
-                "count": len(res_structure)
-            },
-            "metadata": {
-                "results": res_metadata,
-                "count": len(res_metadata)
-            }
+            "content": {"results": res_content, "count": len(res_content)},
+            "structure": {"results": res_structure, "count": len(res_structure)},
+            "metadata": {"results": res_metadata, "count": len(res_metadata)},
+            "visual": {"results": res_visual, "count": len(res_visual)}
         },
         "risk_score": score,
         "risk_percentage": risk_percentage,
@@ -75,4 +63,4 @@ def health():
     return jsonify({"status": "healthy"})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)

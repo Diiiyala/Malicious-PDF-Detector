@@ -4,6 +4,11 @@ def calculate_risk(findings, reader):
     DANGER_THRESHOLD = 45
 
     weights = {
+        # Text
+        "ALERT: Hidden text detected (Tiny Font": 10,    
+        "ALERT: Hidden text detected (Off-Canvas": 8,    
+        "INFO: Page contains images but no extractable text": 2,
+        
         # Structure
         "ALERT: Malformed PDF header": 10, 
         "ALERT: Auto-executable (/OpenAction)": 10,
