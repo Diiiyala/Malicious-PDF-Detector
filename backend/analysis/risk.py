@@ -1,5 +1,5 @@
 
-def calculate_risk(findings, reader):
+def calculate_risk(findings):
     score = 0
     DANGER_THRESHOLD = 45
 
