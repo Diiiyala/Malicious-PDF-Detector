@@ -7,6 +7,9 @@ def calculate_risk(findings, reader):
         # Text
         "ALERT: Hidden text detected (Tiny Font": 10,    
         "ALERT: Hidden text detected (Off-Canvas": 8,    
+        "INFO: Non-standard font encoding detected": 3,
+        "INFO: Text transformation detected": 3,
+        "INFO: Flipped/mirrored text detected": 4,
         "INFO: Page contains images but no extractable text": 2,
         
         # Structure

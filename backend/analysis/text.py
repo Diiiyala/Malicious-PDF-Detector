@@ -14,19 +14,48 @@ def extract_text(reader):
     # Internal Visitor Function
     # -------------------------------------------------------------------------
     def text_inspection_visitor(text, cm, tm, font_dict, font_size):
-
         if not text or not text.strip() or not tm or len(tm) < 6:
             return
 
+        # ----------------------------
+        # Transformation analysis
+        # ----------------------------
+        if cm and len(cm) >= 4:
+            scale_x = cm[0]
+            scale_y = cm[3]
+            rotation_a = cm[1]
+            rotation_b = cm[2]
+
+            if rotation_a != 0 or rotation_b != 0:
+                findings.add("INFO: Text transformation detected (rotation/skew)")
+
+            if scale_x < 0 or scale_y < 0:
+                findings.add("INFO: Flipped/mirrored text detected (possible obfuscation)")
+
+        # ----------------------------
+        # Font analysis
+        # ----------------------------
+        if font_dict:
+            encoding = font_dict.get('/Encoding', 'Standard')
+            if any(target in str(encoding).lower() for target in ['identity', 'custom', 'difference']):
+                findings.add(f"INFO: Non-standard font encoding detected ({encoding})")
+
+        # ----------------------------
+        # Hidden text detection
+        # ----------------------------
         x, y = tm[4], tm[5]
         clean_text = text.strip()
 
         if font_size is not None and font_size < MIN_VISIBLE_FONT_SIZE:
-            findings.add(f"ALERT: Hidden text detected (Tiny Font: {font_size}pt): '{clean_text}'")
-        
+            findings.add(
+                f"ALERT: Hidden text detected (Tiny Font: {font_size}pt): '{clean_text[:50]}'"
+            )
+
         elif x < OUT_OF_BOUNDS_THRESHOLD or y < OUT_OF_BOUNDS_THRESHOLD:
-            findings.add(f"ALERT: Hidden text detected (Off-Canvas at {int(x)},{int(y)}): '{clean_text}'")
-        
+            findings.add(
+                f"ALERT: Hidden text detected (Off-Canvas at {int(x)},{int(y)}): '{clean_text[:50]}'"
+            )
+
         full_text.append(text)
 
     # -------------------------------------------------------------------------
@@ -37,7 +66,7 @@ def extract_text(reader):
             text_count_before = len(full_text)
             page.extract_text(visitor_text=text_inspection_visitor)
             text_count_after = len(full_text)
-            
+
             if text_count_before == text_count_after and has_images(page):
                 findings.add(f"INFO: Page {i+1} contains images but no extractable text")
 
@@ -59,5 +88,5 @@ def has_images(page):
                 if obj_data and obj_data.get("/Subtype") == "/Image":
                     return True
     except Exception:
-        pass 
+        pass
     return False
