@@ -1,7 +1,5 @@
 
 def calculate_risk(findings):
-    score = 0
-    DANGER_THRESHOLD = 45
 
     weights = {
         # Text
@@ -69,7 +67,11 @@ def calculate_risk(findings):
         "ALERT: Hidden Layer": 4,                               
         "INFO: Scripting execution pattern detected": 2,                    
     }
+    
+    top_5_weights = sorted(weights.values(), reverse=True)[:5]
+    DYNAMIC_THRESHOLD = sum(top_5_weights)
 
+    score = 0
     used_keys = set()
     for finding in findings:
         for key, weight in weights.items():
@@ -77,9 +79,11 @@ def calculate_risk(findings):
                 score += weight
                 used_keys.add(key)
 
-    risk_percentage = min(int((score / DANGER_THRESHOLD) * 100), 100)
+    risk_percentage = min(int((score / DYNAMIC_THRESHOLD) * 100), 100)
 
-    if risk_percentage >= 70 or score >= 30:
+    has_critical_threat = any(weights[k] >= 12 for k in used_keys if k in weights)
+
+    if risk_percentage >= 70 or has_critical_threat:
         level = "HIGH RISK"
     elif risk_percentage >= 30:
         level = "MEDIUM RISK"
