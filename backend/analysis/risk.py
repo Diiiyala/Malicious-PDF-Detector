@@ -13,6 +13,8 @@ def calculate_risk(findings):
         # Structure
         "ALERT: Suspicious Scripting found (Raw Scan)": 11,
         "ALERT: Auto-executable (/OpenAction) detected": 11,
+        "ALERT: Suspicious /GoToE pointing to": 11,
+        "ALERT: Form GoToE pointing to": 11,
         "ALERT: Automatic triggers (/AA) detected": 10,
         "ALERT: Annotation (/Launch) detected": 10,
         "ALERT: Embedded Files detected (Raw Scan)": 10,
@@ -54,13 +56,16 @@ def calculate_risk(findings):
         "ALERT: Suspicious metadata source": 3,
         
         # Content      
-        "ALERT: Multi-stage virus detected": 15,                    
+        "ALERT: Multi-stage virus detected": 15,    
+        "ALERT: NTLM Relay attack pattern confirmed": 14,                 
         "ALERT: High-confidence obfuscated script detected": 12, 
         "Ransomware Indicators": 12,
+        "ALERT: UNC path detected": 10,                 
         "Security Disabling": 10,
         "Registry Tampering": 10,
         "Stealer/Spyware": 10,
-        "ALERT: Dangerous file download detected": 10,          
+        "ALERT: Dangerous file download detected": 10,  
+        "ALERT: Embedded execution trigger (/GoToE)": 9,        
         "ALERT: Cryptocurrency address found": 9,
         "ALERT: Highly Random Data": 8,  
         "ALERT: Logic obfuscation detected": 8,                
