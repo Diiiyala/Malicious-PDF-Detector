@@ -192,6 +192,13 @@ def perform_action_analysis(reader, root):
                         if a_type == "/URI":
                             uri_link = action_dict.get("/URI", "Unknown Link")
                             add_location(f"Annotation (URI: {uri_link})", loc_str)
+                            
+                        elif a_type == "/GoToE":
+                            f_path = action_dict.get("/F")
+                            if f_path:
+                                add_location(f"Suspicious /GoToE pointing to: {f_path}", loc_str)
+                            else:
+                                add_location(f"Annotation ({a_type})", loc_str)
                         else:
                             add_location(f"Annotation ({a_type})", loc_str)
                 
@@ -210,7 +217,12 @@ def perform_action_analysis(reader, root):
                     add_location("Automatic triggers (/AA)", f"Field: {field_name}")
                     
                 elif "/A" in f_obj:
-                    add_location("Form Field Action", f"Field: {field_name}")
+                    action_dict = f_obj["/A"].get_object()
+                    a_type = action_dict.get("/S")
+                    if a_type == "/GoToE" and action_dict.get("/F"):
+                        add_location(f"Form GoToE pointing to: {action_dict.get('/F')}", f"Field: {field_name}")
+                    else:
+                        add_location("Form Field Action", f"Field: {field_name}")
     except: pass
     
     # Analyze Outlines
