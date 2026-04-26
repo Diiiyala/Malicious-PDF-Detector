@@ -11,6 +11,11 @@ def calculate_risk(findings):
         "INFO: Page contains images but no extractable text": 2,
         
         # Structure
+        "ALERT: Suspicious Scripting found (Raw Scan)": 11,
+        "ALERT: Auto-executable (/OpenAction) detected": 11,
+        "ALERT: Automatic triggers (/AA) detected": 10,
+        "ALERT: Annotation (/Launch) detected": 10,
+        "ALERT: Embedded Files detected (Raw Scan)": 10,
         "ALERT: Malformed PDF header": 10, 
         "ALERT: Auto-executable (/OpenAction)": 10,
         "ALERT: Automatic triggers (/AA)": 9,
