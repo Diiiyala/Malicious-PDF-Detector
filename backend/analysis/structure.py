@@ -15,7 +15,20 @@ def analyze_structure(reader, file_stream):
     # -------------------------------------------------------------------------
     try:
         file_stream.seek(0)
-        raw_data = file_stream.read(1024)
+        raw_data = file_stream.read()
+        
+        raw_indicators = {
+            b"/JavaScript": "ALERT: Suspicious Scripting found (Raw Scan)",
+            b"/JS": "ALERT: Suspicious Scripting found (Raw Scan)",
+            b"/OpenAction": "ALERT: Auto-executable (/OpenAction) detected",
+            b"/AA": "ALERT: Automatic triggers (/AA) detected",
+            b"/Launch": "ALERT: Annotation (/Launch) detected",
+            b"/EmbeddedFiles": "ALERT: Embedded Files detected (Raw Scan)"
+        }
+        
+        for indicator, message in raw_indicators.items():
+            if indicator in raw_data:
+                findings.append(message)
         
         # Check for PDF Signature
         header_index = raw_data.find(b"%PDF-")
@@ -55,6 +68,9 @@ def analyze_structure(reader, file_stream):
 
     except Exception as e:
         findings.append(f"INFO: Header Analysis failed: {type(e).__name__}")
+        
+    if reader is None:
+        return sorted(list(set(findings)))
 
     # -------------------------------------------------------------------------
     # 2. Root Analysis
@@ -128,7 +144,7 @@ def analyze_structure(reader, file_stream):
     except Exception as e: 
         findings.append(f"INFO: Encryption check failed: {type(e).__name__}")
 
-    return findings
+    return sorted(list(set(findings)))
 
 # -------------------------------------------------------------------------
 #  Helpers
