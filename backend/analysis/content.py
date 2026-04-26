@@ -5,6 +5,7 @@ IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
 URL_PATTERN = re.compile(r'https?://[^\s]+', re.IGNORECASE)
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
+UNC_PATTERN = re.compile(r'(?:\\\\|\\\\\\\\)[a-zA-Z0-9.-]+\\[^\s\)\>]+')
 
 SHORTENERS = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "is.gd", "buff.ly", "adf.ly"]
 SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost"]
@@ -46,6 +47,7 @@ def analyze_content(text, depth=0):
     # 1.3 Auto-Triggers 
     has_open_action = bool(re.search(r"/OpenAction", text, re.IGNORECASE))
     has_aa = bool(re.search(r"/AA", text, re.IGNORECASE))
+    has_gotoe = bool(re.search(r"/GoToE", text, re.IGNORECASE))
 
     if has_open_action and has_aa:
         findings.append("ALERT: Multiple execution triggers (/OpenAction & /AA)")
@@ -55,6 +57,9 @@ def analyze_content(text, depth=0):
         indicators["execution"] = True
     elif has_aa:
         findings.append("ALERT: Event-based execution trigger (/AA)")
+        indicators["execution"] = True
+    elif has_gotoe:
+        findings.append("ALERT: Embedded execution trigger (/GoToE)")
         indicators["execution"] = True
         
     # 1.4 Behavioral Pattern Mapping 
@@ -98,6 +103,11 @@ def analyze_content(text, depth=0):
     # -------------------------------------------------------------------------
     # 3. Network Indicators
     # -------------------------------------------------------------------------
+    unc_paths = UNC_PATTERN.findall(text)
+    for unc in unc_paths:
+        findings.append(f"ALERT: UNC path detected (Potential NTLM Hash Theft): {unc}")
+        indicators["network"] = True
+        
     urls = URL_PATTERN.findall(text)
     suspicious_hosts = []
     
@@ -126,6 +136,9 @@ def analyze_content(text, depth=0):
     # -------------------------------------------------------------------------
     # 4. Correlation Engine
     # -------------------------------------------------------------------------
+    if has_gotoe and unc_paths:
+        findings.append("ALERT: NTLM Relay attack pattern confirmed (GoToE + UNC)")
+        
     if indicators["execution"] and indicators["obfuscation"]:
         findings.append("ALERT: High-confidence obfuscated script detected")
         
