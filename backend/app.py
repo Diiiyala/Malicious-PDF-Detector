@@ -11,57 +11,65 @@ from analysis.risk import calculate_risk
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"message": "Malicious PDF Detector API is running", "status": "OK"})
 
+
 @app.route("/upload", methods=["POST"])
 def upload_file():
+    
     if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+        return jsonify({"error": "No file provided"}), 400
 
     file = request.files["file"]
+    
     if file.filename == "" or not file.filename.lower().endswith(".pdf"):
-        return jsonify({"error": "Invalid file type"}), 400
+        return jsonify({"error": "Unsupported file type. Please upload a PDF."}), 400
 
     try:
         file_content = file.read()
         file_stream = BytesIO(file_content)
         reader = PdfReader(file_stream, strict=False)
-    except Exception as e:
-        logging.exception("Failed to initialize PDF Reader")
-        return jsonify({"error": f"Invalid PDF format: {str(e)}"}), 400
+    except Exception:
+        logger.exception(f"PDF Initialization error for file: {file.filename}")
+        return jsonify({"error": "The provided PDF file is corrupt or invalid."}), 400
 
     res_visual, res_content, res_structure, res_metadata = [], [], [], []
     text = ""
 
     try:
         text, res_visual = extract_text(reader)
-    except Exception as e:
-        logging.error(f"Text/Visual analysis failed: {e}")
-        res_visual = [f"ERROR: Visual analysis failed ({type(e).__name__})"]
+    except Exception:
+        logger.error("Internal Error during text extraction", exc_info=True)
+        res_visual = ["ALERT: Analysis process interrupted during visual scan"]
 
     try:
         res_content = analyze_content(text)
-    except Exception as e:
-        logging.error(f"Content analysis failed: {e}")
-        res_content = [f"ERROR: Content analysis failed ({type(e).__name__})"]
+    except Exception:
+        logger.error("Internal Error during content analysis", exc_info=True)
+        res_content = ["ALERT: Analysis process interrupted during content scan"]
 
     try:
         file_stream.seek(0)
         res_structure = analyze_structure(reader, file_stream)
-    except Exception as e:
-        logging.error(f"Structure analysis failed: {e}")
-        res_structure = [f"ERROR: Structure analysis failed ({type(e).__name__})"]
+    except Exception:
+        logger.error("Internal Error during structure analysis", exc_info=True)
+        res_structure = ["ALERT: Analysis process interrupted during structural scan"]
 
     try:
         res_metadata = analyze_metadata(reader)
-    except Exception as e:
-        logging.error(f"Metadata analysis failed: {e}")
-        res_metadata = [f"ERROR: Metadata analysis failed ({type(e).__name__})"]
+    except Exception:
+        logger.error("Internal Error during metadata analysis", exc_info=True)
+        res_metadata = ["ALERT: Analysis process interrupted during metadata scan"]
 
     all_findings = sorted(set(res_content + res_structure + res_metadata + res_visual))
     score, risk_percentage, level = calculate_risk(all_findings)
@@ -79,9 +87,21 @@ def upload_file():
         "risk_level": level
     })
 
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "healthy"})
 
+
+@app.errorhandler(413)
+def request_entity_too_large(_):
+    return jsonify({"error": "File is too large. Maximum allowed size is 16MB."}), 413
+
+
+@app.errorhandler(500)
+def internal_error(_):
+    return jsonify({"error": "An unexpected internal server error occurred."}), 500
+
+
 if __name__ == "__main__":
-    app.run(debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False)
