@@ -18,59 +18,85 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"message": "Malicious PDF Detector API is running", "status": "OK"})
 
-
 @app.route("/upload", methods=["POST"])
 def upload_file():
-    
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 
     file = request.files["file"]
-    
     if file.filename == "" or not file.filename.lower().endswith(".pdf"):
         return jsonify({"error": "Unsupported file type. Please upload a PDF."}), 400
 
-    try:
-        file_content = file.read()
-        file_stream = BytesIO(file_content)
-        reader = PdfReader(file_stream, strict=False)
-    except Exception:
-        logger.exception(f"PDF Initialization error for file: {file.filename}")
-        return jsonify({"error": "The provided PDF file is corrupt or invalid."}), 400
-
+    # -------------------------------------------------------------------------
+    # 1. Initialize & Read Raw Data
+    # -------------------------------------------------------------------------
+    file_content = file.read()
+    file_stream = BytesIO(file_content)
+    reader = None
+    
     res_visual, res_content, res_structure, res_metadata = [], [], [], []
     text = ""
 
     try:
-        text, res_visual = extract_text(reader)
-    except Exception:
-        logger.error("Internal Error during text extraction", exc_info=True)
-        res_visual = ["ALERT: Analysis process interrupted during visual scan"]
+        reader = PdfReader(file_stream, strict=False)
+        _ = len(reader.pages) 
+        logger.info(f"Successfully initialized pypdf for {file.filename}")
+    except Exception as e:
+        logger.warning(f"Metadata/Structure parsing failed for {file.filename}: {str(e)}")
+        res_structure.append("ALERT: Malformed PDF structure detected (Potential Evasion/Corruption)")
+        reader = None
 
+    # -------------------------------------------------------------------------
+    # 2. Extract Text
+    # -------------------------------------------------------------------------
+    if reader:
+        try:
+            text, res_visual = extract_text(reader)
+        except Exception:
+            logger.error("Text extraction failed, using raw content decode")
+            text = file_content.decode('utf-8', errors='ignore')
+            res_visual = ["ALERT: Analysis process interrupted during visual scan"]
+    else:
+        text = file_content.decode('utf-8', errors='ignore')
+        res_visual = ["INFO: Visual analysis skipped due to malformed PDF structure"]
+
+    # -------------------------------------------------------------------------
+    # 3. Content Analysis
+    # -------------------------------------------------------------------------
     try:
         res_content = analyze_content(text)
-    except Exception:
-        logger.error("Internal Error during content analysis", exc_info=True)
+    except Exception as e:
+        logger.error(f"Internal Error during content analysis: {e}")
         res_content = ["ALERT: Analysis process interrupted during content scan"]
 
+    # -------------------------------------------------------------------------
+    # 4. Structure Analysis
+    # -------------------------------------------------------------------------
     try:
         file_stream.seek(0)
-        res_structure = analyze_structure(reader, file_stream)
-    except Exception:
-        logger.error("Internal Error during structure analysis", exc_info=True)
-        res_structure = ["ALERT: Analysis process interrupted during structural scan"]
+        res_structure.extend(analyze_structure(reader, file_stream))
+    except Exception as e:
+        logger.error(f"Internal Error during structure analysis: {e}")
+        res_structure.append("ALERT: Analysis process interrupted during structural scan")
 
-    try:
-        res_metadata = analyze_metadata(reader)
-    except Exception:
-        logger.error("Internal Error during metadata analysis", exc_info=True)
-        res_metadata = ["ALERT: Analysis process interrupted during metadata scan"]
+    # -------------------------------------------------------------------------
+    # 5. Metadata 
+    # -------------------------------------------------------------------------
+    if reader:
+        try:
+            res_metadata = analyze_metadata(reader)
+        except Exception:
+            res_metadata = ["ALERT: Metadata analysis failed"]
+    else:
+        res_metadata = ["INFO: Metadata analysis skipped (Malformed Structure)"]
 
+    # -------------------------------------------------------------------------
+    # 6. Risk Calculation
+    # -------------------------------------------------------------------------
     all_findings = sorted(set(res_content + res_structure + res_metadata + res_visual))
     score, risk_percentage, level = calculate_risk(all_findings)
     
@@ -86,22 +112,6 @@ def upload_file():
         "risk_percentage": risk_percentage,
         "risk_level": level
     })
-
-
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "healthy"})
-
-
-@app.errorhandler(413)
-def request_entity_too_large(_):
-    return jsonify({"error": "File is too large. Maximum allowed size is 16MB."}), 413
-
-
-@app.errorhandler(500)
-def internal_error(_):
-    return jsonify({"error": "An unexpected internal server error occurred."}), 500
-
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=False)
