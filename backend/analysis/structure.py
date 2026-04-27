@@ -213,8 +213,8 @@ def perform_action_analysis(reader, root):
                                                    
                         if coverage > 0.9:
                             if has_js or is_widget:
-                                reason = "(Transparent UI Redressing)" if is_transparent else "(Large Interactive Layer)"
-                                add_location(f"ALERT: Clickjacking Full-page overlay {reason}", loc_str)
+                                impact_desc = "ALERT: Clickjacking Full-page overlay (Invisible overlay detected; any click on the page may trigger malicious scripts)"
+                                add_location(impact_desc, loc_str)
 
                         if is_widget and is_transparent and coverage < 0.05:
                             visible_widgets_on_page += 1
@@ -248,15 +248,15 @@ def perform_action_analysis(reader, root):
                 field_name = f_obj.get("/T", "Unnamed")
                 
                 if "/AA" in f_obj:
-                    add_location("Automatic triggers (/AA)", f"Field: {field_name}")
+                    add_location("ALERT: Automatic triggers (/AA)", f"Field: {field_name}")
                     
                 elif "/A" in f_obj:
                     action_dict = f_obj["/A"].get_object()
                     a_type = action_dict.get("/S")
                     if a_type == "/GoToE" and action_dict.get("/F"):
-                        add_location(f"Form GoToE pointing to: {action_dict.get('/F')}", f"Field: {field_name}")
+                        add_location(f"ALERT: Form GoToE pointing to: {action_dict.get('/F')}", f"Field: {field_name}")
                     else:
-                        add_location("Form Field Action", f"Field: {field_name}")
+                        add_location("ALERT: Form Field Action", f"Field: {field_name}")
     except: pass
     
     # Analyze Outlines
@@ -269,11 +269,9 @@ def perform_action_analysis(reader, root):
     for action, locations in action_locations.items():
         from collections import Counter
         loc_counts = Counter(locations)
-        
         loc_summary = ", ".join([f"{loc}" + (f" (x{count})" if count > 1 else "") 
                                 for loc, count in loc_counts.items()])
-        
-        action_findings.append(f"ALERT: {action} found in: [{loc_summary}]")
+        action_findings.append(f"{action} found in: [{loc_summary}]")
 
     return action_findings
 
@@ -284,7 +282,7 @@ def check_outlines_recursive(node, add_loc_func):
     # Check for Action in current Bookmark node
     if "/A" in node:
         title = node.get("/Title", "Untitled Bookmark")
-        add_loc_func(f"Bookmark ({node['/A'].get('/S')})", f"Bookmark: {title}")
+        add_loc_func(f"ALERT: Bookmark ({node['/A'].get('/S')})", f"Bookmark: {title}")
     
     # Traverse children and siblings
     if "/First" in node:
