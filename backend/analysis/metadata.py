@@ -85,8 +85,6 @@ def analyze_metadata(reader):
 
                 if any(x in clean_url.lower() for x in MALICIOUS_PARAMS):
                     findings.append(f"ALERT: Suspicious link detected ({clean_url})")
-                else:
-                    findings.append(f"INFO: Link found ({clean_url})")
                     
             # -------------------------------------------------------------------------
             # 2.3 XSS
