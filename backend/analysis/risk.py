@@ -41,7 +41,6 @@ def calculate_risk(findings):
         "INFO: Entry points to an empty object": 1,
         
         # Metadata
-        "INFO: Link found": 1,
         "INFO: Long metadata field": 1,  
         "ALERT: Hacking tools detected": 9,      
         "ALERT: XSS injection attempt": 7,      
