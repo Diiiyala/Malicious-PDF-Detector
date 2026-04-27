@@ -56,8 +56,6 @@ def analyze_structure(reader, file_stream):
                 # Validate version
                 if is_version_older(header_version, "1.4"):
                     findings.append(f"INFO: Old PDF version detected in header ({header_version})")
-                else:
-                    findings.append(f"INFO: PDF Header detected (Version: {header_version})")
             else:
                 findings.append("ALERT: PDF version missing or malformed in header")
                 
@@ -80,7 +78,6 @@ def analyze_structure(reader, file_stream):
         root_obj = reader.trailer.get("/Root")
         if root_obj:
             root = root_obj.get_object()
-            findings.append("INFO: Valid PDF structure")
             
             # Check for Version Mismatch
             catalog_version = root.get("/Version")
