@@ -38,7 +38,7 @@ def upload_file():
     file_stream = BytesIO(file_content)
     reader = None
     
-    res_visual, res_content, res_structure, res_metadata = [], [], [], []
+    res_text, res_content, res_structure, res_metadata = [], [], [], []
     text = ""
 
     try:
@@ -51,21 +51,21 @@ def upload_file():
         reader = None
 
     # -------------------------------------------------------------------------
-    # 2. Extract Text
+    # 2. Text Extraction
     # -------------------------------------------------------------------------
     if reader:
         try:
-            text, res_visual = extract_text(reader)
+            text, res_text = extract_text(reader)
         except Exception:
             logger.error("Text extraction failed, using raw content decode")
             text = file_content.decode('utf-8', errors='ignore')
-            res_visual = ["ALERT: Analysis process interrupted during visual scan"]
+            res_text = ["ALERT: Analysis process interrupted during text extraction"]
     else:
         text = file_content.decode('utf-8', errors='ignore')
-        res_visual = ["INFO: Visual analysis skipped due to malformed PDF structure"]
+        res_text = ["INFO: Deep text extraction skipped due to malformed PDF structure"]
 
     # -------------------------------------------------------------------------
-    # 3. Content Analysis
+    # 3. Content
     # -------------------------------------------------------------------------
     try:
         res_content = analyze_content(text)
@@ -74,7 +74,7 @@ def upload_file():
         res_content = ["ALERT: Analysis process interrupted during content scan"]
 
     # -------------------------------------------------------------------------
-    # 4. Structure Analysis
+    # 4. Structure 
     # -------------------------------------------------------------------------
     try:
         file_stream.seek(0)
@@ -97,7 +97,7 @@ def upload_file():
     # -------------------------------------------------------------------------
     # 6. Risk Calculation
     # -------------------------------------------------------------------------
-    all_findings = sorted(set(res_content + res_structure + res_metadata + res_visual))
+    all_findings = sorted(set(res_content + res_structure + res_metadata + res_text))
     score, risk_percentage, level = calculate_risk(all_findings)
     
     return jsonify({
@@ -106,7 +106,7 @@ def upload_file():
             "content": {"results": sorted(res_content), "count": len(res_content)},
             "structure": {"results": sorted(res_structure), "count": len(res_structure)},
             "metadata": {"results": sorted(res_metadata), "count": len(res_metadata)},
-            "visual": {"results": sorted(res_visual), "count": len(res_visual)}
+            "text_extraction": {"results": sorted(res_text), "count": len(res_text)}
         },
         "risk_score": score,
         "risk_percentage": risk_percentage,
