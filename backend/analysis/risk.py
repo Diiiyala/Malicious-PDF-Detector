@@ -11,9 +11,8 @@ def calculate_risk(findings):
         "INFO: Page contains images but no extractable text": 2,
         
         # Structure
-        "ALERT: Clickjacking Full-page overlay (Transparent UI Redressing)": 13,
-        "ALERT: Clickjacking Full-page overlay (Large Interactive Layer)": 11,
-        "ALERT: Clickjacking Suspicious invisible button grid detected": 12,
+        "ALERT: Clickjacking Full-page overlay": 13, 
+        "ALERT: Clickjacking Suspicious invisible button grid": 12,
         "ALERT: Suspicious Scripting found (Raw Scan)": 11,
         "ALERT: Auto-executable (/OpenAction) detected": 11,
         "ALERT: Suspicious /GoToE pointing to": 11,
