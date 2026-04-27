@@ -11,6 +11,9 @@ def calculate_risk(findings):
         "INFO: Page contains images but no extractable text": 2,
         
         # Structure
+        "ALERT: Clickjacking Full-page overlay (Transparent UI Redressing)": 13,
+        "ALERT: Clickjacking Full-page overlay (Large Interactive Layer)": 11,
+        "ALERT: Clickjacking Suspicious invisible button grid detected": 12,
         "ALERT: Suspicious Scripting found (Raw Scan)": 11,
         "ALERT: Auto-executable (/OpenAction) detected": 11,
         "ALERT: Suspicious /GoToE pointing to": 11,
@@ -92,7 +95,7 @@ def calculate_risk(findings):
     risk_percentage = min(int((score / DYNAMIC_THRESHOLD) * 100), 100)
 
     has_critical_threat = any(weights[k] >= 12 for k in used_keys if k in weights)
-
+    
     if risk_percentage >= 70 or has_critical_threat:
         level = "HIGH RISK"
     elif risk_percentage >= 30:

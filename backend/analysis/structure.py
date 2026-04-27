@@ -173,35 +173,69 @@ def perform_action_analysis(reader, root):
             if "/AA" in root:
                 add_location("Automatic triggers (/AA)", "Catalog")
 
-    # Analyze Page-Level Actions and Annotations
+    # Analyze Page-Level Actions and Annotations  
     try:
         for i, page in enumerate(reader.pages):
             page_obj = page.get_object()
             loc_str = f"Page {i+1}"
             
+            mediabox = page_obj.get("/MediaBox")
+            page_area = 0
+            if mediabox:
+                page_area = abs(float(mediabox[2]) - float(mediabox[0])) * abs(float(mediabox[3]) - float(mediabox[1]))
+            
             if "/AA" in page_obj:
-                add_location("Automatic triggers (/AA)", loc_str)
+                add_location("ALERT: Automatic triggers (/AA)", loc_str)
 
             if "/Annots" in page_obj:
+                visible_widgets_on_page = 0
                 for annot in page_obj["/Annots"]:
                     obj = annot.get_object()
-                    if obj and "/A" in obj:
+                    if not obj: continue
+                                          
+                    rect = obj.get("/Rect")
+                    subtype = obj.get("/Subtype")
+                    is_widget = (subtype == "/Widget")
+                    
+                    is_transparent = (obj.get("/F") == 2 or not obj.get("/AP"))
+                    has_js = False
+                    
+                    if "/A" in obj:
+                        action_dict = obj["/A"].get_object()
+                        if action_dict.get("/S") == "/JavaScript":
+                            has_js = True
+
+                    if rect and page_area > 0:
+                        width = abs(float(rect[2]) - float(rect[0]))
+                        height = abs(float(rect[3]) - float(rect[1]))
+                        annot_area = width * height
+                        coverage = annot_area / page_area
+                                                   
+                        if coverage > 0.9:
+                            if has_js or is_widget:
+                                reason = "(Transparent UI Redressing)" if is_transparent else "(Large Interactive Layer)"
+                                add_location(f"ALERT: Clickjacking Full-page overlay {reason}", loc_str)
+
+                        if is_widget and is_transparent and coverage < 0.05:
+                            visible_widgets_on_page += 1
+
+                    if "/A" in obj:
                         action_dict = obj["/A"].get_object()
                         a_type = action_dict.get("/S")
                                               
                         if a_type == "/URI":
                             uri_link = action_dict.get("/URI", "Unknown Link")
-                            add_location(f"Annotation (URI: {uri_link})", loc_str)
-                            
+                            add_location(f"ALERT: Annotation (URI: {uri_link})", loc_str)
                         elif a_type == "/GoToE":
                             f_path = action_dict.get("/F")
-                            if f_path:
-                                add_location(f"Suspicious /GoToE pointing to: {f_path}", loc_str)
-                            else:
-                                add_location(f"Annotation ({a_type})", loc_str)
+                            add_location(f"ALERT: Suspicious /GoToE pointing to: {f_path if f_path else 'Internal'}", loc_str)
                         else:
-                            add_location(f"Annotation ({a_type})", loc_str)
+                            a_type_clean = str(a_type).replace("/", "")
+                            add_location(f"ALERT: Annotation (/{a_type_clean})", loc_str)
                 
+                if visible_widgets_on_page > 3:
+                    add_location("ALERT: Clickjacking Suspicious invisible button grid detected", loc_str)
+                            
     except Exception as e:
         action_findings.append(f"ALERT: Could not fully analyze actions on page {i+1} (Potential obfuscation)")
 
