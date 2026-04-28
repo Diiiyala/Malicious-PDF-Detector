@@ -2,6 +2,7 @@ import re
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
+JS_URL_PATTERN = re.compile(r'(?:app\.launchURL|this\.getURL|getURL|launchURL)\s*\(\s*["\']([^"\']+)["\']', re.IGNORECASE)
 
 def analyze_structure(reader, file_stream):
     findings = []
@@ -79,13 +80,32 @@ def analyze_structure(reader, file_stream):
         if root_obj:
             root = root_obj.get_object()
             
+            if "/OCProperties" in root:
+                ocp = root["/OCProperties"].get_object()
+                findings.append("ALERT: Optional Content Groups (OCG) detected - potential hidden layer exploit")
+                
+                ocp_str = str(ocp)
+                if "/JS" in ocp_str or "/JavaScript" in ocp_str:
+                    found_js_names = []
+                    js_name_match = re.findall(r'/([^/\s()<>\[\]{}]+)\s+<<\s*/S\s*/JavaScript', ocp_str)
+                    
+                    if js_name_match:
+                        found_js_names = list(set(js_name_match))
+                        names_str = ", ".join(found_js_names)
+                        findings.append(f"ALERT: Suspicious OCG-JavaScript coupling detected (Scripts: {names_str})")
+                    else:
+                        findings.append("ALERT: Suspicious OCG-JavaScript coupling detected")
+                
+                elif "/AA" in root:
+                     findings.append("ALERT: Suspicious OCG-Automatic Trigger coupling detected")
+
             # Check for Version Mismatch
             catalog_version = root.get("/Version")
             if catalog_version and header_version:
                 cat_v_str = str(catalog_version).replace("/", "")
                 if cat_v_str != header_version:
                     findings.append(f"ALERT: Version mismatch (Header: {header_version}, Catalog: {cat_v_str})")
-                           
+                    
     except Exception as e:
         findings.append(f"Root Analysis failed: {type(e).__name__}")
         
@@ -165,10 +185,22 @@ def perform_action_analysis(reader, root):
 
     # Analyze Root Actions
     if root:
-            if "/OpenAction" in root:
-                add_location("Auto-executable (/OpenAction)", "Catalog")
-            if "/AA" in root:
-                add_location("Automatic triggers (/AA)", "Catalog")
+        if "/OpenAction" in root:
+            add_location("Auto-executable (/OpenAction)", "Catalog")
+        
+        if "/AA" in root:
+            aa_dict = root["/AA"].get_object()
+            found_silent_triggers = []
+            
+            for silent_trigger in ["/WP", "/DP", "/WC", "/WS"]:
+                if silent_trigger in aa_dict:
+                    found_silent_triggers.append(silent_trigger)
+            
+            if found_silent_triggers:
+                triggers_str = ", ".join(found_silent_triggers)
+                add_location(f"ALERT: Dangerous silent trigger ({triggers_str}) detected", "Catalog")
+            
+            add_location("Automatic triggers (/AA)", "Catalog")
 
     # Analyze Page-Level Actions and Annotations  
     try:
@@ -182,6 +214,9 @@ def perform_action_analysis(reader, root):
                 page_area = abs(float(mediabox[2]) - float(mediabox[0])) * abs(float(mediabox[3]) - float(mediabox[1]))
             
             if "/AA" in page_obj:
+                aa_page = page_obj["/AA"].get_object()
+                if "/O" in aa_page or "/C" in aa_page:
+                     add_location("ALERT: Silent page trigger (/O or /C) detected", loc_str)
                 add_location("ALERT: Automatic triggers (/AA)", loc_str)
 
             if "/Annots" in page_obj:
@@ -343,6 +378,7 @@ def analyze_streams_and_objects(reader):
     suspicious_filters = ["/JBIG2Decode", "/Crypt"]
     js_objs = []
     obfuscated_objs = []
+    extracted_urls = []
     filter_objs = {}
 
     # Retrieve all object numbers from cross-reference table
@@ -380,17 +416,15 @@ def analyze_streams_and_objects(reader):
                         js_str = None
 
                     if js_str:
-                        # Check for hex-based obfuscation
+                        content_to_scan = ""
                         if isinstance(js_str, bytes):
-                            if b"0x" in js_str:
-                                obfuscated_objs.append(str(obj_num))
-                            else:
-                                js_objs.append(str(obj_num))
+                            content_to_scan = js_str.decode('utf-8', errors='ignore')
                         else:
-                            if "0x" in js_str or "\\x" in js_str:
-                                obfuscated_objs.append(str(obj_num))
-                            else:
-                                js_objs.append(str(obj_num))
+                            content_to_scan = str(js_str)
+                        
+                        found_urls = JS_URL_PATTERN.findall(content_to_scan)
+                        for url in found_urls:
+                            extracted_urls.append(f"Object {obj_num}: {url}")
 
                 # Check for suspicious compression filters
                 filt = obj.get("/Filter")
@@ -426,5 +460,8 @@ def analyze_streams_and_objects(reader):
 
     for filt, objs in filter_objs.items():
         stream_findings.append(f"ALERT: Suspicious stream filter ({filt}) detected in Objects: [{', '.join(objs)}]")
+        
+    if extracted_urls:
+        stream_findings.append(f"ALERT: Hidden URLs extracted from JavaScript: [{', '.join(extracted_urls)}]")
 
     return stream_findings
