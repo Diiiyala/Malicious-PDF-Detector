@@ -363,6 +363,12 @@ def analyze_streams_and_objects(reader):
                 if obj is None: return
 
             if isinstance(obj, dict):
+                # Check for the existence of the /F key
+                if "/F" in obj:
+                    f_val = obj.get("/F")
+                    if obj.get("/Subtype") == "/Image" or "/FS" in obj:
+                        f_path = str(f_val)
+                        stream_findings.append(f"ALERT: Remote resource reference detected in Object {obj_num} (Path: {f_path})")
 
                 # Check for direct Script injection
                 if "/JS" in obj or "/JavaScript" in obj:
@@ -403,7 +409,7 @@ def analyze_streams_and_objects(reader):
                     process_obj(item, obj_num)
 
         except: pass
-
+        
     # Iterate through all objects in the PDF
     for obj_num in all_obj_nums:
         try:
