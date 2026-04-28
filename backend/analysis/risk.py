@@ -12,6 +12,7 @@ def calculate_risk(findings):
         
         # Structure
         "ALERT: Clickjacking Full-page overlay": 13, 
+        "ALERT: Remote XObject resource detected": 12,
         "ALERT: Clickjacking Suspicious invisible button grid": 12,
         "ALERT: Suspicious Scripting found (Raw Scan)": 11,
         "ALERT: Auto-executable (/OpenAction) detected": 11,
