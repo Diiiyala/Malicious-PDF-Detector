@@ -1,4 +1,5 @@
 import re
+from collections import Counter
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
@@ -192,7 +193,7 @@ def perform_action_analysis(reader, root):
             aa_dict = root["/AA"].get_object()
             found_silent_triggers = []
             
-            for silent_trigger in ["/WP", "/DP", "/WC", "/WS"]:
+            for silent_trigger in ["/WP", "/DP", "/WC", "/WS", "/DS"]:
                 if silent_trigger in aa_dict:
                     found_silent_triggers.append(silent_trigger)
             
@@ -299,10 +300,8 @@ def perform_action_analysis(reader, root):
 
     # Aggregate results
     for action, locations in action_locations.items():
-        from collections import Counter
         loc_counts = Counter(locations)
-        loc_summary = ", ".join([f"{loc}" + (f" (x{count})" if count > 1 else "") 
-                                for loc, count in loc_counts.items()])
+        loc_summary = ", ".join([f"{loc}" + (f" (x{count})" if count > 1 else "") for loc, count in loc_counts.items()])
         action_findings.append(f"{action} found in: [{loc_summary}]")
 
     return action_findings
