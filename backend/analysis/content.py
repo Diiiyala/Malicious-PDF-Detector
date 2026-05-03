@@ -1,11 +1,12 @@
-import re, math, base64, string
+import re, math, base64, string, urllib.parse
 from collections import Counter
 
 IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
-URL_PATTERN = re.compile(r'https?://[^\s]+', re.IGNORECASE)
+URL_PATTERN = re.compile(r'https?://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
 UNC_PATTERN = re.compile(r'(?:\\\\|\\\\\\\\)[a-zA-Z0-9.-]+\\[^\s\)\>]+')
+JS_URL_EXTRACTOR = re.compile(r'(?:cPath|url|uri|location)\s*[:=]\s*["\']?([^"\'\s\)]+)', re.IGNORECASE)
 
 SHORTENERS = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "is.gd", "buff.ly", "adf.ly"]
 SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost"]
@@ -22,21 +23,57 @@ def analyze_content(text, depth=0):
     if depth > 2: return []
     
     findings = []
-    text_clean = text.strip()
+    text_clean = re.sub(r'\s+', ' ', text).strip()
     indicators = { "execution": False, "obfuscation": False, "network": False, "payload": False }
     
     # -------------------------------------------------------------------------
-    # 1. Evidence Gathering
+    # 1. De-obfuscation Layer
     # -------------------------------------------------------------------------
     
-    # 1.1 Scripting/Execution Logic
-    exec_patterns = [r"\beval\(", r"\bexec\(", r"String\.fromCharCode"]
-    for p in exec_patterns:
+    # 1.1 Decode hex-escaped strings
+    if "\\x" in text.lower():
+        decoded_hex = decode_hex_escapes(text)
+        if decoded_hex != text:
+            text = decoded_hex
+            findings.append("INFO: Hex-encoded content (\\xXX) de-obfuscated")
+            indicators["obfuscation"] = True
+    
+    # 1.2 Normalize URL-encoded characters
+    if "%" in text:
+        try:
+            decoded_text = urllib.parse.unquote(text)
+            if decoded_text != text:
+                text = decoded_text
+                findings.append("INFO: URL-encoded content de-obfuscated")
+        except: pass
+        
+    # 1.3 Extract hidden URLs staged within JavaScript variables
+    js_links = JS_URL_EXTRACTOR.findall(text)
+    for link in js_links:
+        clean_link = clean_url_logic(link)
+        if URL_PATTERN.match(clean_link) or IP_PATTERN.search(clean_link):
+            findings.append(f"ALERT: Hidden JS-staged URL detected: {clean_link}")
+            indicators["network"] = True
+    
+    # -------------------------------------------------------------------------
+    # 2. Evidence Gathering
+    # -------------------------------------------------------------------------
+    
+    # 2.1 Scripting/Execution Logic
+    exec_patterns = {
+        r"\beval\s*\(": "eval() function",
+        r"\bexec\s*\(": "exec() function",
+        r"String\.fromCharCode": "Charcode obfuscation",
+        r"app\.openDoc": "Remote document opening",
+        r"launchURL": "URL launching"
+    }
+               
+    for p, label in exec_patterns.items():
         if re.search(p, text, re.IGNORECASE):
             indicators["execution"] = True
-            findings.append(f"INFO: Scripting execution pattern detected ({p.strip(r'|')})")
+            findings.append(f"ALERT: Scripting execution pattern detected ({label})")
 
-    # 1.2 Obfuscation Detection
+    # 2.2 Obfuscation Detection
     compact = re.sub(r'\s+', '', text).lower()
     if check_obfuscation(text, compact):
         for key in ["eval", "exec", "unescape"]:
@@ -44,7 +81,7 @@ def analyze_content(text, depth=0):
                 indicators["obfuscation"] = True
                 findings.append(f"ALERT: Logic obfuscation detected ({key})")
                 
-    # 1.3 Auto-Triggers 
+    # 2.3 Auto-Triggers 
     has_open_action = bool(re.search(r"/OpenAction", text, re.IGNORECASE))
     has_aa = bool(re.search(r"/AA", text, re.IGNORECASE))
     has_gotoe = bool(re.search(r"/GoToE", text, re.IGNORECASE))
@@ -62,7 +99,7 @@ def analyze_content(text, depth=0):
         findings.append("ALERT: Embedded execution trigger (/GoToE)")
         indicators["execution"] = True
         
-    # 1.4 Behavioral Pattern Mapping 
+    # 2.4 Behavioral Pattern Mapping 
     detected_threats = []
     for threat_name, patterns in SYSTEM_THREATS.items():
         if any(re.search(p, text, re.IGNORECASE) for p in patterns):
@@ -73,12 +110,12 @@ def analyze_content(text, depth=0):
     if detected_threats:
         findings.append(f"ALERT: Specific threats detected: {', '.join(detected_threats)}")
 
-    # 1.5 Financial Indicator Check
+    # 2.5 Financial Indicator Check
     if BTC_ADDRESS.search(text):
         findings.append(f"ALERT: Cryptocurrency address found (Potential Ransomware)")
 
     # -------------------------------------------------------------------------
-    # 2. Smart Layering 
+    # 3. Smart Layering 
     # -------------------------------------------------------------------------
     candidates = B64_PATTERN.findall(text)
     for cand in candidates:
@@ -101,7 +138,7 @@ def analyze_content(text, depth=0):
             continue
 
     # -------------------------------------------------------------------------
-    # 3. Network Indicators
+    # 4. Network Indicators
     # -------------------------------------------------------------------------
     unc_paths = UNC_PATTERN.findall(text)
     for unc in unc_paths:
@@ -134,7 +171,7 @@ def analyze_content(text, depth=0):
         findings.append(f"ALERT: Suspicious hosts detected: {', '.join(unique_hosts)}")
 
     # -------------------------------------------------------------------------
-    # 4. Correlation Engine
+    # 5. Correlation Engine
     # -------------------------------------------------------------------------
     if has_gotoe and unc_paths:
         findings.append("ALERT: NTLM Relay attack pattern confirmed (GoToE + UNC)")
@@ -159,6 +196,22 @@ def analyze_content(text, depth=0):
 #  Helpers
 # -------------------------------------------------------------------------
 
+def decode_hex_escapes(text):
+    try:
+        hex_pattern = re.compile(rb'\\x([0-9a-fA-F]{2})')
+        if isinstance(text, str):
+            text_bytes = text.encode('utf-8', errors='ignore')
+        else:
+            text_bytes = text
+
+        def replace_hex(match):
+            return bytes([int(match.group(1), 16)])
+
+        decoded = hex_pattern.sub(replace_hex, text_bytes)
+        return decoded.decode('utf-8', errors='ignore')
+    except:
+        return text
+    
 def calculate_entropy(data):
     if not data: return 0
     counts = Counter(data)
@@ -185,4 +238,5 @@ def diagnose_content(text, score):
     return "Minified/Compressed Text" if printable_ratio > 0.9 else "Obfuscated Content"
 
 def clean_url_logic(url):
-    return url.replace("[.]", ".").replace("hxxp", "http").replace("(.)", ".")
+    cleaned = url.strip('()<>[]"\'\\ ,;').split(')')[0].split('"')[0]
+    return cleaned.replace("[.]", ".").replace("hxxp", "http").replace("(.)", ".")
