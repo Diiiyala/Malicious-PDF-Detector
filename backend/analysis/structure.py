@@ -100,6 +100,32 @@ def analyze_structure(reader, file_stream):
                 elif "/AA" in root:
                      findings.append("ALERT: Suspicious OCG-Automatic Trigger coupling detected")
 
+            # Verify PDF 2.0 Associated Files
+            if "/AF" in root:
+                af_list = root["/AF"]
+                af_details = []
+                
+                try:
+                    for af_ref in af_list:
+                        af_obj = af_ref.get_object()
+                        if af_obj:
+                            f_name = af_obj.get("/F", "Unknown")
+                            
+                            f_type = "Unknown"
+                            if "/EF" in af_obj:
+                                ef_dict = af_obj["/EF"].get_object()
+                                if "/F" in ef_dict:
+                                    emb_obj = ef_dict["/F"].get_object()
+                                    f_type = emb_obj.get("/Subtype", "Unknown").replace("/", "")
+                            
+                            af_details.append(f"{f_name} [Type: {f_type}]")
+                    
+                    if af_details:
+                        details_str = ", ".join(af_details)
+                        findings.append(f"ALERT: PDF 2.0 Associated Files (/AF) detected: ({details_str})")
+                except:
+                    findings.append("ALERT: PDF 2.0 Associated Files (/AF) detected (Failed to parse details)")
+                
             # Check for Version Mismatch
             catalog_version = root.get("/Version")
             if catalog_version and header_version:
