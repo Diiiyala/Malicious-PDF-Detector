@@ -66,6 +66,8 @@ def calculate_risk(findings):
         "ALERT: Multi-stage virus detected": 15,
         "ALERT: NTLM Relay attack pattern confirmed": 14,
         "ALERT: High-confidence obfuscated script detected": 12,
+        "ALERT: Hidden JS-staged URL detected": 12,
+        "ALERT: Scripting execution pattern detected": 11,
         "Ransomware Indicators": 12,
         "Security Disabling": 10,
         "Registry Tampering": 10,
@@ -78,8 +80,6 @@ def calculate_risk(findings):
         "ALERT: Direct IP access detected": 7,
         "ALERT: Malicious parameter key detected in URL": 6,
         "ALERT: Suspicious hosts detected": 6,
-        "ALERT: Hidden JS-staged URL detected": 7,
-        "ALERT: Scripting execution pattern detected": 6,
         "ALERT: Multiple execution triggers": 9,
         "ALERT: Automatic execution trigger": 8,
         "ALERT: Event-based execution trigger": 8,
@@ -88,8 +88,8 @@ def calculate_risk(findings):
         "ALERT: Highly Random Data (Encrypted/Compressed)": 8,
         "ALERT: Minified/Compressed Text": 3,
         "ALERT: Obfuscated Content": 5,
-        "INFO: Hex-encoded content de-obfuscated": 1,
-        "INFO: URL-encoded content de-obfuscated": 1
+        "ALERT: Hex-encoded content": 2,                      
+        "ALERT: URL-encoded content": 2
     }                   
     
     top_5_weights = sorted(weights.values(), reverse=True)[:5]
@@ -102,6 +102,7 @@ def calculate_risk(findings):
             if key in finding and key not in used_keys:
                 score += weight
                 used_keys.add(key)
+                break
 
     risk_percentage = min(int((score / DYNAMIC_THRESHOLD) * 100), 100)
 
