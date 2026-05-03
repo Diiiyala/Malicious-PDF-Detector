@@ -67,7 +67,7 @@ def calculate_risk(findings):
         "ALERT: NTLM Relay attack pattern confirmed": 14,
         "ALERT: High-confidence obfuscated script detected": 12,
         "ALERT: Hidden JS-staged URL detected": 12,
-        "ALERT: Scripting execution pattern detected": 11,
+        "ALERT: Scripting execution pattern detected": 12,
         "Ransomware Indicators": 12,
         "Security Disabling": 10,
         "Registry Tampering": 10,
