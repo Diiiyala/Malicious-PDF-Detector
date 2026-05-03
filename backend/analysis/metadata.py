@@ -182,19 +182,33 @@ def analyze_metadata(reader):
         sources_found = set()
         
         target_fields = ["/Author", "/Creator", "/Producer"]
-        suspicious_indicators = ["attacker", "malicious", "script"]
+        suspicious_indicators = [
+            "attacker", "malicious", "script", "exploit", "payload", "shell", 
+            "dropper", "backdoor", "stager", "bypass", "encoded", "obfuscated",
+
+            "metasploit", "cobalt strike", "mimikatz", "powersploit", "empire", 
+            "burp", "collaborator", "interact.sh", "jonaslejon", "deepzec",
+
+            "cve-2018-4993", "cve-2019-7089", "cve-2014-8453", "cve-2017-10951",
+            "cve-2024-4367", "cve-2020-29075", "cve-2022-28244", "cve-2018-5158",
+            "cve-2025-66516", "cve-2025-70401", "cve-2024-12426", "cve-2025-59803",
+
+            "callback", "phone-home", "exfiltration", "tunneling", "beacon",
+            "injection", "unauthorized", "suspicious", "leak", "harvesting"
+        ]
+        found_details = []
 
         for field in target_fields:
             if field in metadata:
                 val_lower = str(metadata[field]).lower()
                 for indicator in suspicious_indicators:
                     if indicator in val_lower:
-                        sources_found.add(indicator.capitalize())
+                        field_name = field.replace("/", "")
+                        found_details.append(f"{field_name}/{indicator.capitalize()}")
 
-        if sources_found:
-            indicators_str = "/".join(sources_found)
-            findings.append(f"ALERT: Suspicious metadata source detected ({indicators_str})")
-         
+        if found_details:
+            unique_details = ", ".join(sorted(list(set(found_details))))
+            findings.append(f"ALERT: Suspicious metadata source detected ({unique_details})")
          
         findings.extend(decoded_values)
                             
