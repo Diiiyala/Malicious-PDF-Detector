@@ -90,7 +90,7 @@ def calculate_risk(findings):
         "ALERT: Obfuscated Content": 5,
         "INFO: Hex-encoded content de-obfuscated": 1,
         "INFO: URL-encoded content de-obfuscated": 1
-}                   
+    }                   
     
     top_5_weights = sorted(weights.values(), reverse=True)[:5]
     DYNAMIC_THRESHOLD = sum(top_5_weights)
