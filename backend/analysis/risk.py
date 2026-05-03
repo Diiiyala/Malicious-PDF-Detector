@@ -17,6 +17,7 @@ def calculate_risk(findings):
         "ALERT: Silent page trigger": 12,
         "ALERT: Hidden URLs extracted from JavaScript": 12,
         "ALERT: Clickjacking Suspicious invisible button grid": 12,
+        "ALERT: PDF 2.0 Associated Files (/AF) detected": 12,
         "ALERT: Suspicious OCG-JavaScript coupling detected": 11,
         "ALERT: Suspicious Scripting found (Raw Scan)": 11,
         "ALERT: Auto-executable (/OpenAction) detected": 11,
