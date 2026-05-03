@@ -35,7 +35,7 @@ def analyze_content(text, depth=0):
         decoded_hex = decode_hex_escapes(text)
         if decoded_hex != text:
             text = decoded_hex
-            findings.append("INFO: Hex-encoded content (\\xXX) de-obfuscated")
+            findings.append("ALERT: Hex-encoded content (\\xXX) de-obfuscated")
             indicators["obfuscation"] = True
     
     # 1.2 Normalize URL-encoded characters
@@ -44,7 +44,7 @@ def analyze_content(text, depth=0):
             decoded_text = urllib.parse.unquote(text)
             if decoded_text != text:
                 text = decoded_text
-                findings.append("INFO: URL-encoded content de-obfuscated")
+                findings.append("ALERT: URL-encoded content de-obfuscated")
         except: pass
         
     # 1.3 Extract hidden URLs staged within JavaScript variables
