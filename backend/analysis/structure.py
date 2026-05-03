@@ -109,16 +109,31 @@ def analyze_structure(reader, file_stream):
                     for af_ref in af_list:
                         af_obj = af_ref.get_object()
                         if af_obj:
-                            f_name = af_obj.get("/F", "Unknown")
-                            
+                            f_name = af_obj.get("/F", "Unknown")                        
                             f_type = "Unknown"
+                            scan_status = ""
+                            
                             if "/EF" in af_obj:
                                 ef_dict = af_obj["/EF"].get_object()
                                 if "/F" in ef_dict:
                                     emb_obj = ef_dict["/F"].get_object()
                                     f_type = emb_obj.get("/Subtype", "Unknown").replace("/", "")
+                                    
+                                    try:
+                                        embedded_data = emb_obj.get_data()
+                                        if embedded_data:
+                                            decoded_text = embedded_data.decode('utf-8', errors='ignore')
+                                            
+                                            from analysis.content import analyze_content
+                                            content_findings = analyze_content(decoded_text)
+                                            
+                                            for cf in content_findings:
+                                                findings.append(f"{cf} (Found inside embedded file: {f_name})")
+                                                
+                                    except Exception as e:
+                                        scan_status = " [Scan Failed]"
                             
-                            af_details.append(f"{f_name} [Type: {f_type}]")
+                            af_details.append(f"{f_name} [Type: {f_type}{scan_status}]")
                     
                     if af_details:
                         details_str = ", ".join(af_details)
