@@ -92,37 +92,43 @@ def upload_file():
     # -------------------------------------------------------------------------
     try:
         res_content = analyze_content(clean_text)
-        raw_data_string = file_content.decode('utf-8', errors='ignore')
-        
-        raw_uris = re.findall(r'/URI\s*\((.*?)\)', raw_data_string)
+
+        raw_uris = re.findall(rb'/URI\s*\((.*?)\)', file_content)
         for uri in raw_uris:
-            res_content.append(f"ALERT: Hidden URI found in raw scan: {uri}")
+            uri_str = uri.decode('utf-8', errors='ignore')
+            res_content.append(f"ALERT: Hidden URI found in raw scan: {uri_str}")
             
-        if "/OpenAction" in raw_data_string:
+        if b"/OpenAction" in file_content:
             res_content.append("ALERT: Automatic execution trigger found in raw data")
             
-        if "/AA" in raw_data_string:
+        if b"/AA" in file_content:
             res_content.append("ALERT: Event-based execution trigger found in raw data")
                 
-        if "/Launch" in raw_data_string:
+        if b"/Launch" in file_content:
             res_content.append("ALERT: Embedded file launch trigger (/Launch) found in raw data")
 
-        if "/SubmitForm" in raw_data_string:
+        if b"/SubmitForm" in file_content:
             res_content.append("ALERT: Form submission trigger (/SubmitForm) found in raw data")
 
-        if "/GoToE" in raw_data_string:
+        if b"/GoToE" in file_content:
             res_content.append("ALERT: Remote PDF embedded link (/GoToE) found in raw data")
 
-        if "/JavaScript" in raw_data_string or "/JS" in raw_data_string:
-            res_content.append("ALERT: Scripting indicators found in raw binary data")
-
-        if "/RichMedia" in raw_data_string:
+        if b"/JavaScript" in file_content or b"/JS" in file_content:
+            res_content.append("ALERT: Scripting indicators found in raw binary data (JavaScript)")
+            
+        if b"application/x-formcalc" in file_content or b"contentType='application/x-formcalc'" in file_content:
+            res_content.append("ALERT: Scripting indicators found in raw binary data (FormCalc)")
+            
+        if b"<?xml-stylesheet" in file_content:
+            res_content.append("ALERT: Scripting indicators found in raw binary data (XSLT/XML)")
+            
+        if b"/RichMedia" in file_content:
             res_content.append("ALERT: RichMedia object (Potential exploit carrier) found in raw data")
 
-        if "/Crypt" in raw_data_string:
+        if b"/Crypt" in file_content:
             res_content.append("ALERT: Custom encryption filter (/Crypt) found in raw data")
 
-        if "/JBIG2Decode" in raw_data_string:
+        if b"/JBIG2Decode" in file_content:
             res_content.append("ALERT: Suspicious compression filter (/JBIG2Decode) detected")
 
     except Exception as e:
