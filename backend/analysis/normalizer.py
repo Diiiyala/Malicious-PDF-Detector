@@ -25,6 +25,7 @@ def normalize_all(text,  max_rounds=3, max_size=2_000_000):
 
         current = decode_pdf_hex_names(current)
         current = decode_unicode_escapes(current)
+        current = decode_pdf_octal(current)
         current = normalize_js_brackets(current)
         current = normalize_join(current)
         current = normalize_string_concat(current)
@@ -104,7 +105,6 @@ def normalize_string_concat(text):
         text = re.sub(pattern, lambda m: f'"{m.group(2)+m.group(4)}"', text)
     return text
 
-
 def normalize_join(text):
     
     return re.sub(
@@ -136,13 +136,30 @@ def normalize_urls(text):
     text = re.sub(r'\(\.\)', '.', text, flags=re.IGNORECASE)
     text = re.sub(r'hxxp', 'http', text, flags=re.IGNORECASE)
     text = re.sub(r'h\*\*p', 'http', text, flags=re.IGNORECASE)
-    text = re.sub(r'(https?|ftp|smb|file)\s*:\s*/\s*/', r'\1://', text, flags=re.IGNORECASE)
+    text = re.sub(r'wxxs', 'wss', text, flags=re.IGNORECASE)
+    text = re.sub(r'wxx', 'ws', text, flags=re.IGNORECASE)
+    text = re.sub(r'(https?|ftp|smb|file|wss?)\s*:\s*/\s*/', r'\1://', text, flags=re.IGNORECASE)
     
     return text
 
 # -------------------------------------------------------------------------
 # 5. Decoding
 # -------------------------------------------------------------------------
+
+def decode_pdf_octal(text):
+    
+    if not text:
+        return ""
+        
+    def replace_octal(match):
+        try:
+            octal_str = match.group(1)
+            return chr(int(octal_str, 8))
+        except (ValueError, TypeError):
+            return match.group(0)
+
+    return re.sub(r'\\([0-7]{1,3})', replace_octal, text)
+
 
 def decode_unicode_escapes(text):
     try:
