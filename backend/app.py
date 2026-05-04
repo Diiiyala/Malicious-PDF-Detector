@@ -20,6 +20,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def deep_binary_scan(file_content):
+    extra_findings = []
+    patterns = {
+        rb"/AA\s*<<\s*/O": "ALERT: Hidden automatic execution trigger (/AA /O) detected in raw stream",
+        rb"/S\s*/URI": "ALERT: Direct URI action detected in hidden object",
+        rb"/JS\s*\(": "ALERT: Scripting indicator found in malformed object",
+        rb"/OpenAction": "ALERT: Automatic execution trigger found in raw data",
+        rb"/AA": "ALERT: Event-based execution trigger found in raw data",
+        rb"/Launch": "ALERT: Embedded file launch trigger (/Launch) found in raw data",
+        rb"/SubmitForm": "ALERT: Form submission trigger (/SubmitForm) found in raw data",
+        rb"/GoToE": "ALERT: Remote PDF embedded link (/GoToE) found in raw data",
+        rb"/JavaScript": "ALERT: Scripting indicators found in raw binary data (JavaScript)",
+        rb"/JS": "ALERT: Scripting indicators found in raw binary data (JavaScript)",
+        rb"application/x-formcalc": "ALERT: Scripting indicators found in raw binary data (FormCalc)",
+        rb"<?xml-stylesheet": "ALERT: Scripting indicators found in raw binary data (XSLT/XML)",
+        rb"/RichMedia": "ALERT: RichMedia object (Potential exploit carrier) found in raw data",
+        rb"/Crypt": "ALERT: Custom encryption filter (/Crypt) found in raw data",
+        rb"/JBIG2Decode": "ALERT: Suspicious compression filter (/JBIG2Decode) detected"
+    }
+    
+    for pattern, message in patterns.items():
+        if re.search(pattern, file_content, re.IGNORECASE):
+            extra_findings.append(message)
+    return extra_findings
+
+
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"message": "Malicious PDF Detector API is running", "status": "OK"})
@@ -92,45 +118,15 @@ def upload_file():
     # -------------------------------------------------------------------------
     try:
         res_content = analyze_content(clean_text)
+        
+        raw_findings = deep_binary_scan(file_content)
+        res_content.extend(raw_findings)
 
         raw_uris = re.findall(rb'/URI\s*\((.*?)\)', file_content)
         for uri in raw_uris:
             uri_str = uri.decode('utf-8', errors='ignore')
             res_content.append(f"ALERT: Hidden URI found in raw scan: {uri_str}")
-            
-        if b"/OpenAction" in file_content:
-            res_content.append("ALERT: Automatic execution trigger found in raw data")
-            
-        if b"/AA" in file_content:
-            res_content.append("ALERT: Event-based execution trigger found in raw data")
-                
-        if b"/Launch" in file_content:
-            res_content.append("ALERT: Embedded file launch trigger (/Launch) found in raw data")
-
-        if b"/SubmitForm" in file_content:
-            res_content.append("ALERT: Form submission trigger (/SubmitForm) found in raw data")
-
-        if b"/GoToE" in file_content:
-            res_content.append("ALERT: Remote PDF embedded link (/GoToE) found in raw data")
-
-        if b"/JavaScript" in file_content or b"/JS" in file_content:
-            res_content.append("ALERT: Scripting indicators found in raw binary data (JavaScript)")
-            
-        if b"application/x-formcalc" in file_content or b"contentType='application/x-formcalc'" in file_content:
-            res_content.append("ALERT: Scripting indicators found in raw binary data (FormCalc)")
-            
-        if b"<?xml-stylesheet" in file_content:
-            res_content.append("ALERT: Scripting indicators found in raw binary data (XSLT/XML)")
-            
-        if b"/RichMedia" in file_content:
-            res_content.append("ALERT: RichMedia object (Potential exploit carrier) found in raw data")
-
-        if b"/Crypt" in file_content:
-            res_content.append("ALERT: Custom encryption filter (/Crypt) found in raw data")
-
-        if b"/JBIG2Decode" in file_content:
-            res_content.append("ALERT: Suspicious compression filter (/JBIG2Decode) detected")
-
+                       
     except Exception as e:
         logger.error(f"Internal Error during content analysis: {e}")
         res_content = ["ALERT: Analysis process interrupted during content scan"]
