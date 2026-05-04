@@ -3,6 +3,7 @@ from io import BytesIO
 from pypdf import PdfReader
 import logging
 
+from analysis.normalizer import normalize_all
 from analysis.text import extract_text
 from analysis.content import analyze_content
 from analysis.structure import analyze_structure
@@ -57,7 +58,6 @@ def upload_file():
         try:
             text, res_text = extract_text(reader)
         except Exception:
-            logger.error("Text extraction failed, using raw content decode")
             text = file_content.decode('utf-8', errors='ignore')
             res_text = ["ALERT: Analysis process interrupted during text extraction"]
     else:
@@ -65,16 +65,22 @@ def upload_file():
         res_text = ["INFO: Deep text extraction skipped due to malformed PDF structure"]
 
     # -------------------------------------------------------------------------
-    # 3. Content
+    # 3. Normalization
+    # -------------------------------------------------------------------------
+    
+    clean_text = normalize_all(text)
+    
+    # -------------------------------------------------------------------------
+    # 4. Content
     # -------------------------------------------------------------------------
     try:
-        res_content = analyze_content(text)
+        res_content = analyze_content(clean_text)
     except Exception as e:
         logger.error(f"Internal Error during content analysis: {e}")
         res_content = ["ALERT: Analysis process interrupted during content scan"]
 
     # -------------------------------------------------------------------------
-    # 4. Structure 
+    # 5. Structure 
     # -------------------------------------------------------------------------
     try:
         file_stream.seek(0)
@@ -84,7 +90,7 @@ def upload_file():
         res_structure.append("ALERT: Analysis process interrupted during structural scan")
 
     # -------------------------------------------------------------------------
-    # 5. Metadata 
+    # 6. Metadata 
     # -------------------------------------------------------------------------
     if reader:
         try:
@@ -95,7 +101,7 @@ def upload_file():
         res_metadata = ["INFO: Metadata analysis skipped (Malformed Structure)"]
 
     # -------------------------------------------------------------------------
-    # 6. Risk Calculation
+    # 7. Risk Calculation
     # -------------------------------------------------------------------------
     all_findings = sorted(set(res_content + res_structure + res_metadata + res_text))
     score, risk_percentage, level = calculate_risk(all_findings)
