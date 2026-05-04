@@ -3,7 +3,7 @@ from collections import Counter
 
 IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
-URL_PATTERN = re.compile(r'\b(?:https?|ftp|ftps|file|smb|ssh|telnet|gopher|ldap|mailto|news|nntp|irc|data|javascript|vnd\.sun\.star\.expand)://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
+URL_PATTERN = re.compile(r'\b(?:https?|ftp|ftps|file|smb|ssh|telnet|gopher|ldap|mailto|news|nntp|irc|data|javascript|ws|wss|vnd\.sun\.star\.expand)://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
 UNC_PATTERN = re.compile(r'(?:\\\\|\\\\\\\\)[a-zA-Z0-9.-]+\\[^\s\)\>]+')
 JS_URL_EXTRACTOR = re.compile(r'(?:cPath|url|uri|location|src|cURL|action|target|soapAction)\s*[:=]\s*["\']?([^"\'\s\)]+)', re.IGNORECASE)
@@ -50,7 +50,8 @@ def analyze_content(text, depth=0):
         r"app\.openDoc": "Remote document opening",
         r"launchURL": "URL launching",
         r"<\s*script": "Embedded HTML Script tag",
-        r"new\s+Image\s*\(": "JS-based Beacon (new Image)"
+        r"new\s+Image\s*\(": "JS-based Beacon (new Image)",
+        r"new\s+WebSocket\s*\(": "WebSocket Connection (C2 Channel)"
     }
                
     for p, label in exec_patterns.items():
