@@ -69,6 +69,7 @@ def calculate_risk(findings):
         "ALERT: High-confidence obfuscated script detected": 12,
         "ALERT: Hidden JS-staged URL detected": 12,
         "ALERT: Scripting execution pattern detected": 12,
+        "WebSocket Connection (C2 Channel)": 12,
         "Ransomware Indicators": 12,
         "Security Disabling": 10,
         "Registry Tampering": 10,
