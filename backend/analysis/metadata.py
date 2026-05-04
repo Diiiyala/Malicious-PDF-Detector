@@ -1,4 +1,4 @@
-import re, base64, codecs, urllib.parse
+import re
 from datetime import datetime
 
 SUSPICIOUS_WORDS = [
@@ -20,7 +20,6 @@ MALICIOUS_PARAMS = ["php", "exe", "sh", "py", "cmd", "cookie", "steal", "script"
 
 def analyze_metadata(reader):
     findings = []
-    decoded_values = []
     all_keywords = set()
 
     try:
@@ -31,34 +30,10 @@ def analyze_metadata(reader):
         
         full_metadata_text = " ".join([str(v) for v in metadata.values() if v]).lower()
         
-        # -------------------------------------------------------------------------
-        # 1. Timestamp Anomaly & Future Date
-        # -------------------------------------------------------------------------
-            
-        try:
-            creation_date = metadata.get("/CreationDate")
-            mod_date = metadata.get("/ModDate")   
-            today_str = datetime.now().strftime('%Y%m%d')
-            today_int = int(today_str)
-
-            if creation_date:
-                c_raw = re.sub(r'[^0-9]', '', str(creation_date))[:8]
-                if len(c_raw) == 8:
-                    c_pretty = f"{c_raw[:4]}-{c_raw[4:6]}-{c_raw[6:]}"                    
-                    if int(c_raw) > today_int:
-                        findings.append(f"ALERT: Future creation date detected ({c_pretty})")
-                    if mod_date:
-                        m_raw = re.sub(r'[^0-9]', '', str(mod_date))[:8]
-                        if len(m_raw) == 8:
-                            m_pretty = f"{m_raw[:4]}-{m_raw[4:6]}-{m_raw[6:]}"
-                            if int(m_raw) < int(c_raw):
-                                findings.append(f"ALERT: Timestamp anomaly detected (Created: {c_pretty}, Modified: {m_pretty})")                             
-                            if int(m_raw) > today_int:
-                                findings.append(f"ALERT: Future modification date detected ({m_pretty})")
-        except Exception: pass
+        analyze_timestamps(metadata, findings)
         
         # -------------------------------------------------------------------------
-        # 2. Individual Metadata Field Analysis
+        # 1. Individual Metadata Field Analysis
         # -------------------------------------------------------------------------
           
         for key, value in metadata.items():
@@ -68,7 +43,7 @@ def analyze_metadata(reader):
             val_lower = val.lower()
 
             # -------------------------------------------------------------------------
-            # 2.1 Suspicious keywords
+            # 1.1 Suspicious keywords
             # -------------------------------------------------------------------------
             
             for word in SUSPICIOUS_WORDS:
@@ -76,7 +51,7 @@ def analyze_metadata(reader):
                     all_keywords.add(word)
                     
             # -------------------------------------------------------------------------
-            #  2.2 URLs
+            #  1.2 URLs
             # -------------------------------------------------------------------------     
                            
             urls = re.findall(r'https?://\S+', val)
@@ -87,86 +62,25 @@ def analyze_metadata(reader):
                     findings.append(f"ALERT: Suspicious link detected ({clean_url})")
                     
             # -------------------------------------------------------------------------
-            # 2.3 XSS
+            # 1.3 XSS
             # -------------------------------------------------------------------------
             
             if re.search(r'<\s*script', val_lower) or "javascript:" in val_lower:
                 findings.append(f"ALERT: XSS injection attempt detected ({val})")
                 all_keywords.add("xss")
-
-            # -------------------------------------------------------------------------
-            # 2.4 Base64
-            # -------------------------------------------------------------------------
-            
-            if len(val) > 50 and is_base64(val):
-                try:
-                    decoded = base64.b64decode(val).decode("utf-8", errors="ignore")
-                    if readable_text(decoded):
-                        findings.append(f"ALERT: Encoded Base64 payload detected ({decoded})")
-                except: pass
-
-            # -------------------------------------------------------------------------
-            # 2.5 Hex decoding
-            # -------------------------------------------------------------------------
-            
-            try:
-                hex_clean = re.sub(r'[^0-9a-fA-F]', '', val)
-                
-                if len(hex_clean) >= 8 and len(hex_clean) % 2 == 0: 
-                    try:
-                        hex_bytes = bytes.fromhex(hex_clean)
-                        hex_decoded = hex_bytes.decode("utf-8", errors="ignore")
-                        
-                        if readable_text(hex_decoded, threshold=0.8):
-                            if any(x in hex_decoded.lower() for x in ["http", "cmd", "script", "powershell"]):
-                                findings.append(f"ALERT: Encoded Hex payload detected ({hex_decoded})")
-                    except: pass
-            except: pass
-
-            # -------------------------------------------------------------------------
-            # 2.6 ROT13 decoding
-            # -------------------------------------------------------------------------
-            
-            try:
-                val_stripped = val.strip()
-                if re.fullmatch(r'[A-Za-z0-9_:/.-]+', val_stripped):
-                    if not val_stripped.lower().startswith(('http', 'www', '<script')):                      
-                        rot13_decoded = codecs.decode(val_stripped, 'rot_13')                    
-                        if readable_text(rot13_decoded) and rot13_decoded.lower() != val_stripped.lower():
-                            if any(x in rot13_decoded.lower() for x in ["http", "cmd", "script", "admin"]):
-                                findings.append(f"ALERT: Encoded ROT13 payload detected ({rot13_decoded})")
-            except Exception: pass
-
-            # -------------------------------------------------------------------------
-            # 2.7 URL decoding
-            # -------------------------------------------------------------------------
-            
-            try:
-                url_decoded = urllib.parse.unquote(val)
-                if url_decoded != val and readable_text(url_decoded):
-                    decoded_values.append(f"URL decoded: {url_decoded}")
-                    if any(x in url_decoded.lower() for x in ["cmd", "powershell", "script"]):
-                        findings.append(f"ALERT: Encoded URL payload detected ({url_decoded})")
-            except: pass
             
             # -------------------------------------------------------------------------
-            # 2.8 Length and Obfuscation
+            # 1.4 Length
             # -------------------------------------------------------------------------
             
             if len(val) > 200:
                 findings.append("INFO: Long metadata field detected")
 
-            non_ascii_ratio = sum(1 for c in val if ord(c) > 127) / len(val)
-            if non_ascii_ratio > 0.3:
-                percentage = int(non_ascii_ratio * 100)
-                findings.append(f"ALERT: Potential obfuscation detected ({percentage}% non-ASCII characters)")
-
-
         if all_keywords:
             findings.append(f"ALERT: Suspicious keywords detected ({', '.join(all_keywords)})")
             
         # -------------------------------------------------------------------------
-        # 3. Hacking tools
+        # 2. Hacking tools
         # -------------------------------------------------------------------------
         
         found_tools = [tool.capitalize() for tool in HACKING_TOOLS if tool.lower() in full_metadata_text]
@@ -176,41 +90,10 @@ def analyze_metadata(reader):
             findings.append(f"ALERT: Hacking tools detected ({tools_str})")
 
         # -------------------------------------------------------------------------
-        # 4. Suspicious sources
+        # 3. Suspicious sources
         # -------------------------------------------------------------------------
         
-        sources_found = set()
-        
-        target_fields = ["/Author", "/Creator", "/Producer"]
-        suspicious_indicators = [
-            "attacker", "malicious", "script", "exploit", "payload", "shell", 
-            "dropper", "backdoor", "stager", "bypass", "encoded", "obfuscated",
-
-            "metasploit", "cobalt strike", "mimikatz", "powersploit", "empire", 
-            "burp", "collaborator", "interact.sh", "jonaslejon", "deepzec",
-
-            "cve-2018-4993", "cve-2019-7089", "cve-2014-8453", "cve-2017-10951",
-            "cve-2024-4367", "cve-2020-29075", "cve-2022-28244", "cve-2018-5158",
-            "cve-2025-66516", "cve-2025-70401", "cve-2024-12426", "cve-2025-59803",
-
-            "callback", "phone-home", "exfiltration", "tunneling", "beacon",
-            "injection", "unauthorized", "suspicious", "leak", "harvesting"
-        ]
-        found_details = []
-
-        for field in target_fields:
-            if field in metadata:
-                val_lower = str(metadata[field]).lower()
-                for indicator in suspicious_indicators:
-                    if indicator in val_lower:
-                        field_name = field.replace("/", "")
-                        found_details.append(f"{field_name}/{indicator.capitalize()}")
-
-        if found_details:
-            unique_details = ", ".join(sorted(list(set(found_details))))
-            findings.append(f"ALERT: Suspicious metadata source detected ({unique_details})")
-         
-        findings.extend(decoded_values)
+        analyze_suspicious_sources(metadata, findings)
                             
     except Exception as e:
         findings.append(f"Metadata error: {str(e)}")
@@ -221,17 +104,60 @@ def analyze_metadata(reader):
 #  Helpers
 # -------------------------------------------------------------------------
 
-def is_base64(s):
+def analyze_timestamps(metadata, findings):
+
     try:
-        if not re.fullmatch(r'[A-Za-z0-9+/=]+', s):
-            return False
-        return base64.b64encode(base64.b64decode(s)) == s.encode()
-    except:
-        return False
+        creation_date = metadata.get("/CreationDate")
+        mod_date = metadata.get("/ModDate")   
+        today_str = datetime.now().strftime('%Y%m%d')
+        today_int = int(today_str)
 
+        if creation_date:
+            c_raw = re.sub(r'[^0-9]', '', str(creation_date))[:8]
+            if len(c_raw) == 8:
+                c_pretty = f"{c_raw[:4]}-{c_raw[4:6]}-{c_raw[6:]}"                    
+                if int(c_raw) > today_int:
+                    findings.append(f"ALERT: Future creation date detected ({c_pretty})")
+                if mod_date:
+                    m_raw = re.sub(r'[^0-9]', '', str(mod_date))[:8]
+                    if len(m_raw) == 8:
+                        m_pretty = f"{m_raw[:4]}-{m_raw[4:6]}-{m_raw[6:]}"
+                        if int(m_raw) < int(c_raw):
+                            findings.append(f"ALERT: Timestamp anomaly detected (Created: {c_pretty}, Modified: {m_pretty})")                             
+                        if int(m_raw) > today_int:
+                            findings.append(f"ALERT: Future modification date detected ({m_pretty})")
+    except Exception: pass
 
-def readable_text(s, threshold=0.6):
-    if not s:
-        return False
-    ratio = sum(1 for c in s if 32 <= ord(c) <= 126) / len(s)
-    return ratio >= threshold
+    
+def analyze_suspicious_sources(metadata, findings):
+
+    sources_found = set()
+        
+    target_fields = ["/Author", "/Creator", "/Producer"]
+    suspicious_indicators = [
+        "attacker", "malicious", "script", "exploit", "payload", "shell", 
+        "dropper", "backdoor", "stager", "bypass", "encoded", "obfuscated",
+
+        "metasploit", "cobalt strike", "mimikatz", "powersploit", "empire", 
+        "burp", "collaborator", "interact.sh", "jonaslejon", "deepzec",
+
+        "cve-2018-4993", "cve-2019-7089", "cve-2014-8453", "cve-2017-10951",
+        "cve-2024-4367", "cve-2020-29075", "cve-2022-28244", "cve-2018-5158",
+        "cve-2025-66516", "cve-2025-70401", "cve-2024-12426", "cve-2025-59803",
+
+        "callback", "phone-home", "exfiltration", "tunneling", "beacon",
+        "injection", "unauthorized", "suspicious", "leak", "harvesting"
+    ]
+    found_details = []
+        
+    for field in target_fields:
+        if field in metadata:
+            val_lower = str(metadata[field]).lower()
+            for indicator in suspicious_indicators:
+                if indicator in val_lower:
+                    field_name = field.replace("/", "")
+                    found_details.append(f"{field_name}/{indicator.capitalize()}")
+
+    if found_details:
+        unique_details = ", ".join(sorted(list(set(found_details))))
+        findings.append(f"ALERT: Suspicious metadata source detected ({unique_details})")
