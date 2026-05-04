@@ -1,4 +1,4 @@
-import re, math, base64, string, urllib.parse
+import re, math, base64, string
 from collections import Counter
 
 IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
@@ -32,29 +32,10 @@ def analyze_content(text, depth=0):
     # 1. De-obfuscation Layer
     # -------------------------------------------------------------------------
     
-    # 1.1 Decode hex-escaped strings
-    if "\\x" in text.lower():
-        decoded_hex = decode_hex_escapes(text)
-        if decoded_hex != text:
-            text = decoded_hex
-            findings.append("ALERT: Hex-encoded content (\\xXX) de-obfuscated")
-            indicators["obfuscation"] = True
-    
-    # 1.2 Normalize URL-encoded characters
-    if "%" in text:
-        try:
-            decoded_text = urllib.parse.unquote(text)
-            if decoded_text != text:
-                text = decoded_text
-                findings.append("ALERT: URL-encoded content de-obfuscated")
-        except: pass
-        
-    # 1.3 Extract hidden URLs staged within JavaScript variables
     js_links = JS_URL_EXTRACTOR.findall(text)
     for link in js_links:
-        clean_link = clean_url_logic(link)
-        if URL_PATTERN.match(clean_link) or IP_PATTERN.search(clean_link):
-            findings.append(f"ALERT: Hidden JS-staged URL detected: {clean_link}")
+        if URL_PATTERN.match(link) or IP_PATTERN.search(link):
+            findings.append(f"ALERT: Hidden JS-staged URL detected: {link}")
             indicators["network"] = True
     
     # -------------------------------------------------------------------------
@@ -119,8 +100,9 @@ def analyze_content(text, depth=0):
         findings.append(f"ALERT: Cryptocurrency address found (Potential Ransomware)")
 
     # -------------------------------------------------------------------------
-    # 3. Smart Layering 
+    # 3. Layered Analysis
     # -------------------------------------------------------------------------
+    
     candidates = B64_PATTERN.findall(text)
     for cand in candidates:
         try:
@@ -128,22 +110,15 @@ def analyze_content(text, depth=0):
             
             if sum(1 for c in decoded if c in string.printable) / len(decoded) > 0.85:
                 sub_res = analyze_content(decoded, depth + 1)
-                
-                inner_urls = URL_PATTERN.findall(decoded)
-                
-                if inner_urls and any("ALERT" in f for f in sub_res):
-                    findings.append(f"ALERT: Dangerous file download detected (Inside Hidden Layer {depth+1}: {inner_urls[0]})")
-                
                 for f in sub_res:
-                    if "ALERT" in f and "Dangerous file" not in f:
+                    if "ALERT" in f:
                         findings.append(f"ALERT: Hidden Layer {depth+1}: {f.replace('ALERT: ', '')}")
-                        
-        except: 
-            continue
+        except: continue
 
     # -------------------------------------------------------------------------
     # 4. Network Indicators
     # -------------------------------------------------------------------------
+    
     unc_paths = UNC_PATTERN.findall(text)
     for unc in unc_paths:
         findings.append(f"ALERT: UNC path detected (Potential NTLM Hash Theft): {unc}")
@@ -153,7 +128,7 @@ def analyze_content(text, depth=0):
     suspicious_hosts = []
     
     for url in urls:
-        c_url = clean_url_logic(url.strip('()<>[]"\'').lower())
+        c_url = url.strip('()<>[]"\'').lower()
         domain_match = re.search(r'https?://([^/]+)', c_url)
         domain = domain_match.group(1) if domain_match else ""
 
@@ -177,6 +152,7 @@ def analyze_content(text, depth=0):
     # -------------------------------------------------------------------------
     # 5. Correlation Engine
     # -------------------------------------------------------------------------
+    
     if has_gotoe and unc_paths:
         findings.append("ALERT: NTLM Relay attack pattern confirmed (GoToE + UNC)")
         
@@ -200,22 +176,6 @@ def analyze_content(text, depth=0):
 #  Helpers
 # -------------------------------------------------------------------------
 
-def decode_hex_escapes(text):
-    try:
-        hex_pattern = re.compile(rb'\\x([0-9a-fA-F]{2})')
-        if isinstance(text, str):
-            text_bytes = text.encode('utf-8', errors='ignore')
-        else:
-            text_bytes = text
-
-        def replace_hex(match):
-            return bytes([int(match.group(1), 16)])
-
-        decoded = hex_pattern.sub(replace_hex, text_bytes)
-        return decoded.decode('utf-8', errors='ignore')
-    except:
-        return text
-    
 def calculate_entropy(data):
     if not data: return 0
     counts = Counter(data)
@@ -223,6 +183,7 @@ def calculate_entropy(data):
     return -sum((count/length) * math.log2(count/length) for count in counts.values())
 
 def check_obfuscation(text, compact_text):
+    if not text: return False
     original_entropy = calculate_entropy(text)
     compact_entropy = calculate_entropy(compact_text)
     entropy_jump = compact_entropy - original_entropy
@@ -233,14 +194,10 @@ def check_obfuscation(text, compact_text):
 def diagnose_content(text, score):
     if not text: return "Empty"
     sample = text[:200]
-    hex_ratio = sum(1 for c in sample if c in string.hexdigits) / len(sample)
+    hex_ratio = sum(1 for c in sample if c in string.hexdigits) / len(sample) if len(sample) > 0 else 0
     
     if hex_ratio > 0.8: return "Possible Shellcode Stream"
     if score > 6.5: return "Highly Random Data (Encrypted/Compressed)"
     
     printable_ratio = sum(1 for c in text if c in string.printable) / len(text)
     return "Minified/Compressed Text" if printable_ratio > 0.9 else "Obfuscated Content"
-
-def clean_url_logic(url):
-    cleaned = url.strip('()<>[]"\'\\ ,;').split(')')[0].split('"')[0]
-    return cleaned.replace("[.]", ".").replace("hxxp", "http").replace("(.)", ".")
