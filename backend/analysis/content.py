@@ -3,20 +3,22 @@ from collections import Counter
 
 IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
-URL_PATTERN = re.compile(r'https?://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
+URL_PATTERN = re.compile(r'\b(?:https?|ftp|ftps|file|smb|ssh|telnet|gopher|ldap|mailto|news|nntp|irc|data|javascript|vnd\.sun\.star\.expand)://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
 UNC_PATTERN = re.compile(r'(?:\\\\|\\\\\\\\)[a-zA-Z0-9.-]+\\[^\s\)\>]+')
-JS_URL_EXTRACTOR = re.compile(r'(?:cPath|url|uri|location)\s*[:=]\s*["\']?([^"\'\s\)]+)', re.IGNORECASE)
+JS_URL_EXTRACTOR = re.compile(r'(?:cPath|url|uri|location|src|cURL|action|target|soapAction)\s*[:=]\s*["\']?([^"\'\s\)]+)', re.IGNORECASE)
 
 SHORTENERS = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "is.gd", "buff.ly", "adf.ly"]
-SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost"]
-SUSPICIOUS_PARAMS = ["download", "payload", "cmd", "exec", "bin"]
+SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost", "script", "image", "jonaslejon", "malicious-pdf", "deepzec", "modzero"]
+SUSPICIOUS_PARAMS = ["download", "payload", "cmd", "exec", "bin", "cSubmitAs", "cFS", "CHTTP", "xdpContent", "textEncoding"]
 
 SYSTEM_THREATS = {
     "Ransomware Indicators": [r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked"],
     "Registry Tampering": [r"reg add", r"HKEY_LOCAL_MACHINE", r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"],
     "Security Disabling": [r"netsh advfirewall", r"Set-MpPreference", r"DisableRealtimeMonitoring", r"taskkill /f /im"],
-    "Stealer/Spyware": [r"cookie", r"password", r"wallet\.dat", r"Login Data", r"autofill"]
+    "Stealer/Spyware": [r"cookie", r"password", r"wallet\.dat", r"Login Data", r"autofill"],
+    "Environment Leak": [r"\$\{HOME\}", r"\.env", r"AWS_CREDENTIALS", r"vnd\.sun\.star\.expand"], 
+    "XFA/SOAP Attack": [r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT"]
 }
 
 def analyze_content(text, depth=0):
@@ -65,7 +67,9 @@ def analyze_content(text, depth=0):
         r"\bexec\s*\(": "exec() function",
         r"String\.fromCharCode": "Charcode obfuscation",
         r"app\.openDoc": "Remote document opening",
-        r"launchURL": "URL launching"
+        r"launchURL": "URL launching",
+        r"<\s*script": "Embedded HTML Script tag",
+        r"new\s+Image\s*\(": "JS-based Beacon (new Image)"
     }
                
     for p, label in exec_patterns.items():
@@ -176,7 +180,7 @@ def analyze_content(text, depth=0):
     if has_gotoe and unc_paths:
         findings.append("ALERT: NTLM Relay attack pattern confirmed (GoToE + UNC)")
         
-    if indicators["execution"] and indicators["obfuscation"]:
+    if (indicators["execution"] or re.search(r"<\s*script", text, re.IGNORECASE)) and indicators["obfuscation"]:
         findings.append("ALERT: High-confidence obfuscated script detected")
         
     if indicators["payload"] and (indicators["execution"] or indicators["network"]):
