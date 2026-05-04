@@ -4,6 +4,7 @@ from pypdf import PdfReader
 from pdfminer.high_level import extract_text as pdfminer_extract
 import logging, re
 
+from analysis.binary import binary_scan
 from analysis.normalizer import normalize_all
 from analysis.text import extract_text
 from analysis.content import analyze_content
@@ -19,32 +20,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-def deep_binary_scan(file_content):
-    extra_findings = []
-    patterns = {
-        rb"/AA\s*<<\s*/O": "ALERT: Hidden automatic execution trigger (/AA /O) detected in raw stream",
-        rb"/S\s*/URI": "ALERT: Direct URI action detected in hidden object",
-        rb"/JS\s*\(": "ALERT: Scripting indicator found in malformed object",
-        rb"/OpenAction": "ALERT: Automatic execution trigger found in raw data",
-        rb"/AA": "ALERT: Event-based execution trigger found in raw data",
-        rb"/Launch": "ALERT: Embedded file launch trigger (/Launch) found in raw data",
-        rb"/SubmitForm": "ALERT: Form submission trigger (/SubmitForm) found in raw data",
-        rb"/GoToE": "ALERT: Remote PDF embedded link (/GoToE) found in raw data",
-        rb"/JavaScript": "ALERT: Scripting indicators found in raw binary data (JavaScript)",
-        rb"/JS": "ALERT: Scripting indicators found in raw binary data (JavaScript)",
-        rb"application/x-formcalc": "ALERT: Scripting indicators found in raw binary data (FormCalc)",
-        rb"<?xml-stylesheet": "ALERT: Scripting indicators found in raw binary data (XSLT/XML)",
-        rb"/RichMedia": "ALERT: RichMedia object (Potential exploit carrier) found in raw data",
-        rb"/Crypt": "ALERT: Custom encryption filter (/Crypt) found in raw data",
-        rb"/JBIG2Decode": "ALERT: Suspicious compression filter (/JBIG2Decode) detected"
-    }
-    
-    for pattern, message in patterns.items():
-        if re.search(pattern, file_content, re.IGNORECASE):
-            extra_findings.append(message)
-    return extra_findings
-
 
 @app.route("/", methods=["GET"])
 def home():
@@ -119,7 +94,7 @@ def upload_file():
     try:
         res_content = analyze_content(clean_text)
         
-        raw_findings = deep_binary_scan(file_content)
+        raw_findings = binary_scan(file_content)
         res_content.extend(raw_findings)
 
         raw_uris = re.findall(rb'/URI\s*\((.*?)\)', file_content)
