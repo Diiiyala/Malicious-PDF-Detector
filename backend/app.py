@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from io import BytesIO
 from pypdf import PdfReader
-import logging
+from pdfminer.high_level import extract_text as pdfminer_extract
+import logging, re
 
 from analysis.normalizer import normalize_all
 from analysis.text import extract_text
@@ -57,12 +58,28 @@ def upload_file():
     if reader:
         try:
             text, res_text = extract_text(reader)
-        except Exception:
-            text = file_content.decode('utf-8', errors='ignore')
-            res_text = ["ALERT: Analysis process interrupted during text extraction"]
+            
+        except Exception as e:
+            logger.warning(f"pypdf extraction failed, trying pdfminer fallback: {e}")
+            try:
+                file_stream.seek(0)
+                text = pdfminer_extract(file_stream)
+                res_text = ["INFO: Text extracted using fallback engine (pdfminer.six) after pypdf failure"]
+                
+            except Exception:
+                text = file_content.decode('utf-8', errors='ignore')
+                res_text = ["ALERT: Analysis process interrupted, using raw binary decode"]
     else:
-        text = file_content.decode('utf-8', errors='ignore')
-        res_text = ["INFO: Deep text extraction skipped due to malformed PDF structure"]
+        try:
+            logger.info("Attempting pdfminer.six for text extraction (No Reader)...")
+            file_stream.seek(0)
+            text = pdfminer_extract(file_stream)
+            res_text = ["INFO: Text extracted using fallback engine (pdfminer.six)"]
+            
+        except Exception as e:
+            logger.error(f"pdfminer fallback failed: {e}")
+            text = file_content.decode('utf-8', errors='ignore')
+            res_text = ["INFO: Deep text extraction skipped, using raw binary decode"]
 
     # -------------------------------------------------------------------------
     # 3. Normalization
@@ -75,6 +92,12 @@ def upload_file():
     # -------------------------------------------------------------------------
     try:
         res_content = analyze_content(clean_text)
+        
+        if not reader:
+            raw_uris = re.findall(r'/URI\s*\((.*?)\)', text)
+            for uri in raw_uris:
+                res_content.append(f"ALERT: Hidden URI found in raw scan: {uri}")
+                
     except Exception as e:
         logger.error(f"Internal Error during content analysis: {e}")
         res_content = ["ALERT: Analysis process interrupted during content scan"]
