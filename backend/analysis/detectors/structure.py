@@ -124,7 +124,7 @@ def analyze_structure(reader, file_stream):
                                         if embedded_data:
                                             decoded_text = embedded_data.decode('utf-8', errors='ignore')
                                             
-                                            from analysis.content import analyze_content
+                                            from analysis.detectors.content import analyze_content
                                             content_findings = analyze_content(decoded_text)
                                             
                                             for cf in content_findings:

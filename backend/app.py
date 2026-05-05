@@ -3,7 +3,7 @@ from io import BytesIO
 from pypdf import PdfReader
 import logging
 
-from analyzer import analyze_all_aspects
+from analysis.core.analyzer import analyze_all_aspects
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024

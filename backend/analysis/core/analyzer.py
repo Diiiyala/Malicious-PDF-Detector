@@ -1,13 +1,13 @@
 from pdfminer.high_level import extract_text as pdfminer_extract
 import logging, re
 
-from analysis.binary import binary_scan
-from analysis.normalizer import normalize_all
-from analysis.text import extract_text
-from analysis.content import analyze_content
-from analysis.structure import analyze_structure
-from analysis.metadata import analyze_metadata
-from analysis.risk import calculate_risk
+from analysis.utils.binary import binary_scan
+from analysis.utils.normalizer import normalize_all
+from analysis.detectors.text import extract_text
+from analysis.detectors.content import analyze_content
+from analysis.detectors.structure import analyze_structure
+from analysis.detectors.metadata import analyze_metadata
+from analysis.core.risk import calculate_risk
 
 logger = logging.getLogger(__name__)
 
