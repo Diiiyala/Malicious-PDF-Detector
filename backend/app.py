@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from io import BytesIO
 from pypdf import PdfReader
-import logging
+import logging, pikepdf
 
 from analysis.core.analyzer import analyze_all_aspects
 
@@ -43,8 +43,18 @@ def upload_file():
         
         except Exception as e:
             logger.warning(f"Metadata/Structure parsing failed for {file.filename}: {str(e)}")
-            initial_structure_findings.append("ALERT: Malformed PDF structure detected (Potential Evasion/Corruption)")
-            reader = None
+            try:
+                with pikepdf.open(BytesIO(file_content)) as pdf:
+                    repaired_stream = BytesIO()
+                    pdf.save(repaired_stream)
+                    repaired_data = repaired_stream.getvalue()
+                    file_stream = BytesIO(repaired_data)
+                    file_content = repaired_data
+                    reader = PdfReader(file_stream, strict=False)
+                    initial_structure_findings.append("ALERT: Malformed structure repaired and analyzed")
+                    
+            except Exception as repair_e:
+                logger.warning(f"Standard repair failed: {repair_e}, attempting manual wrapping...")
                         
         analysis_results = analyze_all_aspects(
             reader, 
