@@ -314,10 +314,22 @@ def perform_action_analysis(reader, root):
                 elif "/A" in f_obj:
                     action_dict = f_obj["/A"].get_object()
                     a_type = action_dict.get("/S")
-                    if a_type == "/GoToE" and action_dict.get("/F"):
-                        add_location(f"ALERT: Form GoToE pointing to: {action_dict.get('/F')}", f"Field: {field_name}")
+                    
+                    if a_type == "/GoToE":
+                        f_spec = action_dict.get("/F")
+                        f_path = "Unknown"
+                        if f_spec:
+                            f_spec_obj = f_spec.get_object() if hasattr(f_spec, "get_object") else f_spec
+                            if isinstance(f_spec_obj, dict):
+                                f_path = f_spec_obj.get("/F", "Unknown")
+                            else:
+                                f_path = str(f_spec_obj)
+                        
+                        add_location(f"ALERT: Form GoToE pointing to: ({f_path})", f"Field: {field_name}")
                     else:
-                        add_location("ALERT: Form Field Action", f"Field: {field_name}")
+                        a_type_clean = str(a_type).replace("/", "")
+                        add_location(f"ALERT: Form Field Action (/{a_type_clean})", f"Field: {field_name}")
+                        
     except: pass
     
     # Analyze Outlines
