@@ -129,7 +129,8 @@ def clean_findings(res_content, res_structure):
 
     for threat in shared_threats:
 
-        if any(threat in f and "found in:" in f for f in final_structure):
+        has_detailed = any(threat in f and ("found in:" in f or "pointing to:" in f) for f in final_structure)
+        if has_detailed:
             final_structure = {f for f in final_structure if not (f == threat)}
             final_content = {f for f in final_content if not (f == threat)}
 
