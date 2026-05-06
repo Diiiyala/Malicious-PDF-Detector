@@ -58,9 +58,9 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
     # -------------------------------------------------------------------------
     try:
         res_content = analyze_content(clean_text)
-        
-        raw_findings = binary_scan(file_content)
-        res_content.extend(raw_findings)
+        bin_content, bin_structure = binary_scan(file_content)
+        res_content.extend(bin_content)
+        res_structure.extend(bin_structure)
 
         raw_uris = re.findall(rb'/URI\s*\((.*?)\)', file_content)
         for uri in raw_uris:
@@ -78,6 +78,7 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
     try:
         file_stream.seek(0)
         res_structure.extend(analyze_structure(reader, file_stream))
+        res_content, res_structure = clean_findings(res_content, res_structure)
     except Exception as e:
         logger.error(f"Internal Error during structure analysis: {e}")
         res_structure.append("ALERT: Analysis process interrupted during structural scan")
@@ -113,3 +114,23 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
         "risk_level": level
     }
     
+    
+def clean_findings(res_content, res_structure):
+    final_content = set(res_content)
+    final_structure = set(res_structure)
+
+    shared_threats = [
+        "ALERT: Automatic triggers (/AA)",
+        "ALERT: Silent page trigger (/O or /C)",
+        "ALERT: Auto-executable (/OpenAction)",
+        "ALERT: Remote PDF embedded link (/GoToE)",
+        "ALERT: Annotation (/Launch)"
+    ]
+
+    for threat in shared_threats:
+
+        if any(threat in f and "found in:" in f for f in final_structure):
+            final_structure = {f for f in final_structure if not (f == threat)}
+            final_content = {f for f in final_content if not (f == threat)}
+
+    return sorted(list(final_content)), sorted(list(final_structure))
