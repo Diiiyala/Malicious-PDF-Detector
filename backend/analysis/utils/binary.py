@@ -4,12 +4,30 @@ def binary_scan(file_content):
     content_findings = []
     structure_findings = []
     
+    raw_f_matches = re.finditer(rb'/F\s*\(', file_content)
+    for match in raw_f_matches:
+        start_pos = match.end()
+        depth = 1
+        content = bytearray()
+        
+        for i in range(start_pos, len(file_content)):
+            char = file_content[i]
+            if char == ord(b'('):
+                depth += 1
+            elif char == ord(b')'):
+                depth -= 1
+                if depth == 0:
+                    break
+            content.append(char)
+        
+        path_str = content.decode('utf-8', errors='ignore')
+        structure_findings.append(f"ALERT: Remote PDF embedded link (/GoToE) pointing to: ({path_str})")
+    
     structure_patterns = {
         rb"/AA\s*<<\s*/O": "ALERT: Silent page trigger (/O or /C)",
         rb"/OpenAction": "ALERT: Auto-executable (/OpenAction)",
         rb"/AA": "ALERT: Automatic triggers (/AA)",
-        rb"/Launch": "ALERT: Annotation (/Launch)",
-        rb"/GoToE": "ALERT: Remote PDF embedded link (/GoToE)",
+        rb"/Launch": "ALERT: Annotation (/Launch)"
     }
     
     content_patterns = {
