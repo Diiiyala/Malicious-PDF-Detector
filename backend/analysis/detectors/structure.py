@@ -17,20 +17,7 @@ def analyze_structure(reader, file_stream):
     # -------------------------------------------------------------------------
     try:
         file_stream.seek(0)
-        raw_data = file_stream.read()
-        
-        raw_indicators = {
-            b"/JavaScript": "ALERT: Suspicious Scripting found (Raw Scan)",
-            b"/JS": "ALERT: Suspicious Scripting found (Raw Scan)",
-            b"/OpenAction": "ALERT: Auto-executable (/OpenAction) detected",
-            b"/AA": "ALERT: Automatic triggers (/AA) detected",
-            b"/Launch": "ALERT: Annotation (/Launch) detected",
-            b"/EmbeddedFiles": "ALERT: Embedded Files detected (Raw Scan)"
-        }
-        
-        for indicator, message in raw_indicators.items():
-            if indicator in raw_data:
-                findings.append(message)
+        raw_data = file_stream.read()     
         
         # Check for PDF Signature
         header_index = raw_data.find(b"%PDF-")
@@ -203,7 +190,7 @@ def analyze_structure(reader, file_stream):
     except Exception as e: 
         findings.append(f"INFO: Encryption check failed: {type(e).__name__}")
 
-    return clean_findings(findings)
+    return sorted(list(set(findings)))
 
 # -------------------------------------------------------------------------
 #  Helpers
@@ -258,7 +245,7 @@ def perform_action_analysis(reader, root):
             if "/AA" in page_obj:
                 aa_page = page_obj["/AA"].get_object()
                 if "/O" in aa_page or "/C" in aa_page:
-                     add_location("ALERT: Silent page trigger (/O or /C) detected", loc_str)
+                     add_location("ALERT: Silent page trigger (/O or /C)", loc_str)
                 add_location("ALERT: Automatic triggers (/AA)", loc_str)
 
             if "/Annots" in page_obj:
@@ -505,46 +492,3 @@ def analyze_streams_and_objects(reader):
         stream_findings.append(f"ALERT: Hidden URLs extracted from JavaScript: [{', '.join(extracted_urls)}]")
 
     return stream_findings
-
-
-def clean_findings(findings):
-    final = set(findings)
-
-    rules = [
-        {
-            "general": "ALERT: Suspicious Scripting found (Raw Scan)",
-            "details": [
-                "Suspicious Scripting found in Names",
-                "Hidden JavaScript",
-                "Obfuscated Scripting",
-                "Hidden URLs extracted from JavaScript"
-            ]
-        },
-        {
-            "general": "ALERT: Embedded Files detected (Raw Scan)",
-            "details": [
-                "Embedded Files detected in Names",
-                "PDF 2.0 Associated Files"
-            ]
-        },
-        {
-            "general": "ALERT: Automatic triggers (/AA) detected",
-            "details": [
-                "Automatic triggers (/AA) found in"
-            ]
-        },
-        {
-            "general": "ALERT: Auto-executable (/OpenAction) detected",
-            "details": [
-                "Auto-executable (/OpenAction) found in"
-            ]
-        }
-    ]
-
-    for rule in rules:
-        general = rule["general"]
-        details = rule["details"]
-
-        if any(any(d in f for d in details) for f in final):
-            final.discard(general)
-
