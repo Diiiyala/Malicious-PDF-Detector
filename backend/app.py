@@ -55,6 +55,7 @@ def upload_file():
                     
             except Exception as repair_e:
                 logger.warning(f"Standard repair failed: {repair_e}, attempting manual wrapping...")
+                initial_structure_findings.append("ALERT: Malformed PDF structure detected (Potential Evasion/Corruption)")
                         
         analysis_results = analyze_all_aspects(
             reader, 

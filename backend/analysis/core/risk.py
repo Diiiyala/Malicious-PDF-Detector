@@ -23,6 +23,7 @@ def calculate_risk(findings):
         "ALERT: Auto-executable (/OpenAction) detected": 11,
         "ALERT: Suspicious /GoToE pointing to": 11,
         "ALERT: Form GoToE pointing to": 11,
+        "ALERT: Malformed structure repaired and analyzed": 10,
         "ALERT: Automatic triggers (/AA) detected": 10,
         "ALERT: Annotation (/Launch) detected": 10,
         "ALERT: Embedded Files detected (Raw Scan)": 10,
