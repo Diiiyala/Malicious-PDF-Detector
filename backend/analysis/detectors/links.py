@@ -7,7 +7,7 @@ JS_URL_EXTRACTOR = re.compile(r'(?:cPath|url|uri|location|src|cURL|action|target
 
 SHORTENERS = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "is.gd", "buff.ly", "adf.ly"]
 SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost", "script", "image", "jonaslejon", "malicious-pdf", "deepzec", "modzero"]
-SUSPICIOUS_PARAMS = ["download", "payload", "cmd", "exec", "bin", "cSubmitAs", "cFS", "CHTTP", "xdpContent", "textEncoding"]
+MALICIOUS_PARAMS = ["download", "payload", "sh", "py", "cmd", "php", "exe", "exec", "bin", "cSubmitAs", "cFS", "CHTTP", "xdpContent", "textEncoding", "cookie", "steal", "script"]
 
 def analyze_links(text):
     findings = []
@@ -37,6 +37,11 @@ def analyze_links(text):
     
     for url in urls:
         c_url = url.strip('()<>[]"\'').lower()
+        
+        if any(x in c_url for x in MALICIOUS_PARAMS):
+            findings.append(f"ALERT: Suspicious link detected ({url})")
+            indicators["network"] = True
+            
         domain_match = re.search(r'https?://([^/]+)', c_url)
         domain = domain_match.group(1) if domain_match else ""
 
@@ -49,7 +54,7 @@ def analyze_links(text):
             indicators["network"] = True
         
         query_params = re.findall(r'[?&]([^=&]+)', c_url)
-        if any(p in SUSPICIOUS_PARAMS for p in query_params):
+        if any(p in MALICIOUS_PARAMS for p in query_params):
             findings.append(f"ALERT: Malicious parameter key detected in URL")
             indicators["network"] = True
 

@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from links import analyze_links
 
 SUSPICIOUS_WORDS = [
     "exploit", "payload", "shell", "malware", "hack", "xss", "script", "eval", 
@@ -16,8 +17,6 @@ HACKING_TOOLS = [
     "kali linux", "parrot os", "backbox", "pentoo", "blackarch"
 ]
 
-MALICIOUS_PARAMS = ["php", "exe", "sh", "py", "cmd", "cookie", "steal", "script"]
-
 def analyze_metadata(reader):
     findings = []
     all_keywords = set()
@@ -29,6 +28,9 @@ def analyze_metadata(reader):
             return findings
         
         full_metadata_text = " ".join([str(v) for v in metadata.values() if v]).lower()
+        
+        link_findings, _, _ = analyze_links(full_metadata_text)
+        findings.extend(link_findings)
         
         analyze_timestamps(metadata, findings)
         
@@ -48,21 +50,10 @@ def analyze_metadata(reader):
             
             for word in SUSPICIOUS_WORDS:
                 if word in val_lower:
-                    all_keywords.add(word)
+                    all_keywords.add(word)                  
                     
             # -------------------------------------------------------------------------
-            #  1.2 URLs
-            # -------------------------------------------------------------------------     
-                           
-            urls = re.findall(r'https?://\S+', val)
-            for url in urls:
-                clean_url = url.strip('()<>[]"\'')
-
-                if any(x in clean_url.lower() for x in MALICIOUS_PARAMS):
-                    findings.append(f"ALERT: Suspicious link detected ({clean_url})")
-                    
-            # -------------------------------------------------------------------------
-            # 1.3 XSS
+            # 1.2 XSS
             # -------------------------------------------------------------------------
             
             if re.search(r'<\s*script', val_lower) or "javascript:" in val_lower:
@@ -70,7 +61,7 @@ def analyze_metadata(reader):
                 all_keywords.add("xss")
             
             # -------------------------------------------------------------------------
-            # 1.4 Length
+            # 1.3 Length
             # -------------------------------------------------------------------------
             
             if len(val) > 200:

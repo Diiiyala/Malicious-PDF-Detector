@@ -1,6 +1,6 @@
 import re, math, base64, string
 from collections import Counter
-from analysis.detectors.links import analyze_links
+from links import analyze_links
 
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
