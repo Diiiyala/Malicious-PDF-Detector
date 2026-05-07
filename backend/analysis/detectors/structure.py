@@ -1,9 +1,9 @@
 import re
 from collections import Counter
+from links import analyze_links
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
-JS_URL_PATTERN = re.compile(r'(?:app\.launchURL|this\.getURL|getURL|launchURL)\s*\(\s*["\']([^"\']+)["\']', re.IGNORECASE)
 
 def analyze_structure(reader, file_stream):
     findings = []
@@ -461,9 +461,9 @@ def analyze_streams_and_objects(reader):
                         else:
                             content_to_scan = str(js_str)
                         
-                        found_urls = JS_URL_PATTERN.findall(content_to_scan)
-                        for url in found_urls:
-                            extracted_urls.append(f"Object {obj_num}: {url}")
+                        l_findings, _, _, l_urls = analyze_links(content_to_scan)
+                        stream_findings.extend(l_findings)
+                        for url in l_urls: extracted_urls.append(f"Object {obj_num}: {url}")
 
                 # Check for suspicious compression filters
                 filt = obj.get("/Filter")

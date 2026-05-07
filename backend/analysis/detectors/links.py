@@ -3,7 +3,13 @@ import re
 IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
 URL_PATTERN = re.compile(r'\b(?:https?|ftp|ftps|file|smb|ssh|telnet|gopher|ldap|mailto|news|nntp|irc|data|javascript|ws|wss|vnd\.sun\.star\.expand)://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
 UNC_PATTERN = re.compile(r'(?:\\\\|\\\\\\\\)[a-zA-Z0-9.-]+\\[^\s\)\>]+')
-JS_URL_EXTRACTOR = re.compile(r'(?:cPath|url|uri|location|src|cURL|action|target|soapAction)\s*[:=]\s*["\']?([^"\'\s\)]+)', re.IGNORECASE)
+
+JS_URL_PATTERN = re.compile(
+    r'(?:(?:cPath|url|uri|location|src|cURL|action|target|soapAction)\s*[:=]\s*["\']?|'
+    r'(?:app\.launchURL|this\.getURL|getURL|launchURL)\s*\(\s*["\'])'
+    r'([^"\'\s\)]+)', 
+    re.IGNORECASE
+) 
 
 SHORTENERS = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "is.gd", "buff.ly", "adf.ly"]
 SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost", "script", "image", "jonaslejon", "malicious-pdf", "deepzec", "modzero"]
@@ -12,13 +18,16 @@ MALICIOUS_PARAMS = ["download", "payload", "sh", "py", "cmd", "php", "exe", "exe
 def analyze_links(text):
     findings = []
     indicators = {"network": False}
+    current_found_urls = []
+    
+    js_links = JS_URL_PATTERN.findall(text)
     
     # -------------------------------------------------------------------------
     # 1. 
     # -------------------------------------------------------------------------
     
-    js_links = JS_URL_EXTRACTOR.findall(text)
     for link in js_links:
+        current_found_urls.append(link)
         if URL_PATTERN.match(link) or IP_PATTERN.search(link):
             findings.append(f"ALERT: Hidden JS-staged URL detected: {link}")
             indicators["network"] = True
@@ -62,4 +71,4 @@ def analyze_links(text):
         unique_hosts = sorted(list(set(suspicious_hosts)))
         findings.append(f"ALERT: Suspicious hosts detected: {', '.join(unique_hosts)}")
             
-    return findings, indicators, unc_paths
+    return findings, indicators, unc_paths, current_found_urls
