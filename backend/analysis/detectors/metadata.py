@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from links import analyze_links
+from analysis.detectors.links import analyze_links
 
 SUSPICIOUS_WORDS = [
     "exploit", "payload", "shell", "malware", "hack", "xss", "script", "eval", 
@@ -29,7 +29,7 @@ def analyze_metadata(reader):
         
         full_metadata_text = " ".join([str(v) for v in metadata.values() if v]).lower()
         
-        link_findings, _, _ = analyze_links(full_metadata_text)
+        link_findings, _, _, _ = analyze_links(full_metadata_text)
         findings.extend(link_findings)
         
         analyze_timestamps(metadata, findings)

@@ -1,6 +1,6 @@
 import re, math, base64, string
 from collections import Counter
-from links import analyze_links
+from analysis.detectors.links import analyze_links
 
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
@@ -25,7 +25,7 @@ def analyze_content(text, depth=0):
     # 1. External Links & Network Analysis
     # -------------------------------------------------------------------------
     
-    link_findings, link_indicators, unc_paths = analyze_links(text)
+    link_findings, link_indicators, unc_paths, _ = analyze_links(text)
     findings.extend(link_findings)
     if link_indicators["network"]:
         indicators["network"] = True

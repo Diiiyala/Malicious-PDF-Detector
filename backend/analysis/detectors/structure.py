@@ -1,6 +1,6 @@
 import re
 from collections import Counter
-from links import analyze_links
+from analysis.detectors.links import analyze_links
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
