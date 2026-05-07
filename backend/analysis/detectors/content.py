@@ -1,16 +1,9 @@
 import re, math, base64, string
 from collections import Counter
+from analysis.detectors.links import analyze_links
 
-IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
-URL_PATTERN = re.compile(r'\b(?:https?|ftp|ftps|file|smb|ssh|telnet|gopher|ldap|mailto|news|nntp|irc|data|javascript|ws|wss|vnd\.sun\.star\.expand)://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
-UNC_PATTERN = re.compile(r'(?:\\\\|\\\\\\\\)[a-zA-Z0-9.-]+\\[^\s\)\>]+')
-JS_URL_EXTRACTOR = re.compile(r'(?:cPath|url|uri|location|src|cURL|action|target|soapAction)\s*[:=]\s*["\']?([^"\'\s\)]+)', re.IGNORECASE)
-
-SHORTENERS = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "is.gd", "buff.ly", "adf.ly"]
-SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost", "script", "image", "jonaslejon", "malicious-pdf", "deepzec", "modzero"]
-SUSPICIOUS_PARAMS = ["download", "payload", "cmd", "exec", "bin", "cSubmitAs", "cFS", "CHTTP", "xdpContent", "textEncoding"]
 
 SYSTEM_THREATS = {
     "Ransomware Indicators": [r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked"],
@@ -29,15 +22,14 @@ def analyze_content(text, depth=0):
     indicators = { "execution": False, "obfuscation": False, "network": False, "payload": False }
     
     # -------------------------------------------------------------------------
-    # 1. De-obfuscation Layer
+    # 1. External Links & Network Analysis
     # -------------------------------------------------------------------------
     
-    js_links = JS_URL_EXTRACTOR.findall(text)
-    for link in js_links:
-        if URL_PATTERN.match(link) or IP_PATTERN.search(link):
-            findings.append(f"ALERT: Hidden JS-staged URL detected: {link}")
-            indicators["network"] = True
-    
+    link_findings, link_indicators, unc_paths = analyze_links(text)
+    findings.extend(link_findings)
+    if link_indicators["network"]:
+        indicators["network"] = True
+        
     # -------------------------------------------------------------------------
     # 2. Evidence Gathering
     # -------------------------------------------------------------------------
@@ -116,43 +108,12 @@ def analyze_content(text, depth=0):
                         findings.append(f"ALERT: Hidden Layer {depth+1}: {f.replace('ALERT: ', '')}")
         except: continue
 
+
     # -------------------------------------------------------------------------
-    # 4. Network Indicators
+    # 4. Correlation Engine
     # -------------------------------------------------------------------------
     
-    unc_paths = UNC_PATTERN.findall(text)
-    for unc in unc_paths:
-        findings.append(f"ALERT: UNC path detected (Potential NTLM Hash Theft): {unc}")
-        indicators["network"] = True
-        
-    urls = URL_PATTERN.findall(text)
-    suspicious_hosts = []
-    
-    for url in urls:
-        c_url = url.strip('()<>[]"\'').lower()
-        domain_match = re.search(r'https?://([^/]+)', c_url)
-        domain = domain_match.group(1) if domain_match else ""
-
-        if IP_PATTERN.search(domain):
-            findings.append(f"ALERT: Direct IP access detected: {domain}")
-            indicators["network"] = True
-
-        if any(s in domain for s in SHORTENERS) or any(k in domain for k in SUSPICIOUS_KEYWORDS):
-            suspicious_hosts.append(domain)
-            indicators["network"] = True
-        
-        query_params = re.findall(r'[?&]([^=&]+)', c_url)
-        if any(p in SUSPICIOUS_PARAMS for p in query_params):
-            findings.append(f"ALERT: Malicious parameter key detected in URL")
-            indicators["network"] = True
-
-    if suspicious_hosts:
-        unique_hosts = sorted(list(set(suspicious_hosts)))
-        findings.append(f"ALERT: Suspicious hosts detected: {', '.join(unique_hosts)}")
-
-    # -------------------------------------------------------------------------
-    # 5. Correlation Engine
-    # -------------------------------------------------------------------------
+    has_gotoe = bool(re.search(r"/GoToE", text, re.IGNORECASE))
     
     if has_gotoe and unc_paths:
         findings.append("ALERT: NTLM Relay attack pattern confirmed (GoToE + UNC)")

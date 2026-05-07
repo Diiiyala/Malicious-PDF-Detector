@@ -1,0 +1,60 @@
+import re
+
+IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
+URL_PATTERN = re.compile(r'\b(?:https?|ftp|ftps|file|smb|ssh|telnet|gopher|ldap|mailto|news|nntp|irc|data|javascript|ws|wss|vnd\.sun\.star\.expand)://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
+UNC_PATTERN = re.compile(r'(?:\\\\|\\\\\\\\)[a-zA-Z0-9.-]+\\[^\s\)\>]+')
+JS_URL_EXTRACTOR = re.compile(r'(?:cPath|url|uri|location|src|cURL|action|target|soapAction)\s*[:=]\s*["\']?([^"\'\s\)]+)', re.IGNORECASE)
+
+SHORTENERS = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "is.gd", "buff.ly", "adf.ly"]
+SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost", "script", "image", "jonaslejon", "malicious-pdf", "deepzec", "modzero"]
+SUSPICIOUS_PARAMS = ["download", "payload", "cmd", "exec", "bin", "cSubmitAs", "cFS", "CHTTP", "xdpContent", "textEncoding"]
+
+def analyze_links(text):
+    findings = []
+    indicators = {"network": False}
+    
+    # -------------------------------------------------------------------------
+    # 1. 
+    # -------------------------------------------------------------------------
+    
+    js_links = JS_URL_EXTRACTOR.findall(text)
+    for link in js_links:
+        if URL_PATTERN.match(link) or IP_PATTERN.search(link):
+            findings.append(f"ALERT: Hidden JS-staged URL detected: {link}")
+            indicators["network"] = True
+            
+    # -------------------------------------------------------------------------
+    # 2. 
+    # -------------------------------------------------------------------------
+    
+    unc_paths = UNC_PATTERN.findall(text)
+    for unc in unc_paths:
+        findings.append(f"ALERT: UNC path detected (Potential NTLM Hash Theft): {unc}")
+        indicators["network"] = True
+        
+    urls = URL_PATTERN.findall(text)
+    suspicious_hosts = []
+    
+    for url in urls:
+        c_url = url.strip('()<>[]"\'').lower()
+        domain_match = re.search(r'https?://([^/]+)', c_url)
+        domain = domain_match.group(1) if domain_match else ""
+
+        if IP_PATTERN.search(domain):
+            findings.append(f"ALERT: Direct IP access detected: {domain}")
+            indicators["network"] = True
+
+        if any(s in domain for s in SHORTENERS) or any(k in domain for k in SUSPICIOUS_KEYWORDS):
+            suspicious_hosts.append(domain)
+            indicators["network"] = True
+        
+        query_params = re.findall(r'[?&]([^=&]+)', c_url)
+        if any(p in SUSPICIOUS_PARAMS for p in query_params):
+            findings.append(f"ALERT: Malicious parameter key detected in URL")
+            indicators["network"] = True
+
+    if suspicious_hosts:
+        unique_hosts = sorted(list(set(suspicious_hosts)))
+        findings.append(f"ALERT: Suspicious hosts detected: {', '.join(unique_hosts)}")
+            
+    return findings, indicators, unc_paths
