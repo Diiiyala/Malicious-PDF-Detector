@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from analysis.detectors.links import analyze_links
+from analysis.utils.links import analyze_links
 
 SUSPICIOUS_WORDS = [
     "exploit", "payload", "shell", "malware", "hack", "xss", "script", "eval", 
