@@ -287,6 +287,18 @@ def perform_action_analysis(reader, root):
                         if a_type == "/URI":
                             uri_link = action_dict.get("/URI", "Unknown Link")
                             add_location(f"ALERT: Annotation (URI: {uri_link})", loc_str)
+                        
+                        elif a_type == "/GoToR":
+                            f_spec = action_dict.get("/F")
+                            f_path = "Unknown"
+                            if f_spec:
+                                f_obj = f_spec.get_object() if hasattr(f_spec, "get_object") else f_spec
+                                if isinstance(f_obj, dict):
+                                    f_path = f_obj.get("/F") or f_obj.get("/Unix") or str(f_obj)
+                                else:
+                                    f_path = str(f_obj)
+                            add_location(f"ALERT: Annotation (/GoToR) pointing to: ({f_path})", loc_str)
+                                
                         elif a_type == "/GoToE":
                             f_path = action_dict.get("/F")
                             add_location(f"ALERT: Suspicious /GoToE pointing to: {f_path if f_path else 'Internal'}", loc_str)
