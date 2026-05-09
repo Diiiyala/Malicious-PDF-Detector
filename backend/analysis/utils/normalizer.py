@@ -11,7 +11,7 @@ SUSPICIOUS_KEYS = [ "eval", "exec", "cmd", "powershell",
 # 1. Main Normalizer Entry Point
 # -------------------------------------------------------------------------
 
-def normalize_all(text,  max_rounds=3, max_size=2_000_000):
+def normalize_all(text, aggregator=None, max_rounds=3, max_size=2_000_000):
 
     if not text:
         return ""
@@ -34,10 +34,16 @@ def normalize_all(text,  max_rounds=3, max_size=2_000_000):
         current = decode_atob(current)
         
         current, new_layers = decode_staged_base64(current, seen_decoded)
-        decoded_layers.extend(new_layers)
+        for layer in new_layers:
+            decoded_layers.append(layer)
+            if aggregator:
+                aggregator.add_script(layer, "Normalization Layer", script_type="De-obfuscated Payload")
 
         current, new_layers = decode_generic_base64(current, seen_decoded)
-        decoded_layers.extend(new_layers)
+        for layer in new_layers:
+            decoded_layers.append(layer)
+            if aggregator:
+                aggregator.add_script(layer, "Normalization Layer", script_type="De-obfuscated Payload")
 
         if len(current) > max_size:
             current = current[:max_size]
@@ -48,7 +54,6 @@ def normalize_all(text,  max_rounds=3, max_size=2_000_000):
 
     if decoded_layers:
         current += "\n--- ALL DECODED LAYERS ---\n" + "\n".join(decoded_layers)
-
     return current
 
 # -------------------------------------------------------------------------

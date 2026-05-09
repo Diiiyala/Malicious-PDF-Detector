@@ -1,6 +1,6 @@
 import re
 
-def binary_scan(file_content):
+def binary_scan(file_content, aggregator=None):
     content_findings = []
     structure_findings = []
     
@@ -47,9 +47,15 @@ def binary_scan(file_content):
         if re.search(pattern, file_content, re.IGNORECASE):
             structure_findings.append(message)
             
-    for pattern, message in content_patterns.items():
+    for pattern, message in content_patterns.items():       
         if re.search(pattern, file_content, re.IGNORECASE):
             content_findings.append(message)
+            
+        if aggregator and pattern in [rb"/JavaScript", rb"/JS", rb"application/x-formcalc", rb"<?xml-stylesheet"]:
+            for match in re.finditer(pattern, file_content, re.IGNORECASE):
+                start = match.start()
+                snippet = file_content[start : start + 500].decode('utf-8', errors='ignore')
+                aggregator.add_script(snippet, f"Raw Binary Scan (Pos: {start})", script_type="Binary Discovery")
             
     raw_uris = re.findall(rb'/URI\s*\((.*?)\)', file_content)
     for uri in raw_uris:

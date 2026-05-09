@@ -3,6 +3,7 @@ import logging, re
 
 from analysis.utils.binary import binary_scan
 from analysis.utils.normalizer import normalize_all
+from analysis.utils.script_aggregator import ScriptAggregator
 from analysis.detectors.text import extract_text
 from analysis.detectors.content import analyze_content
 from analysis.detectors.structure import analyze_structure
@@ -13,12 +14,18 @@ logger = logging.getLogger(__name__)
 
 def analyze_all_aspects(reader, file_stream, file_content, filename, initial_structure_findings=None):
     
+    # -------------------------------------------------------------------------
+    # 1. Initialize Aggregator
+    # -------------------------------------------------------------------------
+    
+    aggregator = ScriptAggregator()
+    
     res_text, res_content, res_metadata = [], [], []
     res_structure = initial_structure_findings if initial_structure_findings else []
     text = ""
     
     # -------------------------------------------------------------------------
-    # 1. Text Extraction
+    # 2. Text Extraction
     # -------------------------------------------------------------------------
     if reader:
         try:
@@ -48,17 +55,17 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
 
 
     # -------------------------------------------------------------------------
-    # 2. Normalization
+    # 3. Normalization
     # -------------------------------------------------------------------------
-    clean_text = normalize_all(text)
+    clean_text = normalize_all(text, aggregator=aggregator)
     
     
     # -------------------------------------------------------------------------
-    # 3. Content
+    # 4. Content
     # -------------------------------------------------------------------------
     try:
-        res_content = analyze_content(clean_text)
-        bin_content, bin_structure = binary_scan(file_content)
+        res_content = analyze_content(clean_text, aggregator=aggregator)
+        bin_content, bin_structure = binary_scan(file_content, aggregator=aggregator)
         res_content.extend(bin_content)
         res_structure.extend(bin_structure)
 
@@ -73,11 +80,11 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
 
 
     # -------------------------------------------------------------------------
-    # 4. Structure 
+    # 5. Structure 
     # -------------------------------------------------------------------------
     try:
         file_stream.seek(0)
-        res_structure.extend(analyze_structure(reader, file_stream))
+        res_structure.extend(analyze_structure(reader, file_stream, aggregator=aggregator))
         res_content, res_structure = clean_findings(res_content, res_structure)
     except Exception as e:
         logger.error(f"Internal Error during structure analysis: {e}")
@@ -85,7 +92,7 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
 
 
     # -------------------------------------------------------------------------
-    # 5. Metadata 
+    # 6. Metadata 
     # -------------------------------------------------------------------------
     if reader:
         try:
@@ -97,7 +104,7 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
 
 
     # -------------------------------------------------------------------------
-    # 6. Risk Calculation
+    # 7. Risk Calculation
     # -------------------------------------------------------------------------
     all_findings = sorted(set(res_content + res_structure + res_metadata + res_text))
     score, risk_percentage, level = calculate_risk(all_findings)
@@ -109,6 +116,7 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
             "metadata": {"results": sorted(res_metadata), "count": len(res_metadata)},
             "text_extraction": {"results": sorted(res_text), "count": len(res_text)}
         },
+        "extracted_scripts": aggregator.get_all_scripts(),
         "risk_score": score,
         "risk_percentage": risk_percentage,
         "risk_level": level

@@ -1,6 +1,7 @@
 import re, math, base64, string
 from collections import Counter
 from analysis.utils.links import analyze_links
+from analysis.utils.normalizer import is_valid_decoded
 
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
@@ -14,7 +15,7 @@ SYSTEM_THREATS = {
     "XFA/SOAP Attack": [r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT"]
 }
 
-def analyze_content(text, depth=0):
+def analyze_content(text, depth=0, aggregator=None):
     if depth > 2: return []
     
     findings = []
@@ -101,8 +102,12 @@ def analyze_content(text, depth=0):
         try:
             decoded = base64.b64decode(cand, validate=True).decode('utf-8', errors='ignore')
             
+            if is_valid_decoded(decoded): 
+                if aggregator:
+                    aggregator.add_script(decoded, f"Base64 Layer {depth+1}", script_type="Decoded Payload")
+            
             if sum(1 for c in decoded if c in string.printable) / len(decoded) > 0.85:
-                sub_res = analyze_content(decoded, depth + 1)
+                sub_res = analyze_content(decoded, depth + 1, aggregator=aggregator)
                 for f in sub_res:
                     if "ALERT" in f:
                         findings.append(f"ALERT: Hidden Layer {depth+1}: {f.replace('ALERT: ', '')}")

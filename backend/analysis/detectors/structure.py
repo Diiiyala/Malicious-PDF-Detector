@@ -1,11 +1,12 @@
 import re
 from collections import Counter
 from analysis.utils.links import analyze_links
+from analysis.detectors.content import analyze_content
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
 
-def analyze_structure(reader, file_stream):
+def analyze_structure(reader, file_stream, aggregator=None):
     findings = []
     js_scripts = set()
     embedded_files = set()
@@ -110,9 +111,7 @@ def analyze_structure(reader, file_stream):
                                         embedded_data = emb_obj.get_data()
                                         if embedded_data:
                                             decoded_text = embedded_data.decode('utf-8', errors='ignore')
-                                            
-                                            from analysis.detectors.content import analyze_content
-                                            content_findings = analyze_content(decoded_text)
+                                            content_findings = analyze_content(decoded_text, aggregator=aggregator)
                                             
                                             for cf in content_findings:
                                                 findings.append(f"{cf} (Found inside embedded file: {f_name})")
@@ -174,7 +173,7 @@ def analyze_structure(reader, file_stream):
     # -------------------------------------------------------------------------  
     
     try:
-        stream_findings = analyze_streams_and_objects(reader)
+        stream_findings = analyze_streams_and_objects(reader, aggregator=aggregator)
         findings.extend(stream_findings)
     except Exception as e:
         findings.append(f"Stream Analysis collapsed: {type(e).__name__}")
@@ -424,7 +423,7 @@ def process_name_node(key, value_obj, findings, whitelist, untrusted_items, js_s
         untrusted_items.add(key)
         
         
-def analyze_streams_and_objects(reader):
+def analyze_streams_and_objects(reader, aggregator=None):
     stream_findings = []
     extracted_urls = []
     suspicious_filters = ["/JBIG2Decode", "/Crypt"]
@@ -476,12 +475,27 @@ def analyze_streams_and_objects(reader):
                     try:
                         js_str = js_content.get_object() if hasattr(js_content, "get_object") else js_content
                         content_to_scan = js_str.decode('utf-8', errors='ignore') if isinstance(js_str, bytes) else str(js_str)
+                        
+                        if aggregator:
+                            aggregator.add_script(content_to_scan, location_label, source_object=location_label)
+                            
                         l_findings, _, _, l_urls = analyze_links(content_to_scan)
                         stream_findings.extend(l_findings)
                         for url in l_urls: extracted_urls.append(f"{location_label}: {url}")
                     except: pass
+                    
+                # 4. Check for XFA/FormCalc Script injection
+                if "/XFA" in obj:
+                    xfa_data = obj.get("/XFA")
+                    try:
+                        xfa_obj = xfa_data.get_object()
+                        if hasattr(xfa_obj, "get_data"):
+                            xfa_text = xfa_obj.get_data().decode('utf-8', errors='ignore')
+                            if aggregator:
+                                aggregator.add_script(xfa_text, location_label, script_type="XFA/XML-Form")
+                    except: pass
 
-                # 4. Check for suspicious compression filters
+                # 5. Check for suspicious compression filters
                 filt = obj.get("/Filter")
                 if filt:
                     filt_list = filt if isinstance(filt, list) else [filt]
