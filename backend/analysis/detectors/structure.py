@@ -426,11 +426,12 @@ def process_name_node(key, value_obj, findings, whitelist, untrusted_items, js_s
         
 def analyze_streams_and_objects(reader):
     stream_findings = []
-    suspicious_filters = ["/JBIG2Decode", "/Crypt"]
-    js_objs = []
-    obfuscated_objs = []
     extracted_urls = []
+    suspicious_filters = ["/JBIG2Decode", "/Crypt"]
+    font_threats = {} 
+    remote_refs = {}
     filter_objs = {}
+    
 
     # Retrieve all object numbers from cross-reference table
     try:
@@ -443,41 +444,44 @@ def analyze_streams_and_objects(reader):
             all_obj_nums = range(1, len(reader.pages) * 50)
 
     # Scan individual objects
-    def process_obj(obj, obj_num):
+    def process_obj(obj, location_label):
         try:
             if hasattr(obj, "get_object"):
                 obj = obj.get_object()
                 if obj is None: return
 
             if isinstance(obj, dict):
-                # Check for the existence of the /F key
+                
+                # Check for FontMatrix injection (CVE-2024-4367)
+                if "/FontMatrix" in obj:
+                    matrix_str = str(obj["/FontMatrix"])
+                    if re.search(r'[a-zA-Z]{4,}', matrix_str):
+                        keywords = ["fetch", "eval", "function", "xmlhttp", "axios", "xml", "script"]
+                        if any(k in matrix_str.lower() for k in keywords):
+                            msg = "ALERT: Scripting indicator found in font object"
+                            if msg not in font_threats: font_threats[msg] = []
+                            font_threats[msg].append(location_label)
+                            
+                # 2. Check for the existence of the /F key
                 if "/F" in obj:
-                    f_val = obj.get("/F")
                     if obj.get("/Subtype") == "/Image" or "/FS" in obj:
-                        f_path = str(f_val)
-                        stream_findings.append(f"ALERT: Remote resource reference detected in Object {obj_num} (Path: {f_path})")
-
-                # Check for direct Script injection
+                        f_path = str(obj.get("/F"))
+                        msg = f"ALERT: Remote resource reference detected (Path: {f_path})"
+                        if msg not in remote_refs: remote_refs[msg] = []
+                        remote_refs[msg].append(location_label)
+            
+                # 3. Check for direct Script injection        
                 if "/JS" in obj or "/JavaScript" in obj:
                     js_content = obj.get("/JS") or obj.get("/JavaScript")
-                    js_str = None
                     try:
                         js_str = js_content.get_object() if hasattr(js_content, "get_object") else js_content
-                    except:
-                        js_str = None
-
-                    if js_str:
-                        content_to_scan = ""
-                        if isinstance(js_str, bytes):
-                            content_to_scan = js_str.decode('utf-8', errors='ignore')
-                        else:
-                            content_to_scan = str(js_str)
-                        
+                        content_to_scan = js_str.decode('utf-8', errors='ignore') if isinstance(js_str, bytes) else str(js_str)
                         l_findings, _, _, l_urls = analyze_links(content_to_scan)
                         stream_findings.extend(l_findings)
-                        for url in l_urls: extracted_urls.append(f"Object {obj_num}: {url}")
+                        for url in l_urls: extracted_urls.append(f"{location_label}: {url}")
+                    except: pass
 
-                # Check for suspicious compression filters
+                # 4. Check for suspicious compression filters
                 filt = obj.get("/Filter")
                 if filt:
                     filt_list = filt if isinstance(filt, list) else [filt]
@@ -485,9 +489,8 @@ def analyze_streams_and_objects(reader):
                         f_name = str(f)
                         for s_filt in suspicious_filters:
                             if s_filt in f_name:
-                                if f_name not in filter_objs:
-                                    filter_objs[f_name] = []
-                                filter_objs[f_name].append(str(obj_num))
+                                if f_name not in filter_objs: filter_objs[f_name] = []
+                                filter_objs[f_name].append(location_label)
 
             elif isinstance(obj, list):
                 for item in obj:
@@ -500,19 +503,31 @@ def analyze_streams_and_objects(reader):
         try:
             obj = reader.get_object(obj_num)
             if obj is not None:
-                process_obj(obj, obj_num)
+                process_obj(obj, f"Obj {obj_num}")
         except: continue
 
-    if js_objs:
-        stream_findings.append(f"ALERT: Hidden JavaScript found in Objects: [{', '.join(js_objs)}]")
+    # Deep Scan Fonts found in Pages
+    try:
+        for i, page in enumerate(reader.pages):
+            if "/Resources" in page and "/Font" in page["/Resources"]:
+                fonts = page["/Resources"]["/Font"].get_object()
+                for f_name in fonts:
+                    process_obj(fonts[f_name], f"Page {i+1} Font:{f_name}")
+    except: pass
+    
+    for msg, locations in font_threats.items():
+        unique_locs = sorted(list(set(locations)))
+        stream_findings.append(f"{msg} found in: [{', '.join(unique_locs)}]")
 
-    if obfuscated_objs:
-        stream_findings.append(f"ALERT: Obfuscated Scripting detected in Objects: [{', '.join(obfuscated_objs)}]")
+    for msg, locations in remote_refs.items():
+        unique_locs = sorted(list(set(locations)))
+        stream_findings.append(f"{msg} found in: [{', '.join(unique_locs)}]")
 
-    for filt, objs in filter_objs.items():
-        stream_findings.append(f"ALERT: Suspicious stream filter ({filt}) detected in Objects: [{', '.join(objs)}]")
-        
+    for filt, locations in filter_objs.items():
+        unique_locs = sorted(list(set(locations)))
+        stream_findings.append(f"ALERT: Suspicious stream filter ({filt}) detected in: [{', '.join(unique_locs)}]")
+         
     if extracted_urls:
-        stream_findings.append(f"ALERT: Hidden URLs extracted from JavaScript: [{', '.join(extracted_urls)}]")
+        stream_findings.append(f"ALERT: Hidden URLs extracted from JavaScript: [{', '.join(sorted(list(set(extracted_urls))))}]")
 
     return stream_findings

@@ -13,6 +13,7 @@ def calculate_risk(findings):
         # Structure
         "ALERT: Clickjacking Full-page overlay": 13, 
         "ALERT: Remote resource reference detected": 12,
+        "ALERT: Scripting indicator found in font object": 12,
         "ALERT: Dangerous silent trigger": 12,
         "ALERT: Silent page trigger": 12,
         "ALERT: Hidden URLs extracted from JavaScript": 12,
