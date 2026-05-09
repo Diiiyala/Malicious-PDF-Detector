@@ -6,6 +6,17 @@ from analysis.utils.normalizer import is_valid_decoded
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
 
+EXEC_PATTERNS = {
+    r"\beval\s*\(": "eval() function",
+    r"\bexec\s*\(": "exec() function",
+    r"String\.fromCharCode": "Charcode obfuscation",
+    r"app\.openDoc": "Remote document opening",
+    r"launchURL": "URL launching",
+    r"<\s*script": "Embedded HTML Script tag",
+    r"new\s+Image\s*\(": "JS Beacon",
+    r"new\s+WebSocket\s*\(": "WebSocket C2 Channel"
+}
+
 SYSTEM_THREATS = {
     "Ransomware Indicators": [r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked"],
     "Registry Tampering": [r"reg add", r"HKEY_LOCAL_MACHINE", r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"],
@@ -22,37 +33,27 @@ def analyze_content(text, depth=0, aggregator=None):
     text_clean = re.sub(r'\s+', ' ', text).strip()
     indicators = { "execution": False, "obfuscation": False, "network": False, "payload": False }
     
-    # -------------------------------------------------------------------------
-    # 1. External Links & Network Analysis
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------------------
+    # 1. Links Analysis
+    # ---------------------------------------------------------------------
     
     link_findings, link_indicators, unc_paths, _ = analyze_links(text)
     findings.extend(link_findings)
-    if link_indicators["network"]:
-        indicators["network"] = True
+    indicators["network"] = link_indicators.get("network", False)
         
-    # -------------------------------------------------------------------------
-    # 2. Evidence Gathering
-    # -------------------------------------------------------------------------
-    
-    # 2.1 Scripting/Execution Logic
-    exec_patterns = {
-        r"\beval\s*\(": "eval() function",
-        r"\bexec\s*\(": "exec() function",
-        r"String\.fromCharCode": "Charcode obfuscation",
-        r"app\.openDoc": "Remote document opening",
-        r"launchURL": "URL launching",
-        r"<\s*script": "Embedded HTML Script tag",
-        r"new\s+Image\s*\(": "JS-based Beacon (new Image)",
-        r"new\s+WebSocket\s*\(": "WebSocket Connection (C2 Channel)"
-    }
-               
-    for p, label in exec_patterns.items():
-        if re.search(p, text, re.IGNORECASE):
+    # ---------------------------------------------------------------------
+    # 2. Execution Patterns
+    # ---------------------------------------------------------------------
+
+    for pattern, label in EXEC_PATTERNS.items():
+        if re.search(pattern, text, re.IGNORECASE):
             indicators["execution"] = True
             findings.append(f"ALERT: Scripting execution pattern detected ({label})")
 
-    # 2.2 Obfuscation Detection
+    # ---------------------------------------------------------------------
+    # 3. Obfuscation Detection
+    # ---------------------------------------------------------------------
+
     compact = re.sub(r'\s+', '', text).lower()
     if check_obfuscation(text, compact):
         for key in ["eval", "exec", "unescape"]:
@@ -60,7 +61,10 @@ def analyze_content(text, depth=0, aggregator=None):
                 indicators["obfuscation"] = True
                 findings.append(f"ALERT: Logic obfuscation detected ({key})")
                 
-    # 2.3 Auto-Triggers 
+    # ---------------------------------------------------------------------
+    # 4. Auto Execution Triggers
+    # ---------------------------------------------------------------------
+
     has_open_action = bool(re.search(r"/OpenAction", text, re.IGNORECASE))
     has_aa = bool(re.search(r"/AA", text, re.IGNORECASE))
     has_gotoe = bool(re.search(r"/GoToE", text, re.IGNORECASE))
@@ -77,48 +81,57 @@ def analyze_content(text, depth=0, aggregator=None):
     elif has_gotoe:
         findings.append("ALERT: Embedded execution trigger (/GoToE)")
         indicators["execution"] = True
-        
-    # 2.4 Behavioral Pattern Mapping 
+     
+    # ---------------------------------------------------------------------
+    # 5. Threat Mapping
+    # ---------------------------------------------------------------------
+
     detected_threats = []
+    
     for threat_name, patterns in SYSTEM_THREATS.items():
         if any(re.search(p, text, re.IGNORECASE) for p in patterns):
             detected_threats.append(threat_name)
-            if "Security" in threat_name or "Registry" in threat_name: indicators["execution"] = True
-            if "Stealer" in threat_name: indicators["payload"] = True
     
+            if "Security" in threat_name or "Registry" in threat_name:
+                indicators["execution"] = True
+
+            if "Stealer" in threat_name:
+                indicators["payload"] = True
+
     if detected_threats:
         findings.append(f"ALERT: Specific threats detected: {', '.join(detected_threats)}")
+        
+    # ---------------------------------------------------------------------
+    # 6. Crypto Check
+    # ---------------------------------------------------------------------
 
-    # 2.5 Financial Indicator Check
     if BTC_ADDRESS.search(text):
         findings.append(f"ALERT: Cryptocurrency address found (Potential Ransomware)")
 
-    # -------------------------------------------------------------------------
-    # 3. Layered Analysis
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------------------
+    # 7. Base64 Layer Analysis
+    # ---------------------------------------------------------------------
     
-    candidates = B64_PATTERN.findall(text)
-    for cand in candidates:
+    for cand in B64_PATTERN.findall(text):
         try:
             decoded = base64.b64decode(cand, validate=True).decode('utf-8', errors='ignore')
             
-            if is_valid_decoded(decoded): 
-                if aggregator:
-                    aggregator.add_script(decoded, f"Base64 Layer {depth+1}", script_type="Decoded Payload")
+            if is_valid_decoded(decoded) and aggregator:
+                aggregator.add_script(decoded, f"Base64 Layer {depth+1}", script_type="Decoded Payload")
             
-            if sum(1 for c in decoded if c in string.printable) / len(decoded) > 0.85:
-                sub_res = analyze_content(decoded, depth + 1, aggregator=aggregator)
-                for f in sub_res:
+            if len(decoded) > 0 and (
+                sum(c in string.printable for c in decoded) / len(decoded)
+                > 0.85
+            ):
+                sub = analyze_content(decoded, depth + 1, aggregator)
+                for f in sub:
                     if "ALERT" in f:
-                        findings.append(f"ALERT: Hidden Layer {depth+1}: {f.replace('ALERT: ', '')}")
-        except: continue
+                        findings.append(f"ALERT: Hidden Layer {depth+1}: "f"{f.replace('ALERT: ', '')}")
+        except Exception: continue
 
-
-    # -------------------------------------------------------------------------
-    # 4. Correlation Engine
-    # -------------------------------------------------------------------------
-    
-    has_gotoe = bool(re.search(r"/GoToE", text, re.IGNORECASE))
+    # ---------------------------------------------------------------------
+    # 8. Correlation Engine
+    # ---------------------------------------------------------------------
     
     if has_gotoe and unc_paths:
         findings.append("ALERT: NTLM Relay attack pattern confirmed (GoToE + UNC)")
@@ -129,11 +142,17 @@ def analyze_content(text, depth=0, aggregator=None):
     if indicators["payload"] and (indicators["execution"] or indicators["network"]):
         findings.append("ALERT: Multi-stage virus detected")
 
-    ent_score = calculate_entropy(text_clean)
-    if len(text_clean) > 200 and ent_score > 5.5:
-        diag = diagnose_content(text_clean, ent_score)
-        findings.append(f"ALERT: {diag} (Entropy: {ent_score:.2f})")
+    # ---------------------------------------------------------------------
+    # 9. Entropy Analysis
+    # ---------------------------------------------------------------------
 
+    ent = calculate_entropy(text_clean)
+    if len(text_clean) > 200 and ent > 5.5:
+        findings.append(f"ALERT: {diagnose_content(text_clean, ent)} "f"(Entropy: {ent:.2f})")
+
+    # ---------------------------------------------------------------------
+    # Final cleanup
+    # ---------------------------------------------------------------------
     if any("ALERT" in f for f in findings):
         findings = [f for f in findings if "INFO" not in f]
 
@@ -145,26 +164,36 @@ def analyze_content(text, depth=0, aggregator=None):
 
 def calculate_entropy(data):
     if not data: return 0
+    
     counts = Counter(data)
     length = len(data)
+    
     return -sum((count/length) * math.log2(count/length) for count in counts.values())
+
 
 def check_obfuscation(text, compact_text):
     if not text: return False
+    
     original_entropy = calculate_entropy(text)
     compact_entropy = calculate_entropy(compact_text)
+    
     entropy_jump = compact_entropy - original_entropy
     symbols = sum(1 for c in text if c in "{}[]();,.$")
+    
     symbol_density = symbols / len(text) if len(text) > 0 else 0
+    
     return entropy_jump > 0.5 and symbol_density > 0.15 and original_entropy > 4.5
+
 
 def diagnose_content(text, score):
     if not text: return "Empty"
+    
     sample = text[:200]
     hex_ratio = sum(1 for c in sample if c in string.hexdigits) / len(sample) if len(sample) > 0 else 0
     
     if hex_ratio > 0.8: return "Possible Shellcode Stream"
     if score > 6.5: return "Highly Random Data (Encrypted/Compressed)"
     
-    printable_ratio = sum(1 for c in text if c in string.printable) / len(text)
+    printable_ratio = sum(1 for c in text if c in string.printable) / len(text) if text else 0
+    
     return "Minified/Compressed Text" if printable_ratio > 0.9 else "Obfuscated Content"
