@@ -522,11 +522,21 @@ def analyze_streams_and_objects(reader, aggregator=None):
                     xfa_data = obj.get("/XFA")
                     try:
                         xfa_obj = xfa_data.get_object()
+                        raw_xfa_bytes = None
                         if hasattr(xfa_obj, "get_data"):
-                            xfa_text = xfa_obj.get_data().decode('utf-8', errors='ignore')
+                            raw_xfa_bytes = xfa_obj.get_data()
+                        elif isinstance(xfa_obj, bytes):
+                            raw_xfa_bytes = xfa_obj
+                            
+                        if raw_xfa_bytes:
+                            xfa_text = raw_xfa_bytes.decode('utf-8', errors='ignore')
+                            
                             if aggregator:
                                 aggregator.add_script(xfa_text, location_label, script_type="XFA/XML-Form")
-                    except: pass
+                                
+                            xfa_findings = analyze_content(xfa_text, aggregator=aggregator)
+                            stream_findings.extend(xfa_findings)
+                    except Exception: pass
 
                 # ----------------------------------------------------------
                 # 6. Suspicious Compression Filters
