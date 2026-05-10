@@ -23,6 +23,7 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
     res_text, res_content, res_metadata = [], [], []
     res_structure = initial_structure_findings if initial_structure_findings else []
     text = ""
+    bin_content, bin_structure = [], []
     
     # -------------------------------------------------------------------------
     # 2. Text Extraction
@@ -53,21 +54,16 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
             text = file_content.decode('utf-8', errors='ignore')
             res_text = ["INFO: Deep text extraction skipped, using raw binary decode"]
 
-
     # -------------------------------------------------------------------------
     # 3. Normalization
     # -------------------------------------------------------------------------
     clean_text = normalize_all(text, aggregator=aggregator)
-    
     
     # -------------------------------------------------------------------------
     # 4. Content
     # -------------------------------------------------------------------------
     try:
         res_content = analyze_content(clean_text, aggregator=aggregator)
-        bin_content, bin_structure = binary_scan(file_content, aggregator=aggregator)
-        res_content.extend(bin_content)
-        res_structure.extend(bin_structure)
 
         raw_uris = re.findall(rb'/URI\s*\((.*?)\)', file_content)
         for uri in raw_uris:
@@ -78,7 +74,6 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
         logger.error(f"Internal Error during content analysis: {e}")
         res_content = ["ALERT: Analysis process interrupted during content scan"]
 
-
     # -------------------------------------------------------------------------
     # 5. Structure 
     # -------------------------------------------------------------------------
@@ -86,13 +81,38 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
         file_stream.seek(0)
         res_structure.extend(analyze_structure(reader, file_stream, aggregator=aggregator))
         res_content, res_structure = clean_findings(res_content, res_structure)
+        
     except Exception as e:
         logger.error(f"Internal Error during structure analysis: {e}")
         res_structure.append("ALERT: Analysis process interrupted during structural scan")
 
+    # -------------------------------------------------------------------------
+    # 6. Binary 
+    # -------------------------------------------------------------------------   
+    try:
+        bin_content_raw, bin_structure_raw = binary_scan(file_content, aggregator=aggregator)
+        
+        bin_content.extend(bin_content_raw)
+        bin_structure.extend(bin_structure_raw)
+
+        try:
+            repaired_binary = clean_text.encode("utf-8", errors="ignore")
+            bin_content_clean, bin_structure_clean = binary_scan(repaired_binary, aggregator=aggregator)
+
+            bin_content.extend(bin_content_clean)
+            bin_structure.extend(bin_structure_clean)
+
+        except Exception as inner_e:
+            logger.warning(f"Clean binary scan skipped: {inner_e}")
+            bin_content.append("INFO: Cleaned binary scan skipped")
+
+    except Exception as e:
+        logger.error(f"Binary analysis failed: {e}")
+        bin_content = ["ALERT: Binary scan failed"]
+        bin_structure = []
 
     # -------------------------------------------------------------------------
-    # 6. Metadata 
+    # 7. Metadata 
     # -------------------------------------------------------------------------
     if reader:
         try:
@@ -102,10 +122,12 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
     else:
         res_metadata = ["INFO: Metadata analysis skipped (Malformed Structure)"]
 
+    # -------------------------------------------------------------------------
+    # 8. Risk Calculation
+    # -------------------------------------------------------------------------   
+    res_content.extend(bin_content)
+    res_structure.extend(bin_structure)
 
-    # -------------------------------------------------------------------------
-    # 7. Risk Calculation
-    # -------------------------------------------------------------------------
     all_findings = sorted(set(res_content + res_structure + res_metadata + res_text))
     score, risk_percentage, level = calculate_risk(all_findings)
     
@@ -122,7 +144,10 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
         "risk_level": level
     }
     
-    
+# ----------------------------------------------------------------------------
+#  Helpers
+# ----------------------------------------------------------------------------
+ 
 def clean_findings(res_content, res_structure):
     final_content = set(res_content)
     final_structure = set(res_structure)
