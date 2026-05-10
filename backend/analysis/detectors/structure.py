@@ -431,8 +431,10 @@ def analyze_streams_and_objects(reader, aggregator=None):
     remote_refs = {}
     filter_objs = {}
     
-
+    # ---------------------------------------------------------------------
     # Retrieve all object numbers from cross-reference table
+    # ---------------------------------------------------------------------
+    
     try:
         all_obj_nums = reader.xref.get_object_numbers()
     except AttributeError:
@@ -442,16 +444,38 @@ def analyze_streams_and_objects(reader, aggregator=None):
         except:
             all_obj_nums = range(1, len(reader.pages) * 50)
 
-    # Scan individual objects
+    # ---------------------------------------------------------------------
+    # Process Individual Objects
+    # ---------------------------------------------------------------------
+
     def process_obj(obj, location_label):
         try:
             if hasattr(obj, "get_object"):
                 obj = obj.get_object()
                 if obj is None: return
 
-            if isinstance(obj, dict):
+            # --------------------------------------------------------------
+            # Process Individual Objects
+            # --------------------------------------------------------------
+
+            if isinstance(obj, dict):           
                 
-                # Check for FontMatrix injection (CVE-2024-4367)
+                # ----------------------------------------------------------
+                # 1. Metadata XML / XXE Scan
+                # ----------------------------------------------------------
+
+                if obj.get("/Type") == "/Metadata":
+                    try:
+                        raw_xml = obj.get_data().decode("utf-8", errors="ignore")
+                        xml_findings = analyze_content(raw_xml, aggregator=aggregator)
+                        stream_findings.extend(xml_findings)
+
+                    except: pass
+                    
+                # ----------------------------------------------------------
+                # 2. FontMatrix Injection Detection (CVE-2024-4367)
+                # ----------------------------------------------------------
+                
                 if "/FontMatrix" in obj:
                     matrix_str = str(obj["/FontMatrix"])
                     if re.search(r'[a-zA-Z]{4,}', matrix_str):
@@ -461,7 +485,10 @@ def analyze_streams_and_objects(reader, aggregator=None):
                             if msg not in font_threats: font_threats[msg] = []
                             font_threats[msg].append(location_label)
                             
-                # 2. Check for the existence of the /F key
+                # ----------------------------------------------------------
+                # 3. Remote Resource References
+                # ----------------------------------------------------------
+
                 if "/F" in obj:
                     if obj.get("/Subtype") == "/Image" or "/FS" in obj:
                         f_path = str(obj.get("/F"))
@@ -469,7 +496,10 @@ def analyze_streams_and_objects(reader, aggregator=None):
                         if msg not in remote_refs: remote_refs[msg] = []
                         remote_refs[msg].append(location_label)
             
-                # 3. Check for direct Script injection        
+                # ----------------------------------------------------------
+                # 4. JavaScript Injection
+                # ----------------------------------------------------------
+     
                 if "/JS" in obj or "/JavaScript" in obj:
                     js_content = obj.get("/JS") or obj.get("/JavaScript")
                     try:
@@ -484,7 +514,10 @@ def analyze_streams_and_objects(reader, aggregator=None):
                         for url in l_urls: extracted_urls.append(f"{location_label}: {url}")
                     except: pass
                     
-                # 4. Check for XFA/FormCalc Script injection
+                # ----------------------------------------------------------
+                # 5. XFA / FormCalc Injection
+                # ----------------------------------------------------------
+
                 if "/XFA" in obj:
                     xfa_data = obj.get("/XFA")
                     try:
@@ -495,7 +528,10 @@ def analyze_streams_and_objects(reader, aggregator=None):
                                 aggregator.add_script(xfa_text, location_label, script_type="XFA/XML-Form")
                     except: pass
 
-                # 5. Check for suspicious compression filters
+                # ----------------------------------------------------------
+                # 6. Suspicious Compression Filters
+                # ----------------------------------------------------------
+                
                 filt = obj.get("/Filter")
                 if filt:
                     filt_list = filt if isinstance(filt, list) else [filt]
@@ -506,13 +542,20 @@ def analyze_streams_and_objects(reader, aggregator=None):
                                 if f_name not in filter_objs: filter_objs[f_name] = []
                                 filter_objs[f_name].append(location_label)
 
+            # --------------------------------------------------------------
+            # Process Individual Objects
+            # --------------------------------------------------------------
+            
             elif isinstance(obj, list):
                 for item in obj:
                     process_obj(item, obj_num)
 
         except: pass
         
-    # Iterate through all objects in the PDF
+    # ---------------------------------------------------------------------
+    # Iterate Through All PDF Objects
+    # ---------------------------------------------------------------------
+
     for obj_num in all_obj_nums:
         try:
             obj = reader.get_object(obj_num)
@@ -520,7 +563,10 @@ def analyze_streams_and_objects(reader, aggregator=None):
                 process_obj(obj, f"Obj {obj_num}")
         except: continue
 
-    # Deep Scan Fonts found in Pages
+    # ---------------------------------------------------------------------
+    # Deep Font Scan Inside Pages
+    # ---------------------------------------------------------------------
+
     try:
         for i, page in enumerate(reader.pages):
             if "/Resources" in page and "/Font" in page["/Resources"]:
@@ -529,6 +575,10 @@ def analyze_streams_and_objects(reader, aggregator=None):
                     process_obj(fonts[f_name], f"Page {i+1} Font:{f_name}")
     except: pass
     
+    # ---------------------------------------------------------------------
+    # Build Final Findings
+    # ---------------------------------------------------------------------
+
     for msg, locations in font_threats.items():
         unique_locs = sorted(list(set(locations)))
         stream_findings.append(f"{msg} found in: [{', '.join(unique_locs)}]")

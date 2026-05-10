@@ -23,7 +23,8 @@ SYSTEM_THREATS = {
     "Security Disabling": [r"netsh advfirewall", r"Set-MpPreference", r"DisableRealtimeMonitoring", r"taskkill /f /im"],
     "Stealer/Spyware": [r"cookie", r"password", r"wallet\.dat", r"Login Data", r"autofill"],
     "Environment Leak": [r"\$\{HOME\}", r"\.env", r"AWS_CREDENTIALS", r"vnd\.sun\.star\.expand"], 
-    "XFA/SOAP Attack": [r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT"]
+    "XFA/SOAP Attack": [r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT", r"<?xml-stylesheet"],
+    "XXE Injection Attempt": [r"<!ENTITY", r"SYSTEM\s+['\"]http", r"<!DOCTYPE"],
 }
 
 def analyze_content(text, depth=0, aggregator=None):
@@ -102,14 +103,32 @@ def analyze_content(text, depth=0, aggregator=None):
         findings.append(f"ALERT: Specific threats detected: {', '.join(detected_threats)}")
         
     # ---------------------------------------------------------------------
-    # 6. Crypto Check
+    # 6. XML / XXE Payload Capture
+    # ---------------------------------------------------------------------
+
+    if aggregator:
+        text_lower = text.lower()
+
+        if "<?xml" in text_lower or "<!doctype" in text_lower:
+            if any(
+                re.search(p, text, re.IGNORECASE)
+                for p in SYSTEM_THREATS["XXE Injection Attempt"]
+            ):
+                aggregator.add_script(
+                    text,
+                    f"XML/XXE Layer {depth}",
+                    script_type="XML/XXE Payload"
+                )
+        
+    # ---------------------------------------------------------------------
+    # 7. Crypto Check
     # ---------------------------------------------------------------------
 
     if BTC_ADDRESS.search(text):
         findings.append(f"ALERT: Cryptocurrency address found (Potential Ransomware)")
 
     # ---------------------------------------------------------------------
-    # 7. Base64 Layer Analysis
+    # 8. Base64 Layer Analysis
     # ---------------------------------------------------------------------
     
     for cand in B64_PATTERN.findall(text):
@@ -130,7 +149,7 @@ def analyze_content(text, depth=0, aggregator=None):
         except Exception: continue
 
     # ---------------------------------------------------------------------
-    # 8. Correlation Engine
+    # 9. Correlation Engine
     # ---------------------------------------------------------------------
     
     if has_gotoe and unc_paths:
@@ -143,7 +162,7 @@ def analyze_content(text, depth=0, aggregator=None):
         findings.append("ALERT: Multi-stage virus detected")
 
     # ---------------------------------------------------------------------
-    # 9. Entropy Analysis
+    # 10. Entropy Analysis
     # ---------------------------------------------------------------------
 
     ent = calculate_entropy(text_clean)

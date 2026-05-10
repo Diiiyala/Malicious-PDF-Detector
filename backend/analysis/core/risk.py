@@ -68,6 +68,7 @@ def calculate_risk(findings):
         
         # Content      
         "ALERT: Multi-stage virus detected": 15,
+        "ALERT: Specific threats detected: XXE Injection Attempt": 15,
         "ALERT: NTLM Relay attack pattern confirmed": 14,
         "ALERT: Analysis process interrupted during content scan": 12,
         "ALERT: Embedded file launch trigger (/Launch) found in raw data": 12,
