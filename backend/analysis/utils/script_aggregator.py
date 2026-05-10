@@ -31,12 +31,16 @@ class ScriptAggregator:
         results = []
 
         for script_id, data in self.scripts_map.items():
-            results.append({
+            entry = {
                 "id": script_id,
                 "script_type": data["script_type"],
                 "code": data["code"],
                 "locations": sorted(data["locations"]),
-                "source_objects": sorted(data["source_objects"])
-            })
+            }
+            
+            if data["source_objects"]:
+                entry["source_objects"] = sorted(data["source_objects"])
+                
+            results.append(entry)
 
         return results
