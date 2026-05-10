@@ -29,18 +29,21 @@ CONTENT_PATTERNS = {
     rb"expect://": "XXE Injection Attempt",
 }
     
-AGGREGATOR_PATTERNS = {
-    rb"/JavaScript",
-    rb"/JS",
-    rb"application/x-formcalc",
-    rb"<?xml-stylesheet",
-    rb"<!DOCTYPE",
-    rb"<!ENTITY",
-    rb"SYSTEM\s+[\"']",
-    rb"PUBLIC\s+[\"']",
-    rb"file://",
-    rb"expect://"
+SCRIPT_TYPE_MAP = {
+    rb"/JavaScript": "JavaScript",
+    rb"/JS": "JavaScript",
+    rb"/JS\s*\(": "JavaScript",
+    rb"application/x-formcalc": "XFA/FormCalc",
+    rb"<?xml-stylesheet": "XSLT/XML",
+    rb"<!DOCTYPE": "XML/XXE Payload",
+    rb"<!ENTITY": "XML/XXE Payload",
+    rb"SYSTEM\s+[\"']": "XML/XXE Payload",
+    rb"PUBLIC\s+[\"']": "XML/XXE Payload",
+    rb"file://": "XML/XXE Payload",
+    rb"expect://": "XML/XXE Payload"
 }
+
+AGGREGATOR_PATTERNS = set(SCRIPT_TYPE_MAP.keys())
 
 def binary_scan(file_content, aggregator=None):
     content_findings = defaultdict(set)
@@ -97,9 +100,10 @@ def binary_scan(file_content, aggregator=None):
             # ----------------------------------------------------------
 
             if aggregator and pattern in AGGREGATOR_PATTERNS:
-
+                detected_type = SCRIPT_TYPE_MAP.get(pattern, "Binary Discovery")
+                
                 snippet = file_content[start:start + 500].decode('utf-8', errors='ignore')
-                aggregator.add_script(snippet, f"Raw Binary Scan (Pos: {start})", script_type="Binary Discovery")
+                aggregator.add_script(snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
                
     # ------------------------------------------------------------------
     # Final formatting
