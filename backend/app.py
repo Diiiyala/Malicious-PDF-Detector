@@ -28,50 +28,75 @@ def upload_file():
         return jsonify({"error": "Unsupported file type. Please upload a PDF."}), 400
 
     # -------------------------------------------------------------------------
-    # Initialize & Read Raw Data
+    # Initial Structure Validation
     # -------------------------------------------------------------------------
     try:
-        file_content = file.read()
-        file_stream = BytesIO(file_content)
+        raw_file_content = file.read()
+        file_stream = BytesIO(raw_file_content)
         
         reader = None
         initial_structure_findings = []
+        
+        current_content_to_analyze = raw_file_content
 
+        # -------------------------------------------------------------------------
+        #  Fallback Recovery (Malformed / Obfuscated PDF Repair Attempt)
+        # -------------------------------------------------------------------------
         try:
             reader = PdfReader(file_stream, strict=False)
-            _ = len(reader.pages) 
-        
+            _ = len(reader.pages)
+            
         except Exception as e:
             logger.warning(f"Metadata/Structure parsing failed for {file.filename}: {str(e)}")
+            
             try:
-                with pikepdf.open(BytesIO(file_content)) as pdf:
+                with pikepdf.open(BytesIO(raw_file_content)) as pdf:
+                    all_extracted_content = bytearray(raw_file_content)
+
+                    for obj in pdf.objects:
+                        if isinstance(obj, pikepdf.Stream):
+                            try:
+                                all_extracted_content.extend(obj.read_bytes())
+                            except:
+                                continue
+                    
                     repaired_stream = BytesIO()
-                    pdf.save(repaired_stream)
-                    repaired_data = repaired_stream.getvalue()
-                    file_stream = BytesIO(repaired_data)
-                    file_content = repaired_data
+                    pdf.save(repaired_stream, static_id=True)
+                    
+                    current_content_to_analyze = bytes(all_extracted_content)
+                    
+                    file_stream = BytesIO(repaired_stream.getvalue())
                     reader = PdfReader(file_stream, strict=False)
+                    
+                    try:
+                        _ = len(reader.pages)
+                    except:
+                        reader = None
+                        
                     initial_structure_findings.append("ALERT: Malformed structure repaired and analyzed")
                     
             except Exception as repair_e:
-                logger.warning(f"Standard repair failed: {repair_e}, attempting manual wrapping...")
+                logger.error(f"Deep repair failed: {repair_e}")
                 initial_structure_findings.append("ALERT: Malformed PDF structure detected (Potential Evasion/Corruption)")
-                        
+                
+        # -------------------------------------------------------------------------
+        # Security Analysis Pipeline Execution
+        # -------------------------------------------------------------------------
         analysis_results = analyze_all_aspects(
             reader, 
             file_stream, 
-            file_content, 
+            current_content_to_analyze,
             filename=file.filename,
             initial_structure_findings=initial_structure_findings
         )
         
         analysis_results["filename"] = file.filename
-        
         return jsonify(analysis_results)
     
     except Exception as e:
         logger.error(f"Fatal error during processing {file.filename}: {e}")
         return jsonify({"error": "An internal error occurred during analysis"}), 500
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=False)
