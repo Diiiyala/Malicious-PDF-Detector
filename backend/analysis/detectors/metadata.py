@@ -24,10 +24,6 @@ SUSPICIOUS_SOURCE_INDICATORS = [
     "metasploit", "cobalt strike", "mimikatz", "powersploit", "empire",
     "burp", "collaborator", "interact.sh", "jonaslejon", "deepzec",
 
-    "cve-2018-4993", "cve-2019-7089", "cve-2014-8453", "cve-2017-10951",
-    "cve-2024-4367", "cve-2020-29075", "cve-2022-28244", "cve-2018-5158",
-    "cve-2025-66516", "cve-2025-70401", "cve-2024-12426", "cve-2025-59803",
-
     "callback", "phone-home", "exfiltration", "tunneling", "beacon",
     "injection", "unauthorized", "suspicious", "leak", "harvesting"
 ]
