@@ -71,22 +71,23 @@ def analyze_structure(reader, file_stream, aggregator=None):
             
             if "/OCProperties" in root:
                 ocp = root["/OCProperties"].get_object()
-                findings.append("ALERT: Optional Content Groups (OCG) detected - potential hidden layer exploit")
-                
                 ocp_str = str(ocp)
+                base_msg = "ALERT: Optional Content Groups (OCG) detected"
+                
                 if "/JS" in ocp_str or "/JavaScript" in ocp_str:
-                    found_js_names = []
                     js_name_match = re.findall(r'/([^/\s()<>\[\]{}]+)\s+<<\s*/S\s*/JavaScript', ocp_str)
                     
                     if js_name_match:
-                        found_js_names = list(set(js_name_match))
-                        names_str = ", ".join(found_js_names)
-                        findings.append(f"ALERT: Suspicious OCG-JavaScript coupling detected (Scripts: {names_str})")
+                        names_str = ", ".join(list(set(js_name_match)))
+                        findings.append(f"{base_msg} - Suspicious JavaScript coupling (Scripts: {names_str})")
                     else:
-                        findings.append("ALERT: Suspicious OCG-JavaScript coupling detected")
-                
+                        findings.append(f"{base_msg} - Suspicious JavaScript coupling")
+                        
                 elif "/AA" in root:
-                     findings.append("ALERT: Suspicious OCG-Automatic Trigger coupling detected")
+                    findings.append(f"{base_msg} - Suspicious Automatic Trigger coupling (Potential Hidden Layer Exploit)")
+
+                else:
+                    findings.append(f"{base_msg} - potential hidden layer exploit")
 
             # Verify PDF 2.0 Associated Files
             if "/AF" in root:
@@ -214,7 +215,7 @@ def perform_action_analysis(reader, root):
     # Analyze Root Actions
     if root:
         if "/OpenAction" in root:
-            add_location("Auto-executable (/OpenAction)", "Catalog")
+            add_location("ALERT: Auto-executable (/OpenAction)", "Catalog")
         
         if "/AA" in root:
             aa_dict = root["/AA"].get_object()
@@ -228,7 +229,7 @@ def perform_action_analysis(reader, root):
                 triggers_str = ", ".join(found_silent_triggers)
                 add_location(f"ALERT: Dangerous silent trigger ({triggers_str}) detected", "Catalog")
             
-            add_location("Automatic triggers (/AA)", "Catalog")
+            add_location("ALERT: Automatic triggers (/AA)", "Catalog")
 
     # Analyze Page-Level Actions and Annotations  
     try:
