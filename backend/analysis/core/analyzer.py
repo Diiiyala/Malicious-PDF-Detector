@@ -15,15 +15,14 @@ logger = logging.getLogger(__name__)
 def analyze_all_aspects(reader, file_stream, file_content, filename, initial_structure_findings=None):
     
     # -------------------------------------------------------------------------
-    # 1. Initialize Aggregator
-    # -------------------------------------------------------------------------
-    
+    # 1. Initialize
+    # ------------------------------------------------------------------------- 
     aggregator = ScriptAggregator()
     
     res_text, res_content, res_metadata = [], [], []
     res_structure = initial_structure_findings if initial_structure_findings else []
-    text = ""
     bin_content, bin_structure = [], []
+    text = ""
     
     # -------------------------------------------------------------------------
     # 2. Text Extraction
@@ -80,8 +79,7 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
     try:
         file_stream.seek(0)
         res_structure.extend(analyze_structure(reader, file_stream, aggregator=aggregator))
-        res_content, res_structure = clean_findings(res_content, res_structure)
-        
+             
     except Exception as e:
         logger.error(f"Internal Error during structure analysis: {e}")
         res_structure.append("ALERT: Analysis process interrupted during structural scan")
@@ -128,6 +126,8 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
     res_content.extend(bin_content)
     res_structure.extend(bin_structure)
 
+    res_content, res_structure = clean_findings(res_content, res_structure)
+
     all_findings = sorted(set(res_content + res_structure + res_metadata + res_text))
     score, risk_percentage, level = calculate_risk(all_findings)
     
@@ -152,6 +152,8 @@ def clean_findings(res_content, res_structure):
     final_content = set(res_content)
     final_structure = set(res_structure)
 
+    # 1. Remove Generic Duplicate Alerts
+    
     shared_threats = [
         "ALERT: Automatic triggers (/AA)",
         "ALERT: Silent page trigger (/O or /C)",
@@ -161,10 +163,26 @@ def clean_findings(res_content, res_structure):
     ]
 
     for threat in shared_threats:
-
         has_detailed = any(threat in f and ("found in:" in f or "pointing to:" in f) for f in final_structure)
         if has_detailed:
             final_structure = {f for f in final_structure if not (f == threat)}
             final_content = {f for f in final_content if not (f == threat)}
+
+    # 2. Merge Repeated Offset Alerts
+    
+    scripting_offsets = set()
+    all_findings = list(final_content | final_structure)
+
+    for finding in all_findings:
+        if "Suspicious Scripting" in finding or "Scripting indicator" in finding:
+            offsets_found = re.findall(r'\b\d+\b', finding)
+            scripting_offsets.update(int(offset) for offset in offsets_found)
+            
+            final_content.discard(finding)
+            final_structure.discard(finding)
+
+    if scripting_offsets:
+        sorted_offsets_str = ", ".join(f"Offset: {offset}" for offset in sorted(list(scripting_offsets)))
+        final_content.add(f"ALERT: Suspicious Scripting found in ( {sorted_offsets_str} )")
 
     return sorted(list(final_content)), sorted(list(final_structure))
