@@ -1,5 +1,6 @@
 import re
 from collections import defaultdict
+from analysis.utils.normalizer import normalize_all
 
 STRUCTURE_PATTERNS = {
     rb"/AA\s*<<\s*/O": "ALERT: Silent page trigger (/O or /C)",
@@ -10,7 +11,7 @@ STRUCTURE_PATTERNS = {
     
 CONTENT_PATTERNS = {
     rb"/S\s*/URI": "ALERT: Direct URI action detected in hidden object",
-    rb"/JS\s*\(": "ALERT: Scripting indicator found in malformed object",
+    rb"/JS\s*\(": "ALERT: Suspicious Scripting found in malformed object",
     rb"/SubmitForm": "ALERT: Form submission trigger (/SubmitForm) found in raw data",
     rb"/JavaScript": "ALERT: Suspicious Scripting found",
     rb"/JS": "ALERT: Suspicious Scripting found",
@@ -102,8 +103,29 @@ def binary_scan(file_content, aggregator=None):
             if aggregator and pattern in AGGREGATOR_PATTERNS:
                 detected_type = SCRIPT_TYPE_MAP.get(pattern, "Binary Discovery")
                 
-                snippet = file_content[start:start + 500].decode('utf-8', errors='ignore')
-                aggregator.add_script(snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
+                raw_chunk = file_content[start:start + 500]
+                end_paren_idx = raw_chunk.find(b')')
+                
+                if end_paren_idx != -1:
+                    snippet = raw_chunk[:end_paren_idx + 1].decode('utf-8', errors='ignore')
+                else:
+                    snippet = raw_chunk.decode('utf-8', errors='ignore')
+                
+                clean_snippet = snippet.strip()
+                while True:
+                    prev_len = len(clean_snippet)
+                    clean_snippet = re.sub(r'^(?:/JavaScript|/JS)\b', '', clean_snippet, flags=re.IGNORECASE).strip()
+                    clean_snippet = re.sub(r'^\(\s*', '', clean_snippet).strip()
+                    
+                    if len(clean_snippet) == prev_len:
+                        break
+                
+                if clean_snippet.endswith(')'):
+                    clean_snippet = clean_snippet[:-1].strip()
+                
+                normalized_snippet = normalize_all(clean_snippet)
+                
+                aggregator.add_script(normalized_snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
                
     # ------------------------------------------------------------------
     # Final formatting
