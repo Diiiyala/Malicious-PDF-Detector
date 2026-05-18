@@ -21,19 +21,24 @@ def analyze_links(text):
     current_found_urls = []
     
     js_links = JS_URL_PATTERN.findall(text)
+    staged_urls = set()
     
     # -------------------------------------------------------------------------
-    # 1. 
+    # 1. Detect JS-staged URLs
     # -------------------------------------------------------------------------
     
     for link in js_links:
         current_found_urls.append(link)
         if URL_PATTERN.match(link) or IP_PATTERN.search(link):
-            findings.append(f"ALERT: Hidden JS-staged URL detected: {link}")
+            staged_urls.add(link)
             indicators["network"] = True
+    
+    if staged_urls:
+        sorted_urls_str = ", ".join(sorted(list(staged_urls)))
+        findings.append(f"ALERT: Hidden JS-staged URLs detected: [ {sorted_urls_str} ]")
             
     # -------------------------------------------------------------------------
-    # 2. 
+    # 2. Detect suspicious paths & URLs
     # -------------------------------------------------------------------------
     
     unc_paths = UNC_PATTERN.findall(text)
