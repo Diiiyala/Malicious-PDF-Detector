@@ -21,6 +21,10 @@ CONTENT_PATTERNS = {
     rb"/Crypt": "ALERT: Custom encryption filter (/Crypt) found in raw data",
     rb"/JBIG2Decode": "ALERT: Suspicious compression filter (/JBIG2Decode) detected",
     
+    # XFA SOAP Attack Indicators
+    rb'method="soap"': "ALERT: Specific threats detected: XFA/SOAP Attack",
+    rb'soapAction': "ALERT: Specific threats detected: XFA/SOAP Attack",
+    
     # XXE / XML Injection Indicators
     rb"<!DOCTYPE": "XXE Injection Attempt",
     rb"<!ENTITY": "XXE Injection Attempt",
@@ -36,6 +40,8 @@ SCRIPT_TYPE_MAP = {
     rb"/JS\s*\(": "JavaScript",
     rb"application/x-formcalc": "XFA/FormCalc",
     rb"<?xml-stylesheet": "XSLT/XML",
+    rb'method="soap"': "XFA/SOAP Payload",
+    rb'soapAction': "XFA/SOAP Payload",
     rb"<!DOCTYPE": "XML/XXE Payload",
     rb"<!ENTITY": "XML/XXE Payload",
     rb"SYSTEM\s+[\"']": "XML/XXE Payload",
@@ -103,29 +109,34 @@ def binary_scan(file_content, aggregator=None):
             if aggregator and pattern in AGGREGATOR_PATTERNS:
                 detected_type = SCRIPT_TYPE_MAP.get(pattern, "Binary Discovery")
                 
-                raw_chunk = file_content[start:start + 500]
-                end_paren_idx = raw_chunk.find(b')')
-                
-                if end_paren_idx != -1:
-                    snippet = raw_chunk[:end_paren_idx + 1].decode('utf-8', errors='ignore')
-                else:
+                if detected_type in ["XFA/SOAP Payload", "XML/XXE Payload"]:
+                    chunk_start = max(0, start - 200)
+                    raw_chunk = file_content[chunk_start:chunk_start + 1500]
                     snippet = raw_chunk.decode('utf-8', errors='ignore')
+                    clean_snippet = snippet.strip()
+                else:
+                    raw_chunk = file_content[start:start + 500]
+                    end_paren_idx = raw_chunk.find(b')')
                 
-                clean_snippet = snippet.strip()
-                while True:
-                    prev_len = len(clean_snippet)
-                    clean_snippet = re.sub(r'^(?:/JavaScript|/JS)\b', '', clean_snippet, flags=re.IGNORECASE).strip()
-                    clean_snippet = re.sub(r'^\(\s*', '', clean_snippet).strip()
+                    if end_paren_idx != -1:
+                        snippet = raw_chunk[:end_paren_idx + 1].decode('utf-8', errors='ignore')
+                    else:
+                        snippet = raw_chunk.decode('utf-8', errors='ignore')
                     
-                    if len(clean_snippet) == prev_len:
-                        break
+                    clean_snippet = snippet.strip()
+                    while True:
+                        prev_len = len(clean_snippet)
+                        clean_snippet = re.sub(r'^(?:/JavaScript|/JS)\b', '', clean_snippet, flags=re.IGNORECASE).strip()
+                        clean_snippet = re.sub(r'^\(\s*', '', clean_snippet).strip()
+                        
+                        if len(clean_snippet) == prev_len:
+                            break
                 
-                if clean_snippet.endswith(')'):
-                    clean_snippet = clean_snippet[:-1].strip()
-                
-                normalized_snippet = normalize_all(clean_snippet)
-                
-                aggregator.add_script(normalized_snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
+                    if clean_snippet.endswith(')'):
+                        clean_snippet = clean_snippet[:-1].strip()
+                    
+                    normalized_snippet = normalize_all(clean_snippet)            
+                    aggregator.add_script(normalized_snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
                
     # ------------------------------------------------------------------
     # Final formatting
