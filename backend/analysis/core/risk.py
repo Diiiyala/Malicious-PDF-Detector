@@ -76,6 +76,7 @@ def calculate_risk(findings):
         "ALERT: Scripting indicators found in raw binary data": 12,
         "ALERT: High-confidence obfuscated script detected": 12,
         "ALERT: Hidden JS-staged URL detected": 12,
+        "ALERT: Hidden JS-staged URLs detected": 12,
         "ALERT: Scripting execution pattern detected": 12,
         "ALERT: Direct URI action detected in hidden object": 12,
         "ALERT: Hidden URI found in raw scan": 12,
