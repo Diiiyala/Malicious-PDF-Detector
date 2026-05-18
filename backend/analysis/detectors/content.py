@@ -103,21 +103,25 @@ def analyze_content(text, depth=0, aggregator=None):
         findings.append(f"ALERT: Specific threats detected: {', '.join(detected_threats)}")
         
     # ---------------------------------------------------------------------
-    # 6. XML / XXE Payload Capture
+    # 6. XML / XXE / XFA SOAP Payload Capture
     # ---------------------------------------------------------------------
 
     if aggregator:
         text_lower = text.lower()
 
-        if "<?xml" in text_lower or "<!doctype" in text_lower:
-            if any(
-                re.search(p, text, re.IGNORECASE)
-                for p in SYSTEM_THREATS["XXE Injection Attempt"]
-            ):
+        if any(k in text_lower for k in ["<?xml", "<!doctype", "<xdp:xdp", "method=\"soap\"", "soapaction"]):
+            
+            if any(re.search(p, text, re.IGNORECASE) for p in SYSTEM_THREATS["XXE Injection Attempt"]):
                 aggregator.add_script(
                     text,
                     f"XML/XXE Layer {depth}",
                     script_type="XML/XXE Payload"
+                )
+            elif "method=\"soap\"" in text_lower or "soapaction" in text_lower:
+                aggregator.add_script(
+                    text,
+                    f"XFA/SOAP Layer {depth}",
+                    script_type="XFA/SOAP Payload"
                 )
         
     # ---------------------------------------------------------------------
