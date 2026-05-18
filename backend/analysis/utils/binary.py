@@ -21,6 +21,10 @@ CONTENT_PATTERNS = {
     rb"/Crypt": "ALERT: Custom encryption filter (/Crypt) found in raw data",
     rb"/JBIG2Decode": "ALERT: Suspicious compression filter (/JBIG2Decode) detected",
     
+    # XSS via HTML Image Tag Injection
+    rb"<img\s+src=": "ALERT: XSS injection attempt detected via HTML tag",
+    rb"onerror\s*=": "ALERT: XSS injection attempt detected via HTML tag",
+    
     # XFA SOAP Attack Indicators
     rb'method="soap"': "ALERT: Specific threats detected: XFA/SOAP Attack",
     rb'soapAction': "ALERT: Specific threats detected: XFA/SOAP Attack",
@@ -45,6 +49,8 @@ SCRIPT_TYPE_MAP = {
     rb"<?xml-stylesheet": "XSLT/XML",
     rb'method="soap"': "XFA/SOAP Payload",
     rb'soapAction': "XFA/SOAP Payload",
+    rb"<img\s+src=": "Stored XSS Payload",
+    rb"onerror\s*=": "Stored XSS Payload",
     rb"vnd\.sun\.star\.expand": "Environment Leak Exploit",
     rb"<!DOCTYPE": "XML/XXE Payload",
     rb"<!ENTITY": "XML/XXE Payload",
