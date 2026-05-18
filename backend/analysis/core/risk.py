@@ -70,6 +70,8 @@ def calculate_risk(findings):
         "ALERT: Multi-stage virus detected": 15,
         "ALERT: Specific threats detected: XXE Injection Attempt": 15,
         "ALERT: NTLM Relay attack pattern confirmed": 14,
+        "ALERT: XSS injection attempt detected via HTML tag": 12,
+        "ALERT: Stored XSS injection attempt detected in Annotation field": 12,
         "ALERT: Analysis process interrupted during content scan": 12,
         "ALERT: Specific threats detected: Environment Leak Pattern (LibreOffice)": 12,
         "ALERT: Embedded file launch trigger (/Launch) found in raw data": 12,
