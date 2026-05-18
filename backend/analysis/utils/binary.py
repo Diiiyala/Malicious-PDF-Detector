@@ -53,11 +53,7 @@ SCRIPT_TYPE_MAP = {
     rb"onerror\s*=": "Stored XSS Payload",
     rb"vnd\.sun\.star\.expand": "Environment Leak Exploit",
     rb"<!DOCTYPE": "XML/XXE Payload",
-    rb"<!ENTITY": "XML/XXE Payload",
-    rb"SYSTEM\s+[\"']": "XML/XXE Payload",
-    rb"PUBLIC\s+[\"']": "XML/XXE Payload",
-    rb"file://": "XML/XXE Payload",
-    rb"expect://": "XML/XXE Payload"
+    rb"<?xml": "XML/XXE Payload"
 }
 
 AGGREGATOR_PATTERNS = set(SCRIPT_TYPE_MAP.keys())
@@ -120,9 +116,13 @@ def binary_scan(file_content, aggregator=None):
                 detected_type = SCRIPT_TYPE_MAP.get(pattern, "Binary Discovery")
                 
                 if detected_type in ["XFA/SOAP Payload", "XML/XXE Payload", "Environment Leak Exploit"]:
-                    chunk_start = max(0, start - 100)
+                    chunk_start = start if detected_type == "XML/XXE Payload" else max(0, start - 100)
                     raw_chunk = file_content[chunk_start:chunk_start + 1000]
                     snippet = raw_chunk.decode('utf-8', errors='ignore')
+
+                    if "endstream" in snippet:
+                        snippet = snippet.split("endstream")[0] + "endstream"
+        
                     clean_snippet = snippet.strip()
                 else:
                     raw_chunk = file_content[start:start + 500]
