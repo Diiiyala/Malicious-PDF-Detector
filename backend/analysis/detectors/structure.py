@@ -203,7 +203,7 @@ def is_version_older(current, target):
             return False
         
         
-def perform_action_analysis(reader, root):
+def perform_action_analysis(reader, root, aggregator=None):
     action_findings = []
     action_locations = {}
 
@@ -279,7 +279,15 @@ def perform_action_analysis(reader, root):
 
                         if is_widget and is_transparent and coverage < 0.05:
                             visible_widgets_on_page += 1
-
+                            
+                    if "/T" in obj:
+                        t_val = str(obj["/T"])
+                        if any(k in t_val.lower() for k in ["<script", "javascript:", "<img", "onerror="]):
+                            add_location(f"ALERT: Stored XSS injection attempt detected in Annotation field (/T): {t_val}", loc_str)
+                            
+                            if aggregator:
+                                aggregator.add_script(t_val, f"{loc_str} Annotation /T Field", script_type="Stored XSS Payload")
+                                
                     if "/A" in obj:
                         action_dict = obj["/A"].get_object()
                         a_type = action_dict.get("/S")
