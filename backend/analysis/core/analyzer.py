@@ -13,7 +13,7 @@ from analysis.core.risk import calculate_risk
 logger = logging.getLogger(__name__)
 
 def analyze_all_aspects(reader, file_stream, file_content, filename, initial_structure_findings=None):
-    
+      
     # -------------------------------------------------------------------------
     # 1. Initialize
     # ------------------------------------------------------------------------- 
@@ -159,11 +159,18 @@ def clean_findings(res_content, res_structure):
         "ALERT: Silent page trigger (/O or /C)",
         "ALERT: Auto-executable (/OpenAction)",
         "ALERT: Remote PDF embedded link (/GoToE)",
-        "ALERT: Annotation (/Launch)"
+        "ALERT: Annotation (/Launch)",
+        "ALERT: Specific threats detected: XFA/SOAP Attack"
     ]
 
     for threat in shared_threats:
-        has_detailed = any(threat in f and ("found in:" in f or "pointing to:" in f) for f in final_structure)
+        all_current_findings = final_structure | final_content
+        
+        has_detailed = any(
+            threat in f and any(indicator in f for indicator in ["found in:", "pointing to:", "in (", "found in: ["]) 
+            for f in all_current_findings
+        )
+        
         if has_detailed:
             final_structure = {f for f in final_structure if not (f == threat)}
             final_content = {f for f in final_content if not (f == threat)}
