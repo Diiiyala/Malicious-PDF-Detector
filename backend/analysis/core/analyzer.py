@@ -174,6 +174,11 @@ def clean_findings(res_content, res_structure):
         if has_detailed:
             final_structure = {f for f in final_structure if not (f == threat)}
             final_content = {f for f in final_content if not (f == threat)}
+            
+    duplicate_uris = final_content & final_structure
+    for dup in duplicate_uris:
+        if "Hidden URI found" in dup:
+            final_structure.discard(dup)
 
     # 2. Merge Repeated Offset Alerts
     
