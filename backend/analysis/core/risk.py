@@ -30,7 +30,7 @@ def calculate_risk(findings):
         "ALERT: Annotation (/Launch) detected": 10,
         "ALERT: Embedded Files detected (Raw Scan)": 10,
         "ALERT: Malformed PDF header": 10, 
-        "ALERT: Auto-executable (/OpenAction)": 10,
+        "ALERT: Automatic execution trigger (/OpenAction)": 10,
         "ALERT: Automatic triggers (/AA)": 9,
         "ALERT: Suspicious Scripting found": 9,      
         "ALERT: Embedded Files detected": 9,
