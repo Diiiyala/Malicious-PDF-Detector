@@ -215,7 +215,7 @@ def perform_action_analysis(reader, root, aggregator=None):
     # Analyze Root Actions
     if root:
         if "/OpenAction" in root:
-            add_location("ALERT: Auto-executable (/OpenAction)", "Catalog")
+            add_location("ALERT: Automatic execution trigger (/OpenAction)", "Catalog")
         
         if "/AA" in root:
             aa_dict = root["/AA"].get_object()
