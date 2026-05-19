@@ -93,16 +93,17 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
         bin_content.extend(bin_content_raw)
         bin_structure.extend(bin_structure_raw)
 
-        try:
-            repaired_binary = clean_text.encode("utf-8", errors="ignore")
-            bin_content_clean, bin_structure_clean = binary_scan(repaired_binary, aggregator=aggregator)
+        if not bin_content and not bin_structure:
+            try:
+                repaired_binary = clean_text.encode("utf-8", errors="ignore")
+                bin_content_clean, bin_structure_clean = binary_scan(repaired_binary, aggregator=aggregator)
 
-            bin_content.extend(bin_content_clean)
-            bin_structure.extend(bin_structure_clean)
+                bin_content.extend(bin_content_clean)
+                bin_structure.extend(bin_structure_clean)
 
-        except Exception as inner_e:
-            logger.warning(f"Clean binary scan skipped: {inner_e}")
-            bin_content.append("INFO: Cleaned binary scan skipped")
+            except Exception as inner_e:
+                logger.warning(f"Clean binary scan skipped: {inner_e}")
+                bin_content.append("INFO: Cleaned binary scan skipped")
 
     except Exception as e:
         logger.error(f"Binary analysis failed: {e}")
