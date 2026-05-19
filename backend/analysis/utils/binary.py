@@ -10,29 +10,48 @@ STRUCTURE_PATTERNS = {
 }
     
 CONTENT_PATTERNS = {
+    # URI Action
     rb"/S\s*/URI": "ALERT: Direct URI action detected in hidden object",
+    
+    # JavaScript Injection
     rb"/JS\s*\(": "ALERT: Suspicious Scripting found in malformed object",
-    rb"/SubmitForm": "ALERT: Form submission trigger (/SubmitForm) found in raw data",
     rb"/JavaScript": "ALERT: Suspicious Scripting found",
-    rb"/JS": "ALERT: Suspicious Scripting found",
+    rb"/JS\b": "ALERT: Suspicious Scripting found",
+    
+    # Form Submission
+    rb"/SubmitForm": "ALERT: Form submission trigger (/SubmitForm) found in raw data",
+    
+    # FormCalc Script
     rb"application/x-formcalc": "ALERT: Scripting indicators found in raw binary data (FormCalc)",
+    
+    # XML/XSLT Script
     rb"<?xml-stylesheet": "ALERT: Scripting indicators found in raw binary data (XSLT/XML)",
+    
+    # RichMedia Object
     rb"/RichMedia": "ALERT: RichMedia object (Potential exploit carrier) found in raw data",
+    
+    # Encryption Filter
     rb"/Crypt": "ALERT: Custom encryption filter (/Crypt) found in raw data",
+    
+    # JBIG2 Exploit
     rb"/JBIG2Decode": "ALERT: Suspicious compression filter (/JBIG2Decode) detected",
     
-    # XSS via HTML Image Tag Injection
+    # XFA Form
+    rb"<template": "ALERT: Specific threats detected: XFA Form Submission Pattern",
+    rb"<subform": "ALERT: Specific threats detected: XFA Form Submission Pattern",
+    
+    # XSS Injection
     rb"<img\s+src=": "ALERT: XSS injection attempt detected via HTML tag",
     rb"onerror\s*=": "ALERT: XSS injection attempt detected via HTML tag",
     
-    # XFA SOAP Attack Indicators
+    # SOAP Attack
     rb'method="soap"': "ALERT: Specific threats detected: XFA/SOAP Attack",
     rb'soapAction': "ALERT: Specific threats detected: XFA/SOAP Attack",
     
-    # LibreOffice Env Leak Indicators 
+    # LibreOffice Env Leak
     rb"vnd\.sun\.star\.expand": "ALERT: Specific threats detected: Environment Leak Pattern (LibreOffice)",
     
-    # XXE / XML Injection Indicators
+    # XXE Injection
     rb"<!DOCTYPE": "XXE Injection Attempt",
     rb"<!ENTITY": "XXE Injection Attempt",
     rb"SYSTEM\s+[\"']": "XXE Injection Attempt",
@@ -47,6 +66,8 @@ SCRIPT_TYPE_MAP = {
     rb"/JS\s*\(": "JavaScript",
     rb"application/x-formcalc": "XFA/FormCalc",
     rb"<?xml-stylesheet": "XSLT/XML",
+    rb"<template": "XFA/XML-Form",
+    rb"<subform": "XFA/XML-Form",
     rb'method="soap"': "XFA/SOAP Payload",
     rb'soapAction': "XFA/SOAP Payload",
     rb"<img\s+src=": "Stored XSS Payload",
@@ -83,12 +104,13 @@ def binary_scan(file_content, aggregator=None):
 
             if message not in structure_findings:
                 structure_findings.append(message)
-                
-                
+                          
     # ------------------------------------------------------------------
     # Content-based detection
     # ------------------------------------------------------------------
-
+    processed_offsets = set() 
+    processed_snippets = set()
+    
     for pattern, message in CONTENT_PATTERNS.items():
         matches = list(re.finditer(pattern, file_content, re.IGNORECASE))
 
@@ -101,7 +123,7 @@ def binary_scan(file_content, aggregator=None):
             # ----------------------------------------------------------
 
             context = detect_pdf_context(file_content, start)
-
+            
             if message == "XXE Injection Attempt":
                 final_msg = "ALERT: Specific threats detected: XXE Injection Attempt"
                 content_findings[final_msg].update(context)
@@ -114,6 +136,9 @@ def binary_scan(file_content, aggregator=None):
 
             if aggregator and pattern in AGGREGATOR_PATTERNS:
                 detected_type = SCRIPT_TYPE_MAP.get(pattern, "Binary Discovery")
+                
+                if any(abs(start - old_offset) < 1500 for old_offset in processed_offsets):
+                    continue
                 
                 if detected_type in ["XFA/SOAP Payload", "XML/XXE Payload", "Environment Leak Exploit"]:
                     chunk_start = start if detected_type == "XML/XXE Payload" else max(0, start - 100)
@@ -145,24 +170,27 @@ def binary_scan(file_content, aggregator=None):
                     if clean_snippet.endswith(')'):
                         clean_snippet = clean_snippet[:-1].strip()
                     
-                normalized_snippet = normalize_all(clean_snippet)            
-                aggregator.add_script(normalized_snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
+                normalized_snippet = normalize_all(clean_snippet)     
+                
+                if normalized_snippet not in processed_snippets and normalized_snippet.strip():
+                    processed_offsets.add(start)
+                    processed_snippets.add(normalized_snippet)                          
+                    aggregator.add_script(normalized_snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
                
     # ------------------------------------------------------------------
     # Final formatting
     # ------------------------------------------------------------------
 
     final_content_findings = []
-
+    
     for msg, items in content_findings.items():
-
+        
         if not items:
             final_content_findings.append(msg)
             continue
-
+        
         unique_items = sorted(items)
         joined = ", ".join(unique_items)
-
         final_content_findings.append(f"{msg} in ( {joined} )")
 
     return final_content_findings, structure_findings
