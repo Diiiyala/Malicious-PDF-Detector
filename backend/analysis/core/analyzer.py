@@ -158,7 +158,7 @@ def clean_findings(res_content, res_structure):
     shared_threats = [
         "ALERT: Automatic triggers (/AA)",
         "ALERT: Silent page trigger (/O or /C)",
-        "ALERT: Auto-executable (/OpenAction)",
+        "ALERT: Automatic execution trigger (/OpenAction)",
         "ALERT: Remote PDF embedded link (/GoToE)",
         "ALERT: Annotation (/Launch)",
         "ALERT: Specific threats detected: XFA/SOAP Attack"
@@ -173,8 +173,11 @@ def clean_findings(res_content, res_structure):
         )
         
         if has_detailed:
-            final_structure = {f for f in final_structure if not (f == threat)}
-            final_content = {f for f in final_content if not (f == threat)}
+            final_structure = {f for f in final_structure if f != threat}
+            final_content = {f for f in final_content if f != threat}
+        else:
+            if threat in final_content and threat in final_structure:
+                final_structure.discard(threat)
             
     duplicate_uris = final_content & final_structure
     for dup in duplicate_uris:
