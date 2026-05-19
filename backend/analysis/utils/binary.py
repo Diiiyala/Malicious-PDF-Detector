@@ -4,7 +4,7 @@ from analysis.utils.normalizer import normalize_all
 
 STRUCTURE_PATTERNS = {
     rb"/AA\s*<<\s*/O": "ALERT: Silent page trigger (/O or /C)",
-    rb"/OpenAction": "ALERT: Auto-executable (/OpenAction)",
+    rb"/OpenAction": "ALERT: Automatic execution trigger (/OpenAction)",
     rb"/AA": "ALERT: Automatic triggers (/AA)",
     rb"/Launch": "ALERT: Annotation (/Launch)"
 }
