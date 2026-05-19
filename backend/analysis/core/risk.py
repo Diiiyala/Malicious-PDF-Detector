@@ -68,8 +68,9 @@ def calculate_risk(findings):
         
         # Content      
         "ALERT: Multi-stage virus detected": 15,
-        "ALERT: Specific threats detected: XXE Injection Attempt": 15,
+        "ALERT: Specific threats detected": 15,
         "ALERT: NTLM Relay attack pattern confirmed": 14,
+        "ALERT: Scripting indicators found in raw binary data (XSLT/XML)": 13,
         "ALERT: XSS injection attempt detected via HTML tag": 12,
         "ALERT: Stored XSS injection attempt detected in Annotation field": 12,
         "ALERT: Analysis process interrupted during content scan": 12,
@@ -108,7 +109,6 @@ def calculate_risk(findings):
         "ALERT: Multiple execution triggers": 9,
         "ALERT: Automatic execution trigger": 8,
         "ALERT: Event-based execution trigger": 8,
-        "ALERT: Specific threats detected": 10,
         "ALERT: Hidden Layer": 4,
         "ALERT: Highly Random Data (Encrypted/Compressed)": 8,
         "ALERT: Minified/Compressed Text": 3,
