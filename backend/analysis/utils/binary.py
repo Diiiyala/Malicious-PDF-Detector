@@ -140,21 +140,41 @@ def binary_scan(file_content, aggregator=None):
                 if any(abs(start - old_offset) < 1500 for old_offset in processed_offsets):
                     continue
                 
-                if detected_type in ["XFA/SOAP Payload", "XML/XXE Payload", "Environment Leak Exploit"]:
-                    chunk_start = start if detected_type == "XML/XXE Payload" else max(0, start - 100)
-                    raw_chunk = file_content[chunk_start:chunk_start + 1000]
+                if detected_type in ["XFA/SOAP Payload", "XML/XXE Payload", "Environment Leak Exploit", "XFA/XML-Form", "XSLT/XML"]:
+                    raw_chunk = file_content[start:start + 1500]
                     snippet = raw_chunk.decode('utf-8', errors='ignore')
 
-                    if "endstream" in snippet:
+                    if "xml-stylesheet" in snippet and "?>" in snippet:
+                        snippet = snippet.split("?>")[0] + "?>"
+                    elif "endstream" in snippet:
                         snippet = snippet.split("endstream")[0] + "endstream"
+                    elif "</xdp:xdp>" in snippet:
+                        snippet = snippet.split("</xdp:xdp>")[0] + "</xdp:xdp>"
+                    elif "</template>" in snippet:
+                        snippet = snippet.split("</template>")[0] + "</template>"
         
                     clean_snippet = snippet.strip()
                 else:
-                    raw_chunk = file_content[start:start + 500]
-                    end_paren_idx = raw_chunk.find(b')')
-                
-                    if end_paren_idx != -1:
-                        snippet = raw_chunk[:end_paren_idx + 1].decode('utf-8', errors='ignore')
+                    raw_chunk = file_content[start:start + 1000]
+                    paren_start = raw_chunk.find(b'(')
+                    
+                    if paren_start != -1:
+                        depth = 0
+                        content = bytearray()
+                        
+                        for i in range(paren_start, len(raw_chunk)):
+                            char = raw_chunk[i]
+                            if char == ord(b'('):
+                                depth += 1
+                            elif char == ord(b')'):
+                                depth -= 1
+                                content.append(char)
+                                if depth == 0:
+                                    break
+                                continue
+                            content.append(char)
+                            
+                        snippet = content.decode('utf-8', errors='ignore')
                     else:
                         snippet = raw_chunk.decode('utf-8', errors='ignore')
                     
@@ -176,7 +196,7 @@ def binary_scan(file_content, aggregator=None):
                     processed_offsets.add(start)
                     processed_snippets.add(normalized_snippet)                          
                     aggregator.add_script(normalized_snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
-               
+                    
     # ------------------------------------------------------------------
     # Final formatting
     # ------------------------------------------------------------------
