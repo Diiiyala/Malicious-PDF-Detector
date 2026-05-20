@@ -62,9 +62,21 @@ def extract_text(reader):
     # Main Extraction Loop
     # -------------------------------------------------------------------------
     try:
-        for i, page in enumerate(reader.pages):
+        try:
+            pages_list = list(reader.pages)
+            pages_iterator = enumerate(pages_list)
+            
+        except Exception:
+            pages_iterator = []
+            findings.add("ALERT: Text extraction skipped (Malformed or missing Pages tree)")
+
+        for i, page in pages_iterator:
             text_count_before = len(full_text)
-            page.extract_text(visitor_text=text_inspection_visitor)
+            try:
+                page.extract_text(visitor_text=text_inspection_visitor)
+                
+            except Exception: continue
+            
             text_count_after = len(full_text)
 
             if text_count_before == text_count_after and has_images(page):
