@@ -202,16 +202,25 @@ def binary_scan(file_content, aggregator=None):
     # ------------------------------------------------------------------
 
     final_content_findings = []
-    
     for msg, items in content_findings.items():
-        
         if not items:
             final_content_findings.append(msg)
             continue
-        
-        unique_items = sorted(items)
+        unique_items = sorted(list(items), key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0)
         joined = ", ".join(unique_items)
-        final_content_findings.append(f"{msg} in ( {joined} )")
+        
+        if "Specific threats detected" in msg:
+            keyword_found = "Detected in Binary"
+            for b_pat, b_msg in CONTENT_PATTERNS.items():
+                if b_msg == "XXE Injection Attempt" and "XXE" in msg:
+                    keyword_found = b_pat.decode('utf-8', errors='ignore')
+                    break
+                elif b_msg == msg.split(" in (")[0]:
+                    keyword_found = b_pat.decode('utf-8', errors='ignore')
+                    break
+            final_content_findings.append(f"{msg} (Found: '{keyword_found}') in ( {joined} )")
+        else:
+            final_content_findings.append(f"{msg} in ( {joined} )")
 
     return final_content_findings, structure_findings
 
