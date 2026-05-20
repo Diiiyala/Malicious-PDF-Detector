@@ -4,6 +4,7 @@ def calculate_risk(findings):
     weights = {
         # Text
         "ALERT: Hidden text detected (Tiny Font": 10,    
+        "ALERT: Text extraction skipped (Malformed or missing Pages tree)": 9,
         "ALERT: Hidden text detected (Off-Canvas": 8,    
         "INFO: Non-standard font encoding detected": 3,
         "INFO: Text transformation detected": 3,
