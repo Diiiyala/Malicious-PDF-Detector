@@ -18,6 +18,7 @@ EXEC_PATTERNS = {
 }
 
 SYSTEM_THREATS = {
+    "Parameter/Header Injection Attempt": [r"textEncoding\s*=\s*.*?&#x(?:0D|0A|D|A);?", r"textEncoding\s*=\s*.*?\\r\\n", r"X-Injected"],
     "Ransomware Indicators": [r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked"],
     "Registry Tampering": [r"reg add", r"HKEY_LOCAL_MACHINE", r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"],
     "Security Disabling": [r"netsh advfirewall", r"Set-MpPreference", r"DisableRealtimeMonitoring", r"taskkill /f /im"],
@@ -88,20 +89,34 @@ def analyze_content(text, depth=0, aggregator=None):
     # 5. Threat Mapping
     # ---------------------------------------------------------------------
 
-    detected_threats = []
-    
     for threat_name, patterns in SYSTEM_THREATS.items():
-        if any(re.search(p, text, re.IGNORECASE) for p in patterns):
-            detected_threats.append(threat_name)
+        found_details = []
+        found_offsets = []
+        
+        for p in patterns:
+
+            for match in re.finditer(p, text, re.IGNORECASE):
+                found_offsets.append(f"(Offset: {match.start()})")
+                matched_str = match.group(0).strip()
+                if matched_str not in found_details:
+                    found_details.append(matched_str)
+        
+        if found_details:
+            unique_offsets = sorted(list(set(found_offsets)), key=lambda x: int(re.search(r'\d+', x).group()))
+            offsets_str = ", ".join(unique_offsets)
+            
+            details_str = ", ".join([f"'{d}'" for d in found_details])
+            
+            findings.append(
+                f"ALERT: Specific threats detected: {threat_name} "
+                f"(Found: {details_str}) in ( {offsets_str} )"
+            )
     
             if "Security" in threat_name or "Registry" in threat_name:
                 indicators["execution"] = True
 
             if "Stealer" in threat_name:
                 indicators["payload"] = True
-
-    if detected_threats:
-        findings.append(f"ALERT: Specific threats detected: {', '.join(detected_threats)}")
         
     # ---------------------------------------------------------------------
     # 6. XML / XXE / XFA SOAP Payload Capture
