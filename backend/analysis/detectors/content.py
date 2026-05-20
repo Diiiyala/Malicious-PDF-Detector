@@ -14,7 +14,8 @@ EXEC_PATTERNS = {
     r"launchURL": "URL launching",
     r"<\s*script": "Embedded HTML Script tag",
     r"new\s+Image\s*\(": "JS Beacon",
-    r"new\s+WebSocket\s*\(": "WebSocket C2 Channel"
+    r"new\s+WebSocket\s*\(": "WebSocket C2 Channel",
+    r"\bPost\s*\(\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"']": "FormCalc Post() Arbitrary Header Injection"
 }
 
 SYSTEM_THREATS = {
