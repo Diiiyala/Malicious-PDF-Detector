@@ -560,14 +560,38 @@ def analyze_streams_and_objects(reader, aggregator=None):
                             if s_filt in f_name:
                                 if f_name not in filter_objs: filter_objs[f_name] = []
                                 filter_objs[f_name].append(location_label)
+                                
+                # ----------------------------------------------------------
+                # 7. Deep EmbeddedFile Stream Scan (HTML / JS Carriers)
+                # ----------------------------------------------------------
+
+                if obj.get("/Type") == "/EmbeddedFile" or "/Subtype" in obj:
+                    try:
+                        if hasattr(obj, "get_data"):
+                            raw_stream_data = obj.get_data()
+                            if raw_stream_data:
+                                decoded_stream_text = raw_stream_data.decode('utf-8', errors='ignore')
+                                
+                                if any(k in decoded_stream_text.lower() for k in ["<script", "html", "javascript:"]):
+                                    if aggregator:
+                                        aggregator.add_script(
+                                            decoded_stream_text, 
+                                            f"{location_label} (Inside embedded file content)",
+                                            script_type="Embedded HTML/JS Payload"
+                                        )
+                                    
+                                    embedded_findings = analyze_content(decoded_stream_text, aggregator=aggregator)
+                                    stream_findings.extend(embedded_findings)
+                                        
+                    except Exception as stream_e: pass
 
             # --------------------------------------------------------------
             # Process Individual Objects
             # --------------------------------------------------------------
             
             elif isinstance(obj, list):
-                for item in obj:
-                    process_obj(item, obj_num)
+                for index, item in enumerate(obj, start=1):
+                    process_obj(item, f"{location_label} (Element {index})")
 
         except: pass
         
