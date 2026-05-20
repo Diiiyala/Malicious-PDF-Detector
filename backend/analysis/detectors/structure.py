@@ -318,7 +318,7 @@ def perform_action_analysis(reader, root, aggregator=None):
                     add_location("ALERT: Clickjacking Suspicious invisible button grid detected", loc_str)
                             
     except Exception as e:
-        action_findings.append(f"ALERT: Could not fully analyze actions on page {i+1} (Potential obfuscation)")
+        action_findings.append("ALERT: Could not fully analyze actions on all pages (Potential obfuscation/Structure corruption)")
 
     # Analyze AcroForm
     try:
