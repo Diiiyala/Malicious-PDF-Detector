@@ -25,6 +25,7 @@ SYSTEM_THREATS = {
     "Environment Leak": [r"\$\{HOME\}", r"\.env", r"AWS_CREDENTIALS", r"vnd\.sun\.star\.expand"], 
     "XFA/SOAP Attack": [r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT", r"<?xml-stylesheet"],
     "XXE Injection Attempt": [r"<!ENTITY", r"SYSTEM\s+['\"]http", r"<!DOCTYPE"],
+    "EICAR Standard Anti-Virus Test File": [r"EICAR-STANDARD-ANTIVIRUS", r"X5O!P%@AP\[4\\PZX54\(P\^\)7CC\)7\}\$EICAR"]
 }
 
 def analyze_content(text, depth=0, aggregator=None):
