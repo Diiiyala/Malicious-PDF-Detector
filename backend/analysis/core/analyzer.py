@@ -160,8 +160,7 @@ def clean_findings(res_content, res_structure):
         "ALERT: Silent page trigger (/O or /C)",
         "ALERT: Automatic execution trigger (/OpenAction)",
         "ALERT: Remote PDF embedded link (/GoToE)",
-        "ALERT: Annotation (/Launch)",
-        "ALERT: Specific threats detected: XFA/SOAP Attack"
+        "ALERT: Annotation (/Launch)"
     ]
 
     for threat in shared_threats:
@@ -184,16 +183,47 @@ def clean_findings(res_content, res_structure):
         if "Hidden URI found" in dup:
             final_structure.discard(dup)
 
-    # 2. Merge Repeated Offset Alerts
+    # 2. Group and deduplicate threat findings
+    
+    all_findings = list(final_content | final_structure)
+    threat_groups = {} 
+
+    for finding in list(all_findings):
+        
+        if "Specific threats detected:" in finding:
+            match_threat = re.search(r'Specific threats detected:\s*([^(\n]+)', finding)
+            
+            if match_threat:
+                threat_name = match_threat.group(1).strip()
+                found_words = re.findall(r"'(.*?)'", finding)
+                offsets = re.findall(r'\(Offset:\s*\d+\)', finding)
+                
+                if threat_name not in threat_groups:
+                    threat_groups[threat_name] = {"words": set(), "offsets": set()}
+                
+                threat_groups[threat_name]["words"].update(found_words)
+                threat_groups[threat_name]["offsets"].update(offsets)
+                
+                final_content.discard(finding)
+                final_structure.discard(finding)
+
+    for threat_name, data in threat_groups.items():
+        
+        if data["offsets"]:
+            sorted_offsets = sorted(list(data["offsets"]), key=lambda x: int(re.search(r'\d+', x).group()))
+            offsets_str = ", ".join(sorted_offsets)
+            words_str = ", ".join([f"'{w}'" for w in sorted(list(data["words"]))])
+            
+            final_content.add(f"ALERT: Specific threats detected: {threat_name} (Found: {words_str}) in ( {offsets_str} )")
+
+    # 3. Merge Repeated Offset Alerts
     
     scripting_offsets = set()
-    all_findings = list(final_content | final_structure)
-
-    for finding in all_findings:
-        if "Suspicious Scripting" in finding or "Scripting indicator" in finding:
+    
+    for finding in list(final_content | final_structure):
+        if ("Suspicious Scripting" in finding or "Scripting indicator" in finding) and "Specific threats" not in finding:
             offsets_found = re.findall(r'\b\d+\b', finding)
             scripting_offsets.update(int(offset) for offset in offsets_found)
-            
             final_content.discard(finding)
             final_structure.discard(finding)
 
