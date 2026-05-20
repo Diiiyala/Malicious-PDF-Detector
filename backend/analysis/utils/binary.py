@@ -37,8 +37,8 @@ CONTENT_PATTERNS = {
     rb"/JBIG2Decode": "ALERT: Suspicious compression filter (/JBIG2Decode) detected",
     
     # XFA Form
-    rb"<template": "ALERT: Specific threats detected: XFA Form Submission Pattern",
-    rb"<subform": "ALERT: Specific threats detected: XFA Form Submission Pattern",
+    rb"<template": "ALERT: Specific threats detected: XFA/SOAP Attack",
+    rb"<subform": "ALERT: Specific threats detected: XFA/SOAP Attack",
     
     # XSS Injection
     rb"<img\s+src=": "ALERT: XSS injection attempt detected via HTML tag",
