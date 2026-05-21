@@ -63,6 +63,7 @@ CONTENT_PATTERNS = {
 SCRIPT_TYPE_MAP = {
     rb"/JavaScript": "JavaScript",
     rb"/JS": "JavaScript",
+    rb"/JS\b": "JavaScript",
     rb"/JS\s*\(": "JavaScript",
     rb"application/x-formcalc": "XFA/FormCalc",
     rb"<?xml-stylesheet": "XSLT/XML",
@@ -166,13 +167,15 @@ def binary_scan(file_content, aggregator=None):
                             char = raw_chunk[i]
                             if char == ord(b'('):
                                 depth += 1
+                                content.append(char)
                             elif char == ord(b')'):
                                 depth -= 1
                                 content.append(char)
                                 if depth == 0:
                                     break
                                 continue
-                            content.append(char)
+                            else:
+                                content.append(char)
                             
                         snippet = content.decode('utf-8', errors='ignore')
                     else:
