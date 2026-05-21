@@ -439,6 +439,7 @@ def analyze_streams_and_objects(reader, aggregator=None):
     font_threats = {} 
     remote_refs = {}
     filter_objs = {}
+    visited_objects = set()
     
     # ---------------------------------------------------------------------
     # Retrieve all object numbers from cross-reference table
@@ -461,7 +462,13 @@ def analyze_streams_and_objects(reader, aggregator=None):
         try:
             if hasattr(obj, "get_object"):
                 obj = obj.get_object()
-                if obj is None: return
+                
+            if obj is None: return
+
+            obj_id = id(obj)
+            if obj_id in visited_objects:
+                return
+            visited_objects.add(obj_id)
 
             # --------------------------------------------------------------
             # Process Individual Objects
@@ -584,6 +591,14 @@ def analyze_streams_and_objects(reader, aggregator=None):
                                     stream_findings.extend(embedded_findings)
                                         
                     except Exception as stream_e: pass
+                    
+                # ----------------------------------------------------------
+                # 8. Recursive Traversal of Nested Objects / Arrays
+                # ----------------------------------------------------------
+                
+                for key, value in obj.items():
+                    if isinstance(value, dict) or isinstance(value, list):
+                        process_obj(value, location_label)
 
             # --------------------------------------------------------------
             # Process Individual Objects
