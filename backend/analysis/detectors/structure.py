@@ -601,6 +601,40 @@ def analyze_streams_and_objects(reader, aggregator=None):
                 for key, value in obj.items():
                     if isinstance(value, dict) or isinstance(value, list):
                         process_obj(value, location_label)
+                        
+                # ----------------------------------------------------------
+                # 9. Advanced Execution Triggers (Zero-Click & Events)
+                # ----------------------------------------------------------
+                if "/AA" in obj:
+                    aa = obj.get("/AA")
+                    try:
+                        aa_obj = aa.get_object() if hasattr(aa, "get_object") else aa
+                        if isinstance(aa_obj, dict):
+                            if "/E" in aa_obj:
+                                msg = "ALERT: Event-based execution trigger (Mouse-over /E)"                               
+                                if msg not in remote_refs: remote_refs[msg] = []
+                                remote_refs[msg].append(location_label)
+                                
+                            elif "/PV" in aa_obj or "/PC" in aa_obj:
+                                msg = "ALERT: Event-based execution trigger (Page Visibility/Close)"
+                                if msg not in remote_refs: remote_refs[msg] = []
+                                remote_refs[msg].append(location_label)
+                                
+                            elif any(k in aa_obj for k in ["/WC", "/WS", "/DS", "/WP", "/DP"]):
+                                msg = "ALERT: Silent background trigger (Save/Print/Close)"
+                                if msg not in remote_refs: remote_refs[msg] = []
+                                remote_refs[msg].append(location_label)
+                    except: pass
+
+                if "/Names" in obj:
+                    names = obj.get("/Names")
+                    try:
+                        names_obj = names.get_object() if hasattr(names, "get_object") else names
+                        if isinstance(names_obj, dict) and "/JavaScript" in names_obj:
+                            msg = "ALERT: Document-level automatic execution trigger (/Names)"
+                            if msg not in remote_refs: remote_refs[msg] = []
+                            remote_refs[msg].append(location_label)
+                    except: pass
 
             # --------------------------------------------------------------
             # Process Individual Objects
