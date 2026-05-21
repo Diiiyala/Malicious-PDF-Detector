@@ -434,7 +434,6 @@ def process_name_node(key, value_obj, findings, whitelist, untrusted_items, js_s
         
 def analyze_streams_and_objects(reader, aggregator=None):
     stream_findings = []
-    extracted_urls = []
     suspicious_filters = ["/JBIG2Decode", "/Crypt"]
     font_threats = {} 
     remote_refs = {}
@@ -525,9 +524,12 @@ def analyze_streams_and_objects(reader, aggregator=None):
                         if aggregator:
                             aggregator.add_script(content_to_scan, location_label, source_object=location_label)
                             
-                        l_findings, _, _, l_urls = analyze_links(content_to_scan)
+                        l_findings, _, _, _ = analyze_links(content_to_scan)
                         stream_findings.extend(l_findings)
-                        for url in l_urls: extracted_urls.append(f"{location_label}: {url}")
+                        
+                        c_findings = analyze_content(content_to_scan, aggregator=aggregator)
+                        stream_findings.extend(c_findings)
+
                     except: pass
                     
                 # ----------------------------------------------------------
@@ -649,7 +651,4 @@ def analyze_streams_and_objects(reader, aggregator=None):
         unique_locs = sorted(list(set(locations)))
         stream_findings.append(f"ALERT: Suspicious stream filter ({filt}) detected in: [{', '.join(unique_locs)}]")
          
-    if extracted_urls:
-        stream_findings.append(f"ALERT: Hidden URLs extracted from JavaScript: [{', '.join(sorted(list(set(extracted_urls))))}]")
-
     return stream_findings
