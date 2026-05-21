@@ -5,11 +5,11 @@ URL_PATTERN = re.compile(r'\b(?:https?|ftp|ftps|file|smb|ssh|telnet|gopher|ldap|
 UNC_PATTERN = re.compile(r'(?:\\\\|\\\\\\\\)(?:https?://)?[a-zA-Z0-9.-]+\\[^\s\)\>]+', re.IGNORECASE)
 
 JS_URL_PATTERN = re.compile(
-    r'(?:(?:cPath|url|uri|location|src|cURL|action|target|soapAction)\s*[:=]\s*["\']?|'
-    r'(?:app\.launchURL|this\.getURL|getURL|launchURL)\s*\(\s*["\'])'
-    r'([^"\'\s\)]+)', 
+    r'(?:(?:cPath|url|uri|location|src|cURL|action|target|soapAction)\s*[:=]\s*(?:encodeURI\s*\(\s*)?["\']?|'
+    r'(?:app\.launchURL|this\.getURL|getURL|launchURL)\s*\(\s*(?:encodeURI\s*\(\s*)?["\'])'
+    r'([^"\'\s\)\+]+)', 
     re.IGNORECASE
-) 
+)
 
 SHORTENERS = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "is.gd", "buff.ly", "adf.ly"]
 SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost", "script", "image", "jonaslejon", "malicious-pdf", "deepzec", "modzero"]
