@@ -13,6 +13,9 @@ def calculate_risk(findings):
         
         # Structure
         "ALERT: Clickjacking Full-page overlay": 13, 
+        "ALERT: Event-based execution trigger": 12,
+        "ALERT: Silent background trigger (Save/Print/Close)": 12,
+        "ALERT: Document-level automatic execution trigger (/Names)": 12,
         "ALERT: Remote resource reference detected": 12,
         "ALERT: Scripting indicator found in font object": 12,
         "ALERT: Dangerous silent trigger": 12,
@@ -110,7 +113,6 @@ def calculate_risk(findings):
         "ALERT: Suspicious hosts detected": 6,
         "ALERT: Multiple execution triggers": 9,
         "ALERT: Automatic execution trigger": 8,
-        "ALERT: Event-based execution trigger": 8,
         "ALERT: Hidden Layer": 4,
         "ALERT: Highly Random Data (Encrypted/Compressed)": 8,
         "ALERT: Minified/Compressed Text": 3,
