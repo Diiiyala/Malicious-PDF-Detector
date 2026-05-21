@@ -519,7 +519,9 @@ def analyze_streams_and_objects(reader, aggregator=None):
                     js_content = obj.get("/JS") or obj.get("/JavaScript")
                     try:
                         js_str = js_content.get_object() if hasattr(js_content, "get_object") else js_content
-                        content_to_scan = js_str.decode('utf-8', errors='ignore') if isinstance(js_str, bytes) else str(js_str)
+                        
+                        if not isinstance(js_str, (dict, list)):
+                            content_to_scan = js_str.decode('utf-8', errors='ignore') if isinstance(js_str, bytes) else str(js_str)
                         
                         if aggregator:
                             aggregator.add_script(content_to_scan, location_label, source_object=location_label)
@@ -603,7 +605,7 @@ def analyze_streams_and_objects(reader, aggregator=None):
                         process_obj(value, location_label)
                         
                 # ----------------------------------------------------------
-                # 9. Advanced Execution Triggers (Zero-Click & Events)
+                # 9. Execution Triggers (Zero-Click & Events)
                 # ----------------------------------------------------------
                 if "/AA" in obj:
                     aa = obj.get("/AA")
