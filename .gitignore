@@ -21,3 +21,8 @@ Thumbs.db
 
 # Environment variables
 .env
+
+# React / Node.js
+node_modules
+dist
+package-lock.json
