@@ -12,6 +12,9 @@ def calculate_risk(findings):
         "INFO: Page contains images but no extractable text": 2,
         
         # Structure
+        "ALERT: SubmitForm configured to leak entire PDF (Flags 256)": 13,
+        "ALERT: SubmitForm configured to leak data as HTML (Flags 4)": 12,
+        "ALERT: OpenAction triggers URI:": 12,
         "ALERT: Clickjacking Full-page overlay": 13, 
         "ALERT: Event-based execution trigger": 12,
         "ALERT: Silent background trigger (Save/Print/Close)": 12,
@@ -24,6 +27,7 @@ def calculate_risk(findings):
         "ALERT: Clickjacking Suspicious invisible button grid": 12,
         "ALERT: PDF 2.0 Associated Files (/AF) detected": 12,
         "ALERT: Annotation (/GoToR)": 12,
+        "ALERT: Remote path detected (/F):": 11,
         "ALERT: Suspicious OCG-JavaScript coupling detected": 11,
         "ALERT: Suspicious Scripting found (Raw Scan)": 11,
         "ALERT: Auto-executable (/OpenAction) detected": 11,
@@ -52,6 +56,7 @@ def calculate_risk(findings):
         "ALERT: Encrypted PDF": 5, 
         "Annotation (/Named)": 4,     
         "ALERT: Bookmark (": 4,      
+        "INFO: SubmitForm triggered with Flags:": 4,
         "INFO: Entry points to an empty object": 1,
         
         # Metadata
