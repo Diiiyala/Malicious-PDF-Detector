@@ -280,7 +280,7 @@ def extract_embedded_paths(file_content):
             content.append(char)
 
         path_str = content.decode('utf-8', errors='ignore')
-        findings.append(f"ALERT: Remote PDF embedded link (/GoToE) pointing to: ({path_str})")
+        findings.append(f"ALERT: Remote path detected (/F): ({path_str})")
 
     return findings
 
