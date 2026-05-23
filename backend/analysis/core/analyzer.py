@@ -231,4 +231,22 @@ def clean_findings(res_content, res_structure):
         sorted_offsets_str = ", ".join(f"Offset: {offset}" for offset in sorted(list(scripting_offsets)))
         final_content.add(f"ALERT: Suspicious Scripting found in ( {sorted_offsets_str} )")
 
+    # 4. Merge Duplicate Remote Paths (Binary vs Structure)
+    
+    parsed_paths = set()
+    
+    for finding in list(final_structure):
+        match = re.search(r'Remote resource reference detected \(Path:\s*(.*?)\)', finding)
+        if match:
+            parsed_paths.add(match.group(1).strip())
+            
+    for finding in list(final_structure | final_content):
+        match = re.search(r'Remote path detected \(/F\):\s*\((.*?)\)', finding)
+        
+        if match:
+            path = match.group(1).strip()
+            if path in parsed_paths:
+                final_structure.discard(finding)
+                final_content.discard(finding)
+
     return sorted(list(final_content)), sorted(list(final_structure))
