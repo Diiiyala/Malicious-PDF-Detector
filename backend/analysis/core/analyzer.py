@@ -231,21 +231,31 @@ def clean_findings(res_content, res_structure):
         sorted_offsets_str = ", ".join(f"Offset: {offset}" for offset in sorted(list(scripting_offsets)))
         final_content.add(f"ALERT: Suspicious Scripting found in ( {sorted_offsets_str} )")
 
-    # 4. Merge Duplicate Remote Paths (Binary vs Structure)
-    
-    parsed_paths = set()
-    
+    # 4. Merge Duplicate Remote Paths
+
+    detailed_action_urls = set()
+    for finding in list(final_structure | final_content):
+        match = re.search(r'pointing to:\s*\((.*?)\)', finding)
+        if match:
+            detailed_action_urls.add(match.group(1).strip())
+            
+    parsed_object_paths = set()
     for finding in list(final_structure):
         match = re.search(r'Remote resource reference detected \(Path:\s*(.*?)\)', finding)
-        if match:
-            parsed_paths.add(match.group(1).strip())
-            
-    for finding in list(final_structure | final_content):
-        match = re.search(r'Remote path detected \(/F\):\s*\((.*?)\)', finding)
         
         if match:
             path = match.group(1).strip()
-            if path in parsed_paths:
+            parsed_object_paths.add(path)
+
+            if path in detailed_action_urls:
+                final_structure.discard(finding)
+                
+    all_structured_paths = detailed_action_urls | parsed_object_paths
+    for finding in list(final_structure | final_content):
+        match = re.search(r'Remote path detected \(/F\):\s*\((.*?)\)', finding)
+        if match:
+            path = match.group(1).strip()
+            if path in all_structured_paths:
                 final_structure.discard(finding)
                 final_content.discard(finding)
 
