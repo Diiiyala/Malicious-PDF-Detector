@@ -215,7 +215,35 @@ def perform_action_analysis(reader, root, aggregator=None):
     # Analyze Root Actions
     if root:
         if "/OpenAction" in root:
-            add_location("ALERT: Automatic execution trigger (/OpenAction)", "Catalog")
+            action_traced = False
+            
+            try:
+                oa_obj = root["/OpenAction"].get_object()
+
+                if isinstance(oa_obj, dict) and "/S" in oa_obj:
+                    action_type = str(oa_obj.get("/S")).replace("/", "")
+                    
+                    add_location(f"ALERT: Automatic execution trigger (/OpenAction) executing Action (/{action_type})", "Catalog")
+                    action_traced = True
+                    
+                    if action_type == "SubmitForm":
+                        if "/Flags" in oa_obj:
+                            flags = int(oa_obj.get("/Flags", 0))
+                            if flags & 4:
+                                add_location("ALERT: SubmitForm configured to leak data as HTML (Flags 4)", "Catalog")
+                            elif flags & 256:
+                                add_location("ALERT: SubmitForm configured to leak entire PDF (Flags 256)", "Catalog")
+                            else:
+                                add_location(f"INFO: SubmitForm triggered with Flags: {flags}", "Catalog")
+                    
+                    elif action_type == "URI":
+                        uri_val = str(oa_obj.get("/URI", "Unknown"))
+                        add_location(f"ALERT: OpenAction triggers URI: {uri_val}", "Catalog")
+                        
+            except Exception as e: pass 
+
+            if not action_traced:
+                add_location("ALERT: Automatic execution trigger (/OpenAction)", "Catalog")
         
         if "/AA" in root:
             aa_dict = root["/AA"].get_object()
