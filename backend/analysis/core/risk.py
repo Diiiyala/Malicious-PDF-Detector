@@ -25,6 +25,7 @@ def calculate_risk(findings):
         "ALERT: Silent page trigger": 12,
         "ALERT: Hidden URLs extracted from JavaScript": 12,
         "ALERT: Clickjacking Suspicious invisible button grid": 12,
+        "ALERT: External data import trigger (/ImportData) pointing to:": 12,
         "ALERT: PDF 2.0 Associated Files (/AF) detected": 12,
         "ALERT: Annotation (/GoToR)": 12,
         "ALERT: Remote path detected (/F):": 11,
