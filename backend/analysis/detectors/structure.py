@@ -288,11 +288,28 @@ def perform_action_analysis(reader, root, aggregator=None):
                     
                     is_transparent = (obj.get("/F") == 2 or not obj.get("/AP"))
                     has_js = False
+                    trigger_type = "Unknown trigger"
                     
                     if "/A" in obj:
                         action_dict = obj["/A"].get_object()
-                        if action_dict.get("/S") == "/JavaScript":
+                        a_type = action_dict.get("/S")
+                        
+                        if a_type == "/JavaScript":
                             has_js = True
+                            trigger_type = "JavaScript trigger"
+                            
+                        elif a_type == "/URI":
+                            uri_link = action_dict.get("/URI", "Unknown Link")
+                            trigger_type = f"DNS/HTTP trigger: {uri_link}"
+                            
+                        elif a_type == "/SubmitForm":
+                            trigger_type = "Data exfiltration trigger"
+                            
+                        elif a_type:
+                            trigger_type = f"{str(a_type).replace('/', '')} trigger"
+                            
+                    is_link_trigger = (subtype == "/Link" and "/A" in obj)
+                    is_clickjacking = False
 
                     if rect and page_area > 0:
                         width = abs(float(rect[2]) - float(rect[0]))
@@ -301,9 +318,10 @@ def perform_action_analysis(reader, root, aggregator=None):
                         coverage = annot_area / page_area
                                                    
                         if coverage > 0.9:
-                            if has_js or is_widget:
-                                impact_desc = "ALERT: Clickjacking Full-page overlay (Invisible overlay detected; any click on the page may trigger malicious scripts)"
+                            if has_js or is_widget or is_link_trigger:
+                                impact_desc = f"ALERT: Clickjacking overlay ({trigger_type})"
                                 add_location(impact_desc, loc_str)
+                                is_clickjacking = True
 
                         if is_widget and is_transparent and coverage < 0.05:
                             visible_widgets_on_page += 1
@@ -316,13 +334,13 @@ def perform_action_analysis(reader, root, aggregator=None):
                             if aggregator:
                                 aggregator.add_script(t_val, f"{loc_str} Annotation /T Field", script_type="Stored XSS Payload")
                                 
-                    if "/A" in obj:
+                    if "/A" in obj and not is_clickjacking:
                         action_dict = obj["/A"].get_object()
                         a_type = action_dict.get("/S")
                                               
                         if a_type == "/URI":
                             uri_link = action_dict.get("/URI", "Unknown Link")
-                            add_location(f"ALERT: Annotation (URI: {uri_link})", loc_str)
+                            add_location(f"ALERT: Annotation (URI: {uri_link}) - Potential DNS/HTTP Request Trigger", loc_str)
                         
                         elif a_type == "/ImportData":
                             f_spec = action_dict.get("/F")
