@@ -2,6 +2,10 @@ import re
 from collections import defaultdict
 from analysis.utils.normalizer import normalize_all
 
+# -----------------------------------------------------------------------
+# Threat Signatures
+# -----------------------------------------------------------------------
+
 STRUCTURE_PATTERNS = {
     rb"/AA\s*<<\s*/O": "ALERT: Silent page trigger (/O or /C)",
     rb"/OpenAction": "ALERT: Automatic execution trigger (/OpenAction)",
@@ -10,48 +14,23 @@ STRUCTURE_PATTERNS = {
 }
     
 CONTENT_PATTERNS = {
-    # URI Action
     rb"/S\s*/URI": "ALERT: Direct URI action detected in hidden object",
-    
-    # JavaScript Injection
     rb"/JS\s*\(": "ALERT: Suspicious Scripting found in malformed object",
     rb"/JavaScript": "ALERT: Suspicious Scripting found",
     rb"/JS\b": "ALERT: Suspicious Scripting found",
-    
-    # Form Submission
     rb"/SubmitForm": "ALERT: Form submission trigger (/SubmitForm) found in raw data",
-    
-    # FormCalc Script
     rb"application/x-formcalc": "ALERT: Scripting indicators found in raw binary data (FormCalc)",
-    
-    # XML/XSLT Script
     rb"<?xml-stylesheet": "ALERT: Scripting indicators found in raw binary data (XSLT/XML)",
-    
-    # RichMedia Object
     rb"/RichMedia": "ALERT: RichMedia object (Potential exploit carrier) found in raw data",
-    
-    # Encryption Filter
     rb"/Crypt": "ALERT: Custom encryption filter (/Crypt) found in raw data",
-    
-    # JBIG2 Exploit
     rb"/JBIG2Decode": "ALERT: Suspicious compression filter (/JBIG2Decode) detected",
-    
-    # XFA Form
     rb"<template": "ALERT: Specific threats detected: XFA/SOAP Attack",
     rb"<subform": "ALERT: Specific threats detected: XFA/SOAP Attack",
-    
-    # XSS Injection
     rb"<img\s+src=": "ALERT: XSS injection attempt detected via HTML tag",
     rb"onerror\s*=": "ALERT: XSS injection attempt detected via HTML tag",
-    
-    # SOAP Attack
     rb'method="soap"': "ALERT: Specific threats detected: XFA/SOAP Attack",
     rb'soapAction': "ALERT: Specific threats detected: XFA/SOAP Attack",
-    
-    # LibreOffice Env Leak
     rb"vnd\.sun\.star\.expand": "ALERT: Specific threats detected: Environment Leak Pattern (LibreOffice)",
-    
-    # XXE Injection
     rb"<!DOCTYPE": "XXE Injection Attempt",
     rb"<!ENTITY": "XXE Injection Attempt",
     rb"SYSTEM\s+[\"']": "XXE Injection Attempt",
@@ -59,7 +38,11 @@ CONTENT_PATTERNS = {
     rb"file://": "XXE Injection Attempt",
     rb"expect://": "XXE Injection Attempt",
 }
-    
+ 
+# -----------------------------------------------------------------------
+# Aggregator Maps
+# -----------------------------------------------------------------------
+   
 SCRIPT_TYPE_MAP = {
     rb"/JavaScript": "JavaScript",
     rb"/JS": "JavaScript",
@@ -85,19 +68,14 @@ def binary_scan(file_content, aggregator=None):
     structure_findings = []
     
     # ------------------------------------------------------------------
-    # Embedded /F(...) references
+    # 1. Extract standard paths & URIs
     # ------------------------------------------------------------------
 
-    structure_findings.extend(extract_embedded_paths(file_content))
-    
-    # ------------------------------------------------------------------
-    # Hidden URIs
-    # ------------------------------------------------------------------
-    
+    structure_findings.extend(extract_embedded_paths(file_content))  
     structure_findings.extend(extract_hidden_uris(file_content))
     
     # ------------------------------------------------------------------
-    # Structure-based detection
+    # 2. Structure-based detection
     # ------------------------------------------------------------------
 
     for pattern, message in STRUCTURE_PATTERNS.items():
@@ -107,7 +85,7 @@ def binary_scan(file_content, aggregator=None):
                 structure_findings.append(message)
                           
     # ------------------------------------------------------------------
-    # Content-based detection
+    # 3. Content-based detection & Script Aggregation
     # ------------------------------------------------------------------
     processed_offsets = set() 
     processed_snippets = set()
@@ -201,7 +179,7 @@ def binary_scan(file_content, aggregator=None):
                     aggregator.add_script(normalized_snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
                     
     # ------------------------------------------------------------------
-    # Final formatting
+    # 4. Final Formatting
     # ------------------------------------------------------------------
 
     final_content_findings = []
