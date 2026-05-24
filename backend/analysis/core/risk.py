@@ -13,9 +13,9 @@ def calculate_risk(findings):
         
         # Structure
         "ALERT: SubmitForm configured to leak entire PDF (Flags 256)": 13,
+        "ALERT: Clickjacking overlay": 13,
         "ALERT: SubmitForm configured to leak data as HTML (Flags 4)": 12,
         "ALERT: OpenAction triggers URI:": 12,
-        "ALERT: Clickjacking Full-page overlay": 13, 
         "ALERT: Event-based execution trigger": 12,
         "ALERT: Silent background trigger (Save/Print/Close)": 12,
         "ALERT: Document-level automatic execution trigger (/Names)": 12,
