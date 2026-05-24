@@ -211,12 +211,21 @@ def perform_action_analysis(reader, root, aggregator=None):
         if action_type not in action_locations:
             action_locations[action_type] = []
         action_locations[action_type].append(location)
+        
+    def extract_action_path(action_dict):
+        f_spec = action_dict.get("/F")
+        if not f_spec: return None
+        f_obj = f_spec.get_object() if hasattr(f_spec, "get_object") else f_spec
+        
+        if isinstance(f_obj, dict):
+            f_path = f_obj.get("/F") or f_obj.get("/Unix") or str(f_obj)
+            return str(f_path)
+        return str(f_obj)
 
     # Analyze Root Actions
     if root:
         if "/OpenAction" in root:
             action_traced = False
-            
             try:
                 oa_obj = root["/OpenAction"].get_object()
 
@@ -240,7 +249,7 @@ def perform_action_analysis(reader, root, aggregator=None):
                         uri_val = str(oa_obj.get("/URI", "Unknown"))
                         add_location(f"ALERT: OpenAction triggers URI: {uri_val}", "Catalog")
                         
-            except Exception as e: pass 
+            except Exception as e: pass
 
             if not action_traced:
                 add_location("ALERT: Automatic execution trigger (/OpenAction)", "Catalog")
@@ -289,21 +298,28 @@ def perform_action_analysis(reader, root, aggregator=None):
                     is_transparent = (obj.get("/F") == 2 or not obj.get("/AP"))
                     has_js = False
                     trigger_type = "Unknown trigger"
+                    extracted_path = None
                     
                     if "/A" in obj:
                         action_dict = obj["/A"].get_object()
                         a_type = action_dict.get("/S")
+                        extracted_path = extract_action_path(action_dict)
                         
                         if a_type == "/JavaScript":
                             has_js = True
                             trigger_type = "JavaScript trigger"
                             
                         elif a_type == "/URI":
-                            uri_link = action_dict.get("/URI", "Unknown Link")
+                            uri_link = str(action_dict.get("/URI", "Unknown Link"))
                             trigger_type = f"DNS/HTTP trigger: {uri_link}"
+                            extracted_path = uri_link
                             
                         elif a_type == "/SubmitForm":
-                            trigger_type = "Data exfiltration trigger"
+                            trigger_type = f"Data exfiltration trigger: {extracted_path}" if extracted_path else "Data exfiltration trigger"
+                            
+                        elif a_type in ["/Launch", "/GoToR", "/ImportData", "/Thread", "/GoToE"]:
+                            a_clean = str(a_type).replace("/", "")
+                            trigger_type = f"{a_clean} trigger: {extracted_path}" if extracted_path else f"{a_clean} trigger (Internal)"
                             
                         elif a_type:
                             trigger_type = f"{str(a_type).replace('/', '')} trigger"
@@ -323,8 +339,8 @@ def perform_action_analysis(reader, root, aggregator=None):
                                 add_location(impact_desc, loc_str)
                                 is_clickjacking = True
 
-                        if is_widget and is_transparent and coverage < 0.05:
-                            visible_widgets_on_page += 1
+                    if is_widget and is_transparent and coverage < 0.05:
+                        visible_widgets_on_page += 1
                             
                     if "/T" in obj:
                         t_val = str(obj["/T"])
@@ -339,44 +355,26 @@ def perform_action_analysis(reader, root, aggregator=None):
                         a_type = action_dict.get("/S")
                                               
                         if a_type == "/URI":
-                            uri_link = action_dict.get("/URI", "Unknown Link")
-                            add_location(f"ALERT: Annotation (URI: {uri_link}) - Potential DNS/HTTP Request Trigger", loc_str)
-                        
+                            add_location(f"ALERT: Annotation (URI: {extracted_path}) - Potential DNS/HTTP Request Trigger", loc_str)
                         elif a_type == "/ImportData":
-                            f_spec = action_dict.get("/F")
-                            f_path = "Unknown"
-                            if f_spec:
-                                f_obj = f_spec.get_object() if hasattr(f_spec, "get_object") else f_spec
-                                if isinstance(f_obj, dict):
-                                    f_path = f_obj.get("/F") or f_obj.get("/Unix") or str(f_obj)
-                                else:
-                                    f_path = str(f_obj)
-                            add_location(f"ALERT: External data import trigger (/ImportData) pointing to: ({f_path})", loc_str)
-                            
+                            add_location(f"ALERT: External data import trigger (/ImportData) pointing to: ({extracted_path})", loc_str)
                         elif a_type == "/GoToR":
-                            f_spec = action_dict.get("/F")
-                            f_path = "Unknown"
-                            if f_spec:
-                                f_obj = f_spec.get_object() if hasattr(f_spec, "get_object") else f_spec
-                                if isinstance(f_obj, dict):
-                                    f_path = f_obj.get("/F") or f_obj.get("/Unix") or str(f_obj)
-                                else:
-                                    f_path = str(f_obj)
-                            add_location(f"ALERT: Annotation (/GoToR) pointing to: ({f_path})", loc_str)
-                                
+                            add_location(f"ALERT: Annotation (/GoToR) pointing to: ({extracted_path})", loc_str)
                         elif a_type == "/GoToE":
-                            f_path = action_dict.get("/F")
-                            add_location(f"ALERT: Suspicious /GoToE pointing to: {f_path if f_path else 'Internal'}", loc_str)
+                            add_location(f"ALERT: Suspicious /GoToE pointing to: {extracted_path if extracted_path else 'Internal'}", loc_str)
+                        elif a_type in ["/Launch", "/SubmitForm", "/Thread"]:
+                            a_clean = str(a_type).replace("/", "")
+                            add_location(f"ALERT: Annotation (/{a_clean}) pointing to: ({extracted_path})", loc_str) if extracted_path else add_location(f"ALERT: Annotation (/{a_clean})", loc_str)
                         else:
                             a_type_clean = str(a_type).replace("/", "")
                             add_location(f"ALERT: Annotation (/{a_type_clean})", loc_str)
-                
-                if visible_widgets_on_page > 3:
-                    add_location("ALERT: Clickjacking Suspicious invisible button grid detected", loc_str)
-                            
+            
+            if visible_widgets_on_page > 3:
+                add_location("ALERT: Clickjacking Suspicious invisible button grid detected", loc_str)
+                        
     except Exception as e:
         action_findings.append("ALERT: Could not fully analyze actions on all pages (Potential obfuscation/Structure corruption)")
-
+        
     # Analyze AcroForm
     try:
         if root and "/AcroForm" in root:
@@ -391,33 +389,18 @@ def perform_action_analysis(reader, root, aggregator=None):
                 elif "/A" in f_obj:
                     action_dict = f_obj["/A"].get_object()
                     a_type = action_dict.get("/S")
+                    extracted_path = extract_action_path(action_dict)
                     
                     if a_type == "/GoToE":
-                        f_spec = action_dict.get("/F")
-                        f_path = "Unknown"
-                        if f_spec:
-                            f_spec_obj = f_spec.get_object() if hasattr(f_spec, "get_object") else f_spec
-                            if isinstance(f_spec_obj, dict):
-                                f_path = f_spec_obj.get("/F", "Unknown")
-                            else:
-                                f_path = str(f_spec_obj)
-                        
-                        add_location(f"ALERT: Form GoToE pointing to: ({f_path})", f"Field: {field_name}")
-                        
+                        add_location(f"ALERT: Form GoToE pointing to: ({extracted_path if extracted_path else 'Internal'})", f"Field: {field_name}")
                     elif a_type == "/ImportData":
-                        f_spec = action_dict.get("/F")
-                        f_path = "Unknown"
-                        if f_spec:
-                            f_spec_obj = f_spec.get_object() if hasattr(f_spec, "get_object") else f_spec
-                            if isinstance(f_spec_obj, dict):
-                                f_path = f_spec_obj.get("/F", "Unknown")
-                            else:
-                                f_path = str(f_spec_obj)
-                        add_location(f"ALERT: External data import trigger (/ImportData) pointing to: ({f_path})", f"Field: {field_name}")
-                        
+                        add_location(f"ALERT: External data import trigger (/ImportData) pointing to: ({extracted_path})", f"Field: {field_name}")
                     else:
                         a_type_clean = str(a_type).replace("/", "")
-                        add_location(f"ALERT: Form Field Action (/{a_type_clean})", f"Field: {field_name}")
+                        if extracted_path:
+                            add_location(f"ALERT: Form Field Action (/{a_type_clean}) pointing to: ({extracted_path})", f"Field: {field_name}")
+                        else:
+                            add_location(f"ALERT: Form Field Action (/{a_type_clean})", f"Field: {field_name}")
                         
     except: pass
     
