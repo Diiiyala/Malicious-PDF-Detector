@@ -235,9 +235,11 @@ def clean_findings(res_content, res_structure):
 
     detailed_action_urls = set()
     for finding in list(final_structure | final_content):
-        match = re.search(r'pointing to:\s*\((.*?)\)', finding)
+        match = re.search(r'pointing to:\s*\((.*?)\)|trigger:\s*(.*?)\)', finding)
         if match:
-            detailed_action_urls.add(match.group(1).strip())
+            extracted_url = match.group(1) if match.group(1) else match.group(2)
+            if extracted_url:
+                detailed_action_urls.add(extracted_url.strip())
             
     parsed_object_paths = set()
     for finding in list(final_structure):
