@@ -558,7 +558,15 @@ def analyze_streams_and_objects(reader, aggregator=None):
 
                 if "/F" in obj:
                     if obj.get("/Subtype") == "/Image" or "/FS" in obj:
-                        f_path = str(obj.get("/F"))
+                        f_val = obj.get("/F")
+                        if hasattr(f_val, "get_object"):
+                            f_val = f_val.get_object()
+
+                        if isinstance(f_val, dict) and "/F" in f_val:
+                            f_path = str(f_val.get("/F"))
+                        else:
+                            f_path = str(f_val)
+                            
                         msg = f"ALERT: Remote resource reference detected (Path: {f_path})"
                         if msg not in remote_refs: remote_refs[msg] = []
                         remote_refs[msg].append(location_label)
