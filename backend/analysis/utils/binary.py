@@ -31,7 +31,6 @@ CONTENT_PATTERNS = {
     rb'method="soap"': "ALERT: Specific threats detected: XFA/SOAP Attack",
     rb'soapAction': "ALERT: Specific threats detected: XFA/SOAP Attack",
     rb"vnd\.sun\.star\.expand": "ALERT: Specific threats detected: Environment Leak Pattern (LibreOffice)",
-    rb"<!DOCTYPE": "XXE Injection Attempt",
     rb"<!ENTITY": "XXE Injection Attempt",
     rb"SYSTEM\s+[\"']": "XXE Injection Attempt",
     rb"PUBLIC\s+[\"']": "XXE Injection Attempt",
