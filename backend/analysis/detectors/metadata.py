@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.links import analyze_links
 
 SUSPICIOUS_WORDS = [
@@ -30,87 +31,115 @@ SUSPICIOUS_SOURCE_INDICATORS = [
 
 TARGET_SOURCE_FIELDS = ["/Author", "/Creator", "/Producer"]
 
-def analyze_metadata(reader):
-    findings = []
+def analyze_metadata(content: ExtractedContent) -> list[Threat]:
+    threats = []
     suspicious_keywords = set()
 
-    try:
-        metadata = reader.metadata
-        if not metadata:
-            return ["INFO: No metadata found"]
+    metadata = content.metadata_dict
+    if not metadata:
+        return threats
+    
+    full_metadata_text = " ".join(str(v) for v in metadata.values() if v).lower()
+    
+    # ---------------------------------------------------------------------
+    # 1. Link Analysis
+    # ---------------------------------------------------------------------
+    
+    link_findings, _, _, _ = analyze_links(full_metadata_text)
+    for lf in link_findings:
+        threats.append(Threat(
+            id="META-LINK-DETECTED",
+            category="Metadata",
+            severity=5,
+            description=lf.replace("ALERT: ", ""),
+            location="Metadata Text"
+        ))
         
-        full_metadata_text = " ".join(str(v) for v in metadata.values() if v).lower()
-        
-        # ---------------------------------------------------------------------
-        # 1. Link Analysis
-        # ---------------------------------------------------------------------
+    # ---------------------------------------------------------------------
+    # 2. Timestamp Analysis
+    # ---------------------------------------------------------------------
 
-        link_findings, _, _, _ = analyze_links(full_metadata_text)
-        findings.extend(link_findings)
+    threats.extend(analyze_timestamps(metadata))
         
-        # ---------------------------------------------------------------------
-        # 2. Timestamp Analysis
-        # ---------------------------------------------------------------------
-
-        analyze_timestamps(metadata, findings)
-        
-        # -------------------------------------------------------------------------
-        # 3. Metadata Field Analysis
-        # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # 3. Metadata Field Analysis
+    # -------------------------------------------------------------------------
           
-        for value in metadata.values():
-            if not value:
-                continue
-            value_str = str(value).strip()
-            value_lower = value_str.lower()
+    for key, value in metadata.items():
+        if not value:
+            continue
+        value_str = str(value).strip()
+        value_lower = value_str.lower()
+        field_name = key.replace("/", "")
 
-            # 3.1 Suspicious keywords
-            for word in SUSPICIOUS_WORDS:
-                if word in value_lower:
-                    suspicious_keywords.add(word)
+        # 3.1 Suspicious keywords
+        for word in SUSPICIOUS_WORDS:
+            if word in value_lower:
+                suspicious_keywords.add(word)
                                   
-            # 3.2 XSS Detection         
-            if re.search(r"<\s*script", value_lower) or "javascript:" in value_lower:
-                findings.append(f"ALERT: XSS injection attempt detected ({value_str})")
-                suspicious_keywords.add("xss")
+        # 3.2 XSS Detection         
+        if re.search(r"<\s*script", value_lower) or "javascript:" in value_lower:
+            threats.append(Threat(
+                id="META-XSS-ATTEMPT",
+                category="Metadata",
+                severity=7,
+                description=f"XSS injection attempt detected ({value_str[:100]})",
+                location=f"Field: {field_name}"
+            ))
+            suspicious_keywords.add("xss")
                 
-            # 3.3 Oversized Metadata Fields
-            if len(value_str) > 200:
-                findings.append("INFO: Long metadata field detected")
+        # 3.3 Oversized Metadata Fields
+        if len(value_str) > 200:
+            threats.append(Threat(
+                id="META-LONG-FIELD",
+                category="Metadata",
+                severity=1,
+                description=f"Long metadata field detected ({field_name}: {len(value_str)} chars)",
+                location=f"Field: {field_name}"
+            ))
 
-        if suspicious_keywords:
-            findings.append(f"ALERT: Suspicious keywords detected "f"({', '.join(sorted(suspicious_keywords))})")
-            
-        # -------------------------------------------------------------------------
-        # 4. Hacking Tool Detection
-        # -------------------------------------------------------------------------
+    if suspicious_keywords:
+        threats.append(Threat(
+            id="META-SUSPICIOUS-KEYWORD",
+            category="Metadata",
+            severity=4,
+            description=f"Suspicious keywords detected ({', '.join(sorted(suspicious_keywords))})",
+            location="Metadata Fields"
+        ))   
         
-        found_tools = [
-            tool.capitalize()
-            for tool in HACKING_TOOLS
-            if tool.lower() in full_metadata_text
-        ]
+    # -------------------------------------------------------------------------
+    # 4. Hacking Tool Detection
+    # -------------------------------------------------------------------------
         
-        if found_tools:
-            findings.append(f"ALERT: Hacking tools detected ({'/'.join(found_tools)})")
+    found_tools = [
+        tool.capitalize()
+        for tool in HACKING_TOOLS
+        if tool.lower() in full_metadata_text
+    ]
+    
+    if found_tools:
+        threats.append(Threat(
+            id="META-HACKING-TOOL",
+            category="Metadata",
+            severity=9,
+            description=f"Hacking tools detected ({'/'.join(found_tools)})",
+            location="Metadata Fields"
+        ))
 
-        # -------------------------------------------------------------------------
-        # 5. Suspicious Source Analysis
-        # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # 5. Suspicious Source Analysis
+    # -------------------------------------------------------------------------
         
-        analyze_suspicious_sources(metadata, findings)
+    threats.extend(analyze_suspicious_sources(metadata))
 
-    except Exception as e:
-        findings.append(f"Metadata error: {str(e)}")
-
-    return findings
+    return threats
 
 # -------------------------------------------------------------------------
 #  Helpers
 # -------------------------------------------------------------------------
 
-def analyze_timestamps(metadata, findings):
-
+def analyze_timestamps(metadata) -> list[Threat]:
+    threats = []
     try:
         creation_date = metadata.get("/CreationDate")
         modification_date = metadata.get("/ModDate")
@@ -118,46 +147,59 @@ def analyze_timestamps(metadata, findings):
         today_int = int(datetime.now().strftime("%Y%m%d"))
 
         if not creation_date:
-            return
+            return threats
         
         creation_raw = re.sub(r"[^0-9]", "", str(creation_date))[:8]
         
         if len(creation_raw) != 8:
-            return 
+            return threats
             
-        creation_pretty = (
-            f"{creation_raw[:4]}-"
-            f"{creation_raw[4:6]}-"
-            f"{creation_raw[6:]}"
-        )
+        creation_pretty = f"{creation_raw[:4]}-{creation_raw[4:6]}-{creation_raw[6:]}"
         
         if int(creation_raw) > today_int:
-            findings.append(f"ALERT: Future creation date detected ({creation_pretty})")
+            threats.append(Threat(
+                id="META-FUTURE-CREATION",
+                category="Metadata",
+                severity=3,
+                description=f"Future creation date detected ({creation_pretty})",
+                location="CreationDate"
+            ))
 
         if not modification_date:
-            return
+            return threats
         
         modification_raw = re.sub(r"[^0-9]", "", str(modification_date))[:8]
 
         if len(modification_raw) != 8:
-            return
+            return threats
 
-        modification_pretty = (
-            f"{modification_raw[:4]}-"
-            f"{modification_raw[4:6]}-"
-            f"{modification_raw[6:]}"
-        )
+        modification_pretty = f"{modification_raw[:4]}-{modification_raw[4:6]}-{modification_raw[6:]}"
+        
         if int(modification_raw) < int(creation_raw):
-            findings.append("ALERT: Timestamp anomaly detected "f"(Created: {creation_pretty}, "f"Modified: {modification_pretty})")
+            threats.append(Threat(
+                id="META-TIMESTAMP-ANOMALY",
+                category="Metadata",
+                severity=3,
+                description=f"Timestamp anomaly detected (Created: {creation_pretty}, Modified: {modification_pretty})",
+                location="Timestamps"
+            ))
 
         if int(modification_raw) > today_int:
-            findings.append(f"ALERT: Future modification date detected "f"({modification_pretty})")
+            threats.append(Threat(
+                id="META-FUTURE-MODIFICATION",
+                category="Metadata",
+                severity=3,
+                description=f"Future modification date detected ({modification_pretty})",
+                location="ModDate"
+                ))
             
-    except Exception: pass
+    except Exception: 
+        pass
+    return threats
 
     
-def analyze_suspicious_sources(metadata, findings):
-
+def analyze_suspicious_sources(metadata) -> list[Threat]:
+    threats = []
     found_details = set()
 
     for field in TARGET_SOURCE_FIELDS:
@@ -172,4 +214,11 @@ def analyze_suspicious_sources(metadata, findings):
                 found_details.add(f"{field_name}/{indicator.capitalize()}")
 
     if found_details:
-        findings.append("ALERT: Suspicious metadata source detected "f"({', '.join(sorted(found_details))})")
+        threats.append(Threat(
+            id="META-SUSPICIOUS-SOURCE",
+            category="Metadata",
+            severity=3,
+            description=f"Suspicious metadata source detected ({', '.join(sorted(found_details))})",
+            location="Source Fields"
+        ))
+    return threats
