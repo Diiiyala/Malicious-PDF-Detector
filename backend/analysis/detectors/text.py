@@ -1,104 +1,72 @@
-import logging
+from analysis.utils.models import ExtractedContent, Threat
 
-# -------------------------------------------------------------------------
-# Constants for Visual Anomaly Detection
-# -------------------------------------------------------------------------
-MIN_VISIBLE_FONT_SIZE = 1.0
-OUT_OF_BOUNDS_THRESHOLD = -50
+def detect_text_anomalies(content: ExtractedContent) -> list[Threat]:
+    threats = []
+    
+    if content.has_malformed_pages_tree:
+        threats.append(Threat(
+            id="TXT-TREE-MALFORMED",
+            category="Text Extraction",
+            severity=9,
+            description="Text extraction skipped (Malformed or missing Pages tree)",
+            location="Document Tree"
+        ))
 
-def extract_text(reader):
-    full_text = []
-    findings = set()
+    for page_num in content.image_only_pages:
+        threats.append(Threat(
+            id="TXT-IMG-ONLY",
+            category="Text Extraction",
+            severity=2,
+            description="Page contains images but no extractable text",
+            location=f"Page {page_num}"
+        ))
 
-    # -------------------------------------------------------------------------
-    # Internal Visitor Function
-    # -------------------------------------------------------------------------
-    def text_inspection_visitor(text, cm, tm, font_dict, font_size):
-        if not text or not text.strip() or not tm or len(tm) < 6:
-            return
-
-        # ----------------------------
-        # Transformation analysis
-        # ----------------------------
-        if cm and len(cm) >= 4:
-            scale_x = cm[0]
-            scale_y = cm[3]
-            rotation_a = cm[1]
-            rotation_b = cm[2]
-
-            if rotation_a != 0 or rotation_b != 0:
-                findings.add("INFO: Text transformation detected (rotation/skew)")
-
-            if scale_x < 0 or scale_y < 0:
-                findings.add("INFO: Flipped/mirrored text detected (possible obfuscation)")
-
-        # ----------------------------
-        # Font analysis
-        # ----------------------------
-        if font_dict:
-            encoding = font_dict.get('/Encoding', 'Standard')
-            if any(target in str(encoding).lower() for target in ['identity', 'custom', 'difference']):
-                findings.add(f"INFO: Non-standard font encoding detected ({encoding})")
-
-        # ----------------------------
-        # Hidden text detection
-        # ----------------------------
-        x, y = tm[4], tm[5]
-        clean_text = text.strip()
-
-        if font_size is not None and font_size < MIN_VISIBLE_FONT_SIZE:
-            findings.add(
-                f"ALERT: Hidden text detected (Tiny Font: {font_size}pt): '{clean_text[:50]}'"
-            )
-
-        elif x < OUT_OF_BOUNDS_THRESHOLD or y < OUT_OF_BOUNDS_THRESHOLD:
-            findings.add(
-                f"ALERT: Hidden text detected (Off-Canvas at {int(x)},{int(y)}): '{clean_text[:50]}'"
-            )
-
-        full_text.append(text)
-
-    # -------------------------------------------------------------------------
-    # Main Extraction Loop
-    # -------------------------------------------------------------------------
-    try:
-        try:
-            pages_list = list(reader.pages)
-            pages_iterator = enumerate(pages_list)
+    for anomaly in content.visual_anomalies:
+        a_type = anomaly.get("type")
+        
+        if a_type == "tiny_font":
+            threats.append(Threat(
+                id="TXT-HIDDEN-TINY",
+                category="Text Extraction",
+                severity=10,
+                description=f"Hidden text detected (Tiny Font: {anomaly.get('size')}pt): '{anomaly.get('text')}'",
+                location="Text Elements"
+            ))
             
-        except Exception:
-            pages_iterator = []
-            findings.add("ALERT: Text extraction skipped (Malformed or missing Pages tree)")
-
-        for i, page in pages_iterator:
-            text_count_before = len(full_text)
-            try:
-                page.extract_text(visitor_text=text_inspection_visitor)
-                
-            except Exception: continue
+        elif a_type == "off_canvas":
+            threats.append(Threat(
+                id="TXT-HIDDEN-CANVAS",
+                category="Text Extraction",
+                severity=8,
+                description=f"Hidden text detected (Off-Canvas at {anomaly.get('x')},{anomaly.get('y')}): '{anomaly.get('text')}'",
+                location="Text Elements"
+            ))
             
-            text_count_after = len(full_text)
+        elif a_type == "encoding":
+            threats.append(Threat(
+                id="TXT-FONT-ENCODING",
+                category="Text Extraction",
+                severity=3,
+                description=f"Non-standard font encoding detected ({anomaly.get('details')})",
+                location="Text Elements"
+            ))
+            
+        elif a_type == "transformation":
+            threats.append(Threat(
+                id="TXT-TRANSFORM",
+                category="Text Extraction",
+                severity=3,
+                description=f"Text transformation detected ({anomaly.get('details')})",
+                location="Text Elements"
+            ))
+            
+        elif a_type == "flipped":
+            threats.append(Threat(
+                id="TXT-FLIPPED",
+                category="Text Extraction",
+                severity=4,
+                description=f"Flipped/mirrored text detected ({anomaly.get('details')})",
+                location="Text Elements"
+            ))
 
-            if text_count_before == text_count_after and has_images(page):
-                findings.add(f"INFO: Page {i+1} contains images but no extractable text")
-
-    except Exception:
-        logging.exception("Text Analysis collapsed during extraction")
-
-    return "".join(full_text), sorted(findings)
-
-# -------------------------------------------------------------------------
-#  Helpers
-# -------------------------------------------------------------------------
-
-def has_images(page):
-    try:
-        if "/Resources" in page and "/XObject" in page["/Resources"]:
-            x_objects = page["/Resources"]["/XObject"].get_object()
-            for obj in x_objects:
-                obj_data = x_objects[obj].get_object()
-                if obj_data and obj_data.get("/Subtype") == "/Image":
-                    return True
-    except Exception:
-        pass
-    return False
+    return threats
