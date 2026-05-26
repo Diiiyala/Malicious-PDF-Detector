@@ -1,5 +1,6 @@
 import re, math, base64, string
 from collections import Counter
+from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.links import analyze_links
 from analysis.utils.normalizer import is_valid_decoded
 
@@ -7,33 +8,39 @@ B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
 
 EXEC_PATTERNS = {
-    r"\beval\s*\(": "eval() function",
-    r"\bexec\s*\(": "exec() function",
-    r"String\.fromCharCode": "Charcode obfuscation",
-    r"app\s*(?:\.\s*openDoc|\[\s*['\"]openDoc['\"]\s*\])": "Remote document opening",
-    r"launchURL": "URL launching",
-    r"<\s*script": "Embedded HTML Script tag",
-    r"new\s+Image\s*\(": "JS Beacon",
-    r"new\s+WebSocket\s*\(": "WebSocket C2 Channel",
-    r"\bPost\s*\(\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"']": "FormCalc Post() Arbitrary Header Injection"
+    r"\beval\s*\(": ("eval() function", 12),
+    r"\bexec\s*\(": ("exec() function", 12),
+    r"String\.fromCharCode": ("Charcode obfuscation", 8),
+    r"app\s*(?:\.\s*openDoc|\[\s*['\"]openDoc['\"]\s*\])": ("Remote document opening", 11),
+    r"launchURL": ("URL launching", 11),
+    r"<\s*script": ("Embedded HTML Script tag", 12),
+    r"new\s+Image\s*\(": ("JS Beacon", 10),
+    r"new\s+WebSocket\s*\(": ("WebSocket C2 Channel", 12),
+    r"\bPost\s*\(\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"']": ("FormCalc Post() Arbitrary Header Injection", 12)
 }
 
 SYSTEM_THREATS = {
-    "Parameter/Header Injection Attempt": [r"textEncoding\s*=\s*.*?&#x(?:0D|0A|D|A);?", r"textEncoding\s*=\s*.*?\\r\\n", r"X-Injected"],
-    "Ransomware Indicators": [r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked"],
-    "Registry Tampering": [r"reg add", r"HKEY_LOCAL_MACHINE", r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"],
-    "Security Disabling": [r"netsh advfirewall", r"Set-MpPreference", r"DisableRealtimeMonitoring", r"taskkill /f /im"],
-    "Stealer/Spyware": [r"cookie", r"password", r"wallet\.dat", r"Login Data", r"autofill", r"getPageNthWord", r"getPageNumWords"],
-    "Environment Leak": [r"\$\{HOME\}", r"\.env", r"AWS_CREDENTIALS", r"vnd\.sun\.star\.expand"], 
-    "XFA/SOAP Attack": [r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT", r"<?xml-stylesheet"],
-    "XXE Injection Attempt": [r"<!ENTITY", r"SYSTEM\s+['\"]http", r"<!DOCTYPE"],
-    "EICAR Standard Anti-Virus Test File": [r"EICAR-STANDARD-ANTIVIRUS", r"X5O!P%@AP\[4\\PZX54\(P\^\)7CC\)7\}\$EICAR"]
+    "Parameter/Header Injection Attempt": ([r"textEncoding\s*=\s*.*?&#x(?:0D|0A|D|A);?", r"textEncoding\s*=\s*.*?\\r\\n", r"X-Injected"], 12),
+    "Ransomware Indicators": ([r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked"], 12),
+    "Registry Tampering": ([r"reg add", r"HKEY_LOCAL_MACHINE", r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"], 10),
+    "Security Disabling": ([r"netsh advfirewall", r"Set-MpPreference", r"DisableRealtimeMonitoring", r"taskkill /f /im"], 10),
+    "Stealer/Spyware": ([r"cookie", r"password", r"wallet\.dat", r"Login Data", r"autofill", r"getPageNthWord", r"getPageNumWords"], 10),
+    "Environment Leak": ([r"\$\{HOME\}", r"\.env", r"AWS_CREDENTIALS", r"vnd\.sun\.star\.expand"], 12), 
+    "XFA/SOAP Attack": ([r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT", r"<?xml-stylesheet"], 13),
+    "XXE Injection Attempt": ([r"<!ENTITY", r"SYSTEM\s+['\"]http", r"<!DOCTYPE"], 13),
+    "EICAR Standard Anti-Virus Test File": ([r"EICAR-STANDARD-ANTIVIRUS", r"X5O!P%@AP\[4\\PZX54\(P\^\)7CC\)7\}\$EICAR"], 15)
 }
 
-def analyze_content(text, depth=0, aggregator=None):
+def analyze_content(content: ExtractedContent, aggregator=None) -> list[Threat]:
+
+    if not content.extracted_text:
+        return []
+    return _analyze_text_recursive(content.extracted_text, depth=0, aggregator=aggregator)
+
+def _analyze_text_recursive(text: str, depth=0, aggregator=None) -> list[Threat]:
     if depth > 2: return []
     
-    findings = []
+    threats = []
     text_clean = re.sub(r'\s+', ' ', text).strip()
     indicators = { "execution": False, "obfuscation": False, "network": False, "payload": False }
     
@@ -42,17 +49,32 @@ def analyze_content(text, depth=0, aggregator=None):
     # ---------------------------------------------------------------------
     
     link_findings, link_indicators, unc_paths, _ = analyze_links(text)
-    findings.extend(link_findings)
+    
+    for lf in link_findings:
+        severity = 10 if "UNC" in lf else 6
+        threats.append(Threat(
+            id="CONT-LINK-DETECTED", 
+            category="Content", 
+            severity=severity, 
+            description=lf.replace("ALERT: ", ""), 
+            location=f"Layer {depth}"
+        ))
     indicators["network"] = link_indicators.get("network", False)
         
     # ---------------------------------------------------------------------
     # 2. Execution Patterns
     # ---------------------------------------------------------------------
 
-    for pattern, label in EXEC_PATTERNS.items():
+    for pattern, (label, severity) in EXEC_PATTERNS.items():
         if re.search(pattern, text, re.IGNORECASE):
             indicators["execution"] = True
-            findings.append(f"ALERT: Scripting execution pattern detected ({label})")
+            threats.append(Threat(
+                id="CONT-EXEC-PATTERN", 
+                category="Content", 
+                severity=severity, 
+                description=f"Scripting execution pattern detected ({label})", 
+                location=f"Layer {depth}"
+            ))
 
     # ---------------------------------------------------------------------
     # 3. Obfuscation Detection
@@ -63,7 +85,13 @@ def analyze_content(text, depth=0, aggregator=None):
         for key in ["eval", "exec", "unescape"]:
             if key in compact and not re.search(rf"\b{key}\b", text):
                 indicators["obfuscation"] = True
-                findings.append(f"ALERT: Logic obfuscation detected ({key})")
+                threats.append(Threat(
+                    id="CONT-LOGIC-OBFUSCATION", 
+                    category="Content", 
+                    severity=8, 
+                    description=f"Logic obfuscation detected ({key})", 
+                    location=f"Layer {depth}"
+                ))
                 
     # ---------------------------------------------------------------------
     # 4. Auto Execution Triggers
@@ -74,50 +102,38 @@ def analyze_content(text, depth=0, aggregator=None):
     has_gotoe = bool(re.search(r"/GoToE", text, re.IGNORECASE))
 
     if has_open_action and has_aa:
-        findings.append("ALERT: Multiple execution triggers (/OpenAction & /AA)")
+        threats.append(Threat(id="CONT-TRIG-MULTI", category="Content", severity=10, description="Multiple execution triggers (/OpenAction & /AA)", location=f"Layer {depth}"))
         indicators["execution"] = True
     elif has_open_action:
-        findings.append("ALERT: Automatic execution trigger (/OpenAction)")
+        threats.append(Threat(id="CONT-TRIG-OPENACTION", category="Content", severity=10, description="Automatic execution trigger (/OpenAction)", location=f"Layer {depth}"))
         indicators["execution"] = True
     elif has_aa:
-        findings.append("ALERT: Event-based execution trigger (/AA)")
+        threats.append(Threat(id="CONT-TRIG-AA", category="Content", severity=9, description="Event-based execution trigger (/AA)", location=f"Layer {depth}"))
         indicators["execution"] = True
     elif has_gotoe:
-        findings.append("ALERT: Embedded execution trigger (/GoToE)")
+        threats.append(Threat(id="CONT-TRIG-GOTOE", category="Content", severity=9, description="Embedded execution trigger (/GoToE)", location=f"Layer {depth}"))
         indicators["execution"] = True
      
     # ---------------------------------------------------------------------
     # 5. Threat Mapping
     # ---------------------------------------------------------------------
 
-    for threat_name, patterns in SYSTEM_THREATS.items():
-        found_details = []
-        found_offsets = []
-        
+    for threat_name, (patterns, severity) in SYSTEM_THREATS.items():
         for p in patterns:
-
             for match in re.finditer(p, text, re.IGNORECASE):
-                found_offsets.append(f"(Offset: {match.start()})")
                 matched_str = match.group(0).strip()
-                if matched_str not in found_details:
-                    found_details.append(matched_str)
-        
-        if found_details:
-            unique_offsets = sorted(list(set(found_offsets)), key=lambda x: int(re.search(r'\d+', x).group()))
-            offsets_str = ", ".join(unique_offsets)
-            
-            details_str = ", ".join([f"'{d}'" for d in found_details])
-            
-            findings.append(
-                f"ALERT: Specific threats detected: {threat_name} "
-                f"(Found: {details_str}) in ( {offsets_str} )"
-            )
+                threats.append(Threat(
+                    id=f"CONT-SYS-{threat_name[:4].upper()}", 
+                    category="Content", 
+                    severity=severity,
+                    description=f"Specific threats detected: {threat_name} (Found: '{matched_str}')",
+                    location=f"Offset: {match.start()} (Layer {depth})"
+                ))
     
-            if "Security" in threat_name or "Registry" in threat_name:
-                indicators["execution"] = True
-
-            if "Stealer" in threat_name:
-                indicators["payload"] = True
+                if "Security" in threat_name or "Registry" in threat_name:
+                    indicators["execution"] = True
+                if "Stealer" in threat_name:
+                    indicators["payload"] = True
         
     # ---------------------------------------------------------------------
     # 6. XML / XXE / XFA SOAP Payload Capture
@@ -125,28 +141,24 @@ def analyze_content(text, depth=0, aggregator=None):
 
     if aggregator:
         text_lower = text.lower()
-
         if any(k in text_lower for k in ["<?xml", "<!doctype", "<xdp:xdp", "method=\"soap\"", "soapaction"]):
-            
-            if any(re.search(p, text, re.IGNORECASE) for p in SYSTEM_THREATS["XXE Injection Attempt"]):
-                aggregator.add_script(
-                    text,
-                    f"XML/XXE Layer {depth}",
-                    script_type="XML/XXE Payload"
-                )
+            if any(re.search(p, text, re.IGNORECASE) for p in SYSTEM_THREATS["XXE Injection Attempt"][0]):
+                aggregator.add_script(text, f"XML/XXE Layer {depth}", script_type="XML/XXE Payload")
             elif "method=\"soap\"" in text_lower or "soapaction" in text_lower:
-                aggregator.add_script(
-                    text,
-                    f"XFA/SOAP Layer {depth}",
-                    script_type="XFA/SOAP Payload"
-                )
+                aggregator.add_script(text, f"XFA/SOAP Layer {depth}", script_type="XFA/SOAP Payload")
         
     # ---------------------------------------------------------------------
     # 7. Crypto Check
     # ---------------------------------------------------------------------
 
     if BTC_ADDRESS.search(text):
-        findings.append(f"ALERT: Cryptocurrency address found (Potential Ransomware)")
+        threats.append(Threat(
+            id="CONT-CRYPTO-ADDRESS", 
+            category="Content", 
+            severity=9, 
+            description="Cryptocurrency address found (Potential Ransomware)", 
+            location=f"Layer {depth}"
+        ))
 
     # ---------------------------------------------------------------------
     # 8. Base64 Layer Analysis
@@ -159,28 +171,24 @@ def analyze_content(text, depth=0, aggregator=None):
             if is_valid_decoded(decoded) and aggregator:
                 aggregator.add_script(decoded, f"Base64 Layer {depth+1}", script_type="Decoded Payload")
             
-            if len(decoded) > 0 and (
-                sum(c in string.printable for c in decoded) / len(decoded)
-                > 0.85
-            ):
-                sub = analyze_content(decoded, depth + 1, aggregator)
-                for f in sub:
-                    if "ALERT" in f:
-                        findings.append(f"ALERT: Hidden Layer {depth+1}: "f"{f.replace('ALERT: ', '')}")
-        except Exception: continue
+            if len(decoded) > 0 and (sum(c in string.printable for c in decoded) / len(decoded) > 0.85):
+                sub_threats = _analyze_text_recursive(decoded, depth + 1, aggregator)
+                threats.extend(sub_threats)
+        except Exception: 
+            continue
 
     # ---------------------------------------------------------------------
     # 9. Correlation Engine
     # ---------------------------------------------------------------------
     
     if has_gotoe and unc_paths:
-        findings.append("ALERT: NTLM Relay attack pattern confirmed (GoToE + UNC)")
+        threats.append(Threat(id="CONT-CORR-NTLM", category="Content", severity=14, description="NTLM Relay attack pattern confirmed (GoToE + UNC)", location=f"Layer {depth}"))
         
     if (indicators["execution"] or re.search(r"<\s*script", text, re.IGNORECASE)) and indicators["obfuscation"]:
-        findings.append("ALERT: High-confidence obfuscated script detected")
+        threats.append(Threat(id="CONT-CORR-OBFUSCATED", category="Content", severity=12, description="High-confidence obfuscated script detected", location=f"Layer {depth}"))
         
     if indicators["payload"] and (indicators["execution"] or indicators["network"]):
-        findings.append("ALERT: Multi-stage virus detected")
+        threats.append(Threat(id="CONT-CORR-MULTISTAGE", category="Content", severity=15, description="Multi-stage virus detected", location=f"Layer {depth}"))
 
     # ---------------------------------------------------------------------
     # 10. Entropy Analysis
@@ -188,15 +196,17 @@ def analyze_content(text, depth=0, aggregator=None):
 
     ent = calculate_entropy(text_clean)
     if len(text_clean) > 200 and ent > 5.5:
-        findings.append(f"ALERT: {diagnose_content(text_clean, ent)} "f"(Entropy: {ent:.2f})")
+        diag = diagnose_content(text_clean, ent)
+        severity = 8 if "Encrypted" in diag else (5 if "Obfuscated" in diag else 3)
+        threats.append(Threat(
+            id="CONT-ENTROPY-ANOMALY", 
+            category="Content", 
+            severity=severity, 
+            description=f"{diag} (Entropy: {ent:.2f})", 
+            location=f"Layer {depth}"
+        ))
 
-    # ---------------------------------------------------------------------
-    # Final cleanup
-    # ---------------------------------------------------------------------
-    if any("ALERT" in f for f in findings):
-        findings = [f for f in findings if "INFO" not in f]
-
-    return sorted(list(set(findings)))
+    return threats
 
 # -------------------------------------------------------------------------
 #  Helpers
@@ -204,36 +214,24 @@ def analyze_content(text, depth=0, aggregator=None):
 
 def calculate_entropy(data):
     if not data: return 0
-    
     counts = Counter(data)
     length = len(data)
-    
     return -sum((count/length) * math.log2(count/length) for count in counts.values())
-
 
 def check_obfuscation(text, compact_text):
     if not text: return False
-    
     original_entropy = calculate_entropy(text)
     compact_entropy = calculate_entropy(compact_text)
-    
     entropy_jump = compact_entropy - original_entropy
     symbols = sum(1 for c in text if c in "{}[]();,.$")
-    
     symbol_density = symbols / len(text) if len(text) > 0 else 0
-    
     return entropy_jump > 0.5 and symbol_density > 0.15 and original_entropy > 4.5
-
 
 def diagnose_content(text, score):
     if not text: return "Empty"
-    
     sample = text[:200]
     hex_ratio = sum(1 for c in sample if c in string.hexdigits) / len(sample) if len(sample) > 0 else 0
-    
     if hex_ratio > 0.8: return "Possible Shellcode Stream"
     if score > 6.5: return "Highly Random Data (Encrypted/Compressed)"
-    
     printable_ratio = sum(1 for c in text if c in string.printable) / len(text) if text else 0
-    
     return "Minified/Compressed Text" if printable_ratio > 0.9 else "Obfuscated Content"
