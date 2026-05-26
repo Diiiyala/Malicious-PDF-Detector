@@ -1,25 +1,25 @@
 import re
 from collections import Counter
+from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.links import analyze_links
 from analysis.detectors.content import analyze_content
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
 
-def analyze_structure(reader, file_stream, aggregator=None):
-    findings = []
+def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> list[Threat]:
+    threats = []
     js_scripts = set()
     embedded_files = set()
     unknown_items = set()
     root = None
+    
+    raw_data = content.raw_binary
           
     # -------------------------------------------------------------------------
     # 1. Header Analysis
     # -------------------------------------------------------------------------
-    try:
-        file_stream.seek(0)
-        raw_data = file_stream.read()     
-        
+    try:      
         # Check for PDF Signature
         header_index = raw_data.find(b"%PDF-")
         
@@ -32,36 +32,43 @@ def analyze_structure(reader, file_stream, aggregator=None):
             
         # Check for Signature Offset
         elif header_index > 0:
-            findings.append(f"ALERT: PDF signature is not at the start (Offset: {header_index} bytes - potential hiding)")
+            threats.append(Threat(
+                id="STR-HDR-OFFSET", category="Structure", severity=7,
+                description=f"PDF signature is not at the start (Offset: {header_index} bytes - potential hiding)", location="Header"
+            ))
         
         header_version = None
         
        # Extract and Validate PDF Version
         if header_index != -1:
-            
-            # Extract version
             version_area = raw_data[header_index+5 : header_index+15]
             version_match = re.search(b"^[0-9.]+", version_area)
             
             if version_match:
                 header_version = version_match.group(0).decode('utf-8', errors='ignore').strip()
-                
-                # Validate version
                 if is_version_older(header_version, "1.4"):
-                    findings.append(f"INFO: Old PDF version detected in header ({header_version})")
+                    threats.append(Threat(
+                        id="STR-HDR-OLDVER", category="Structure", severity=1,
+                        description=f"Old PDF version detected in header ({header_version})", location="Header"
+                    ))
             else:
-                findings.append("ALERT: PDF version missing or malformed in header")
+                threats.append(Threat(
+                    id="STR-HDR-NOVER", category="Structure", severity=7,
+                    description="PDF version missing or malformed in header", location="Header"
+                ))
                 
         # Check for Multiple Headers
         header_count = raw_data.count(b"%PDF-")
         if header_count > 1:
-            findings.append(f"ALERT: Multiple PDF headers detected ({header_count} found - potential spoofing)")
+            threats.append(Threat(
+                id="STR-HDR-MULTI", category="Structure", severity=8,
+                description=f"Multiple PDF headers detected ({header_count} found - potential spoofing)", location="Header"
+            ))
 
-    except Exception as e:
-        findings.append(f"INFO: Header Analysis failed: {type(e).__name__}")
+    except Exception as e: pass
         
     if reader is None:
-        return sorted(list(set(findings)))
+        return threats
 
     # -------------------------------------------------------------------------
     # 2. Root Analysis
@@ -75,22 +82,25 @@ def analyze_structure(reader, file_stream, aggregator=None):
             if "/OCProperties" in root:
                 ocp = root["/OCProperties"].get_object()
                 ocp_str = str(ocp)
-                base_msg = "ALERT: Optional Content Groups (OCG) detected"
                 
                 if "/JS" in ocp_str or "/JavaScript" in ocp_str:
                     js_name_match = re.findall(r'/([^/\s()<>\[\]{}]+)\s+<<\s*/S\s*/JavaScript', ocp_str)
-                    
-                    if js_name_match:
-                        names_str = ", ".join(list(set(js_name_match)))
-                        findings.append(f"{base_msg} - Suspicious JavaScript coupling (Scripts: {names_str})")
-                    else:
-                        findings.append(f"{base_msg} - Suspicious JavaScript coupling")
+                    names_str = f" (Scripts: {', '.join(list(set(js_name_match)))})" if js_name_match else ""
+                    threats.append(Threat(
+                        id="STR-ROOT-OCG-JS", category="Structure", severity=11,
+                        description=f"Optional Content Groups (OCG) detected - Suspicious JavaScript coupling{names_str}", location="Root Catalog"
+                    ))
                         
                 elif "/AA" in root:
-                    findings.append(f"{base_msg} - Suspicious Automatic Trigger coupling (Potential Hidden Layer Exploit)")
-
+                    threats.append(Threat(
+                        id="STR-ROOT-OCG-AA", category="Structure", severity=11,
+                        description="Optional Content Groups (OCG) detected - Suspicious Automatic Trigger coupling (Potential Hidden Layer Exploit)", location="Root Catalog"
+                    ))
                 else:
-                    findings.append(f"{base_msg} - potential hidden layer exploit")
+                    threats.append(Threat(
+                        id="STR-ROOT-OCG", category="Structure", severity=7,
+                        description="Optional Content Groups (OCG) detected - potential hidden layer exploit", location="Root Catalog"
+                    ))
 
             # Verify PDF 2.0 Associated Files
             if "/AF" in root:
@@ -115,10 +125,13 @@ def analyze_structure(reader, file_stream, aggregator=None):
                                         embedded_data = emb_obj.get_data()
                                         if embedded_data:
                                             decoded_text = embedded_data.decode('utf-8', errors='ignore')
-                                            content_findings = analyze_content(decoded_text, aggregator=aggregator)
+
+                                            dummy_content = ExtractedContent(extracted_text=decoded_text)
+                                            content_threats = analyze_content(dummy_content, aggregator=aggregator)
                                             
-                                            for cf in content_findings:
-                                                findings.append(f"{cf} (Found inside embedded file: {f_name})")
+                                            for ct in content_threats:
+                                                ct.location = f"Inside embedded file: {f_name}"
+                                                threats.append(ct)
                                                 
                                     except Exception as e:
                                         scan_status = " [Scan Failed]"
@@ -127,19 +140,27 @@ def analyze_structure(reader, file_stream, aggregator=None):
                     
                     if af_details:
                         details_str = ", ".join(af_details)
-                        findings.append(f"ALERT: PDF 2.0 Associated Files (/AF) detected: ({details_str})")
+                        threats.append(Threat(
+                            id="STR-ROOT-AF", category="Structure", severity=12,
+                            description=f"PDF 2.0 Associated Files (/AF) detected: ({details_str})", location="Root Catalog"
+                        ))
                 except:
-                    findings.append("ALERT: PDF 2.0 Associated Files (/AF) detected (Failed to parse details)")
-                
+                    threats.append(Threat(
+                        id="STR-ROOT-AF-FAIL", category="Structure", severity=12,
+                        description="PDF 2.0 Associated Files (/AF) detected (Failed to parse details)", location="Root Catalog"
+                    ))
+                        
             # Check for Version Mismatch
             catalog_version = root.get("/Version")
             if catalog_version and header_version:
                 cat_v_str = str(catalog_version).replace("/", "")
                 if cat_v_str != header_version:
-                    findings.append(f"ALERT: Version mismatch (Header: {header_version}, Catalog: {cat_v_str})")
+                    threats.append(Threat(
+                        id="STR-ROOT-VER-MISMATCH", category="Structure", severity=6,
+                        description=f"Version mismatch (Header: {header_version}, Catalog: {cat_v_str})", location="Root Catalog"
+                    ))
                     
-    except Exception as e:
-        findings.append(f"Root Analysis failed: {type(e).__name__}")
+    except Exception as e: pass
         
     # -------------------------------------------------------------------------
     # 3. Names Analysis
@@ -151,49 +172,56 @@ def analyze_structure(reader, file_stream, aggregator=None):
             
             # Iterate through all categories in the NameTree
             for category_key in names.keys():
-                walk_names_tree(names[category_key], findings, WHITELIST, unknown_items, js_scripts, embedded_files, category=category_key)               
+                walk_names_tree(names[category_key], threats, WHITELIST, unknown_items, js_scripts, embedded_files, category=category_key)               
                 
-            if js_scripts: findings.append(f"ALERT: Suspicious Scripting found in Names: {sorted(list(js_scripts))}")      
-            if embedded_files: findings.append(f"ALERT: Embedded Files detected in Names: {sorted(list(embedded_files))}")              
-            if unknown_items: findings.append(f"INFO: Unknown NameTree entries found: {sorted(unknown_items)}")
+            if js_scripts: 
+                threats.append(Threat(
+                    id="STR-NAMES-JS", category="Structure", severity=12,
+                    description=f"Suspicious Scripting found in Names: {sorted(list(js_scripts))}", location="NameTree"
+                ))      
+            if embedded_files: 
+                threats.append(Threat(
+                    id="STR-NAMES-EMBEDDED", category="Structure", severity=9,
+                    description=f"Embedded Files detected in Names: {sorted(list(embedded_files))}", location="NameTree"
+                ))              
+            if unknown_items: 
+                threats.append(Threat(
+                    id="STR-NAMES-UNKNOWN", category="Structure", severity=2,
+                    description=f"Unknown NameTree entries found: {sorted(unknown_items)}", location="NameTree"
+                ))
                 
-    except Exception as e:
-        findings.append(f"NameTree Analysis incomplete: {type(e).__name__}")
-        
-    
+    except Exception as e: pass
+         
     # -------------------------------------------------------------------------
     # 4. Action Analysis
     # -------------------------------------------------------------------------   
     
     try:
-        action_findings = perform_action_analysis(reader, root)
-        findings.extend(action_findings)
-        
+        action_threats = perform_action_analysis(reader, root, aggregator)
+        threats.extend(action_threats)
     except Exception as e:
-        findings.append(f"Action Analysis collapsed: {type(e).__name__}")
+        pass
 
     # -------------------------------------------------------------------------
     # 5. Stream & Object Analysis
     # -------------------------------------------------------------------------  
     
     try:
-        stream_findings = analyze_streams_and_objects(reader, aggregator=aggregator)
-        findings.extend(stream_findings)
+        stream_threats = analyze_streams_and_objects(reader, aggregator)
+        threats.extend(stream_threats)
     except Exception as e:
-        findings.append(f"Stream Analysis collapsed: {type(e).__name__}")
+        pass
    
     # -------------------------------------------------------------------------
     # 6. Encryption Analysis
     # -------------------------------------------------------------------------            
-    try:
-        # Check for File Encryption
-        if reader.is_encrypted:
-            findings.append("ALERT: Encrypted PDF (Restricted access)")
-            
-    except Exception as e: 
-        findings.append(f"INFO: Encryption check failed: {type(e).__name__}")
+    if content.has_encryption:
+        threats.append(Threat(
+            id="STR-ENCRYPTED", category="Structure", severity=5,
+            description="Encrypted PDF (Restricted access)", location="Document Settings"
+        ))
 
-    return sorted(list(set(findings)))
+    return threats
 
 # -------------------------------------------------------------------------
 #  Helpers
@@ -206,14 +234,15 @@ def is_version_older(current, target):
             return False
         
         
-def perform_action_analysis(reader, root, aggregator=None):
-    action_findings = []
-    action_locations = {}
+def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
+    threats = []
+    threat_map = {}
 
-    def add_location(action_type, location):
-        if action_type not in action_locations:
-            action_locations[action_type] = []
-        action_locations[action_type].append(location)
+    def add_threat(t_id, severity, description, location):
+        key = (t_id, "Action/Trigger", severity, description)
+        if key not in threat_map:
+            threat_map[key] = []
+        threat_map[key].append(location)
         
     def extract_action_path(action_dict):
         f_spec = action_dict.get("/F")
@@ -235,27 +264,27 @@ def perform_action_analysis(reader, root, aggregator=None):
                 if isinstance(oa_obj, dict) and "/S" in oa_obj:
                     action_type = str(oa_obj.get("/S")).replace("/", "")
                     
-                    add_location(f"ALERT: Automatic execution trigger (/OpenAction) executing Action (/{action_type})", "Catalog")
+                    add_threat("STR-ACT-OPEN-EXEC", 12, f"Automatic execution trigger (/OpenAction) executing Action (/{action_type})", "Catalog")
                     action_traced = True
                     
                     if action_type == "SubmitForm":
                         if "/Flags" in oa_obj:
                             flags = int(oa_obj.get("/Flags", 0))
                             if flags & 4:
-                                add_location("ALERT: SubmitForm configured to leak data as HTML (Flags 4)", "Catalog")
+                                add_threat("STR-ACT-SUBMIT-HTML", 12, "SubmitForm configured to leak data as HTML (Flags 4)", "Catalog")
                             elif flags & 256:
-                                add_location("ALERT: SubmitForm configured to leak entire PDF (Flags 256)", "Catalog")
+                                add_threat("STR-ACT-SUBMIT-PDF", 13, "SubmitForm configured to leak entire PDF (Flags 256)", "Catalog")
                             else:
-                                add_location(f"INFO: SubmitForm triggered with Flags: {flags}", "Catalog")
+                                add_threat("STR-ACT-SUBMIT-FLAGS", 4, f"SubmitForm triggered with Flags: {flags}", "Catalog")
                     
                     elif action_type == "URI":
                         uri_val = str(oa_obj.get("/URI", "Unknown"))
-                        add_location(f"ALERT: OpenAction triggers URI: {uri_val}", "Catalog")
+                        add_threat("STR-ACT-OPEN-URI", 12, f"OpenAction triggers URI: {uri_val}", "Catalog")
                         
             except Exception as e: pass
 
             if not action_traced:
-                add_location("ALERT: Automatic execution trigger (/OpenAction)", "Catalog")
+                add_threat("STR-ACT-OPENACTION", 11, "Automatic execution trigger (/OpenAction) detected", "Catalog")
         
         if "/AA" in root:
             aa_dict = root["/AA"].get_object()
@@ -267,9 +296,9 @@ def perform_action_analysis(reader, root, aggregator=None):
             
             if found_silent_triggers:
                 triggers_str = ", ".join(found_silent_triggers)
-                add_location(f"ALERT: Dangerous silent trigger ({triggers_str}) detected", "Catalog")
+                add_threat("STR-ACT-SILENT-ROOT", 12, f"Dangerous silent trigger ({triggers_str}) detected", "Catalog")
             
-            add_location("ALERT: Automatic triggers (/AA)", "Catalog")
+            add_threat("STR-ACT-AA-ROOT", 10, "Automatic triggers (/AA) detected", "Catalog")
 
     # Analyze Page-Level Actions and Annotations  
     try:
@@ -285,8 +314,8 @@ def perform_action_analysis(reader, root, aggregator=None):
             if "/AA" in page_obj:
                 aa_page = page_obj["/AA"].get_object()
                 if "/O" in aa_page or "/C" in aa_page:
-                     add_location("ALERT: Silent page trigger (/O or /C)", loc_str)
-                add_location("ALERT: Automatic triggers (/AA)", loc_str)
+                     add_threat("STR-ACT-PAGE-SILENT", 12, "Silent page trigger (/O or /C)", loc_str)
+                add_threat("STR-ACT-PAGE-AA", 10, "Automatic triggers (/AA)", loc_str)
 
             if "/Annots" in page_obj:
                 visible_widgets_on_page = 0
@@ -338,8 +367,7 @@ def perform_action_analysis(reader, root, aggregator=None):
                                                    
                         if coverage > 0.9:
                             if has_js or is_widget or is_link_trigger:
-                                impact_desc = f"ALERT: Clickjacking overlay ({trigger_type})"
-                                add_location(impact_desc, loc_str)
+                                add_threat("STR-ACT-CLICKJACK", 13, f"Clickjacking overlay ({trigger_type})", loc_str)
                                 is_clickjacking = True
 
                     if is_widget and is_transparent and coverage < 0.05:
@@ -348,35 +376,35 @@ def perform_action_analysis(reader, root, aggregator=None):
                     if "/T" in obj:
                         t_val = str(obj["/T"])
                         if any(k in t_val.lower() for k in ["<script", "javascript:", "<img", "onerror="]):
-                            add_location(f"ALERT: Stored XSS injection attempt detected in Annotation field (/T): {t_val}", loc_str)
-                            
+                            add_threat("STR-ACT-STORED-XSS", 12, f"Stored XSS injection attempt detected in Annotation field (/T): {t_val[:50]}", loc_str)
                             if aggregator:
                                 aggregator.add_script(t_val, f"{loc_str} Annotation /T Field", script_type="Stored XSS Payload")
                                 
                     if "/A" in obj and not is_clickjacking:
                         action_dict = obj["/A"].get_object()
                         a_type = action_dict.get("/S")
-                                              
+                        
                         if a_type == "/URI":
-                            add_location(f"ALERT: Annotation (URI: {extracted_path}) - Potential DNS/HTTP Request Trigger", loc_str)
+                            add_threat("STR-ACT-ANNOT-URI", 5, f"Annotation (URI: {extracted_path}) - Potential DNS/HTTP Request", loc_str)
                         elif a_type == "/ImportData":
-                            add_location(f"ALERT: External data import trigger (/ImportData) pointing to: ({extracted_path})", loc_str)
+                            add_threat("STR-ACT-IMPORTDATA", 12, f"External data import trigger (/ImportData) pointing to: ({extracted_path})", loc_str)
                         elif a_type == "/GoToR":
-                            add_location(f"ALERT: Annotation (/GoToR) pointing to: ({extracted_path})", loc_str)
+                            add_threat("STR-ACT-GOTOR", 12, f"Annotation (/GoToR) pointing to: ({extracted_path})", loc_str)
                         elif a_type == "/GoToE":
-                            add_location(f"ALERT: Suspicious /GoToE pointing to: {extracted_path if extracted_path else 'Internal'}", loc_str)
+                            add_threat("STR-ACT-GOTOE", 11, f"Suspicious /GoToE pointing to: {extracted_path if extracted_path else 'Internal'}", loc_str)
                         elif a_type in ["/Launch", "/SubmitForm", "/Thread"]:
                             a_clean = str(a_type).replace("/", "")
-                            add_location(f"ALERT: Annotation (/{a_clean}) pointing to: ({extracted_path})", loc_str) if extracted_path else add_location(f"ALERT: Annotation (/{a_clean})", loc_str)
+                            desc = f"Annotation (/{a_clean}) pointing to: ({extracted_path})" if extracted_path else f"Annotation (/{a_clean})"
+                            add_threat(f"STR-ACT-{a_clean.upper()}", 10, desc, loc_str)
                         else:
                             a_type_clean = str(a_type).replace("/", "")
-                            add_location(f"ALERT: Annotation (/{a_type_clean})", loc_str)
+                            add_threat(f"STR-ACT-ANNOT-{a_type_clean}", 4, f"Annotation (/{a_type_clean})", loc_str)
             
             if visible_widgets_on_page > 3:
-                add_location("ALERT: Clickjacking Suspicious invisible button grid detected", loc_str)
+                add_threat("STR-ACT-CLICKJACK-GRID", 12, "Clickjacking Suspicious invisible button grid detected", loc_str)
                         
     except Exception as e:
-        action_findings.append("ALERT: Could not fully analyze actions on all pages (Potential obfuscation/Structure corruption)")
+        add_threat("STR-ACT-ERROR", 8, "Could not fully analyze actions on all pages (Potential obfuscation/Structure corruption)", "Document Body")
         
     # Analyze AcroForm
     try:
@@ -387,7 +415,7 @@ def perform_action_analysis(reader, root, aggregator=None):
                 field_name = f_obj.get("/T", "Unnamed")
                 
                 if "/AA" in f_obj:
-                    add_location("ALERT: Automatic triggers (/AA)", f"Field: {field_name}")
+                    add_threat("STR-ACT-FORM-AA", 10, "Automatic triggers (/AA)", f"Field: {field_name}")
                     
                 elif "/A" in f_obj:
                     action_dict = f_obj["/A"].get_object()
@@ -395,49 +423,55 @@ def perform_action_analysis(reader, root, aggregator=None):
                     extracted_path = extract_action_path(action_dict)
                     
                     if a_type == "/GoToE":
-                        add_location(f"ALERT: Form GoToE pointing to: ({extracted_path if extracted_path else 'Internal'})", f"Field: {field_name}")
+                        add_threat("STR-ACT-FORM-GOTOE", 11, f"Form GoToE pointing to: ({extracted_path if extracted_path else 'Internal'})", f"Field: {field_name}")
                     elif a_type == "/ImportData":
-                        add_location(f"ALERT: External data import trigger (/ImportData) pointing to: ({extracted_path})", f"Field: {field_name}")
+                        add_threat("STR-ACT-FORM-IMPORT", 12, f"External data import trigger (/ImportData) pointing to: ({extracted_path})", f"Field: {field_name}")
                     else:
                         a_type_clean = str(a_type).replace("/", "")
-                        if extracted_path:
-                            add_location(f"ALERT: Form Field Action (/{a_type_clean}) pointing to: ({extracted_path})", f"Field: {field_name}")
-                        else:
-                            add_location(f"ALERT: Form Field Action (/{a_type_clean})", f"Field: {field_name}")
-                        
+                        desc = f"Form Field Action (/{a_type_clean}) pointing to: ({extracted_path})" if extracted_path else f"Form Field Action (/{a_type_clean})"
+                        add_threat("STR-ACT-FORM-ACTION", 5, desc, f"Field: {field_name}")
     except: pass
     
     # Analyze Outlines
     try:
         if root and "/Outlines" in root:
-            check_outlines_recursive(root["/Outlines"].get_object(), add_location)
+            check_outlines_recursive(root["/Outlines"].get_object(), add_threat)
     except: pass
-
+    
     # Aggregate results
-    for action, locations in action_locations.items():
+    for (t_id, category, severity, desc), locations in threat_map.items():
         loc_counts = Counter(locations)
+
         loc_summary = ", ".join([f"{loc}" + (f" (x{count})" if count > 1 else "") for loc, count in loc_counts.items()])
-        action_findings.append(f"{action} found in: [{loc_summary}]")
+        
+        threats.append(Threat(
+            id=t_id,
+            category=category,
+            severity=severity,
+            description=desc,
+            location=f"Found in: [{loc_summary}]"
+        ))
 
-    return action_findings
+    return threats
 
 
-def check_outlines_recursive(node, add_loc_func):
+def check_outlines_recursive(node, add_threat_func):
     if not node: return
     
     # Check for Action in current Bookmark node
     if "/A" in node:
         title = node.get("/Title", "Untitled Bookmark")
-        add_loc_func(f"ALERT: Bookmark ({node['/A'].get('/S')})", f"Bookmark: {title}")
+        action_type = node['/A'].get('/S')
+        add_threat_func("STR-ACT-BOOKMARK", 4, f"Bookmark ({action_type})", f"Bookmark: {title}")
     
     # Traverse children and siblings
     if "/First" in node:
-        check_outlines_recursive(node["/First"].get_object(), add_loc_func)
+        check_outlines_recursive(node["/First"].get_object(), add_threat_func)
     if "/Next" in node:
-        check_outlines_recursive(node["/Next"].get_object(), add_loc_func)
+        check_outlines_recursive(node["/Next"].get_object(), add_threat_func)
         
 
-def walk_names_tree(node, findings, whitelist, untrusted_items, js_scripts, embedded_files, category=None):
+def walk_names_tree(node, threats, whitelist, untrusted_items, js_scripts, embedded_files, category=None):
 
     if not node: return
     node = node.get_object()
@@ -445,7 +479,7 @@ def walk_names_tree(node, findings, whitelist, untrusted_items, js_scripts, embe
     # Check for Child Nodes
     if "/Kids" in node:
         for kid in node["/Kids"]:
-            walk_names_tree(kid, findings, whitelist, untrusted_items, js_scripts, embedded_files, category)
+            walk_names_tree(kid, threats, whitelist, untrusted_items, js_scripts, embedded_files, category)
             
     # Check for Leaf Nodes with Data
     if "/Names" in node:
@@ -453,22 +487,27 @@ def walk_names_tree(node, findings, whitelist, untrusted_items, js_scripts, embe
         for i in range(0, len(names_list), 2):
             key = str(names_list[i])
             value_obj = names_list[i+1]   
-            process_name_node(key, value_obj, findings, whitelist, untrusted_items, js_scripts, embedded_files, category)
-    
+            process_name_node(key, value_obj, threats, whitelist, untrusted_items, js_scripts, embedded_files, category)
+            
     # Check for Direct Hidden Sections
     if category and category not in whitelist:
         if category not in ["/JavaScript", "/JS", "/EmbeddedFiles"]:
              untrusted_items.add(category)
             
-            
-def process_name_node(key, value_obj, findings, whitelist, untrusted_items, js_scripts, embedded_files, category):
-
+def process_name_node(key, value_obj, threats, whitelist, untrusted_items, js_scripts, embedded_files, category):
+    
     # Verify Object Integrity and Access
     try:
         if value_obj.get_object() is None:
-            findings.append(f"INFO: Entry [{key}] points to an empty object")
+            threats.append(Threat(
+                id="STR-NAMES-EMPTY", category="Structure", severity=1, 
+                description=f"Entry [{key}] points to an empty object", location=f"NameTree: {category}"
+            ))
     except:
-        findings.append(f"ALERT: Could not parse object for [{key}] - potential corruption")
+        threats.append(Threat(
+            id="STR-NAMES-CORRUPT", category="Structure", severity=7, 
+            description=f"Could not parse object for [{key}] - potential corruption", location=f"NameTree: {category}"
+        ))
         
     # Analyze JavaScript Payloads
     if category in ["/JavaScript", "/JS"]:
@@ -480,20 +519,27 @@ def process_name_node(key, value_obj, findings, whitelist, untrusted_items, js_s
         
     # Analyze suspicious NameTree keys
     if key in SUSPICIOUS_KEYS:
-        findings.append(f"ALERT: Suspicious key detected in NameTree: {key}")
+        threats.append(Threat(
+            id="STR-NAMES-SUSP-KEY", category="Structure", severity=10, 
+            description=f"Suspicious key detected in NameTree: {key}", location=f"NameTree: {category}"
+        ))
      
     # Collect Unexpected entries
     elif key not in whitelist:
         untrusted_items.add(key)
         
         
-def analyze_streams_and_objects(reader, aggregator=None):
-    stream_findings = []
-    suspicious_filters = ["/JBIG2Decode", "/Crypt"]
-    font_threats = {} 
-    remote_refs = {}
-    filter_objs = {}
+def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
+    threats = []
+    threat_map = {}
     visited_objects = set()
+    suspicious_filters = ["/JBIG2Decode", "/Crypt"]
+    
+    def add_threat(t_id, severity, description, location):
+        key = (t_id, "Stream/Object", severity, description)
+        if key not in threat_map:
+            threat_map[key] = []
+        threat_map[key].append(location)
     
     # ---------------------------------------------------------------------
     # Retrieve all object numbers from cross-reference table
@@ -520,8 +566,7 @@ def analyze_streams_and_objects(reader, aggregator=None):
             if obj is None: return
 
             obj_id = id(obj)
-            if obj_id in visited_objects:
-                return
+            if obj_id in visited_objects: return
             visited_objects.add(obj_id)
 
             # --------------------------------------------------------------
@@ -537,9 +582,11 @@ def analyze_streams_and_objects(reader, aggregator=None):
                 if obj.get("/Type") == "/Metadata":
                     try:
                         raw_xml = obj.get_data().decode("utf-8", errors="ignore")
-                        xml_findings = analyze_content(raw_xml, aggregator=aggregator)
-                        stream_findings.extend(xml_findings)
-
+                        dummy_content = ExtractedContent(extracted_text=raw_xml)
+                        xml_threats = analyze_content(dummy_content, aggregator=aggregator)
+                        for t in xml_threats:
+                            t.location = f"{location_label} (Metadata XML)"
+                            threats.append(t)
                     except: pass
                     
                 # ----------------------------------------------------------
@@ -551,9 +598,7 @@ def analyze_streams_and_objects(reader, aggregator=None):
                     if re.search(r'[a-zA-Z]{4,}', matrix_str):
                         keywords = ["fetch", "eval", "function", "xmlhttp", "axios", "xml", "script"]
                         if any(k in matrix_str.lower() for k in keywords):
-                            msg = "ALERT: Scripting indicator found in font object"
-                            if msg not in font_threats: font_threats[msg] = []
-                            font_threats[msg].append(location_label)
+                            add_threat("STR-OBJ-FONT-JS", 12, "Scripting indicator found in font object", location_label)
                             
                 # ----------------------------------------------------------
                 # 3. Remote Resource References
@@ -562,17 +607,9 @@ def analyze_streams_and_objects(reader, aggregator=None):
                 if "/F" in obj:
                     if obj.get("/Subtype") == "/Image" or "/FS" in obj:
                         f_val = obj.get("/F")
-                        if hasattr(f_val, "get_object"):
-                            f_val = f_val.get_object()
-
-                        if isinstance(f_val, dict) and "/F" in f_val:
-                            f_path = str(f_val.get("/F"))
-                        else:
-                            f_path = str(f_val)
-                            
-                        msg = f"ALERT: Remote resource reference detected (Path: {f_path})"
-                        if msg not in remote_refs: remote_refs[msg] = []
-                        remote_refs[msg].append(location_label)
+                        if hasattr(f_val, "get_object"): f_val = f_val.get_object()
+                        f_path = str(f_val.get("/F")) if isinstance(f_val, dict) and "/F" in f_val else str(f_val)
+                        add_threat("STR-OBJ-REMOTE-RES", 12, f"Remote resource reference detected (Path: {f_path})", location_label)
             
                 # ----------------------------------------------------------
                 # 4. JavaScript Injection
@@ -582,19 +619,16 @@ def analyze_streams_and_objects(reader, aggregator=None):
                     js_content = obj.get("/JS") or obj.get("/JavaScript")
                     try:
                         js_str = js_content.get_object() if hasattr(js_content, "get_object") else js_content
-                        
-                        if not isinstance(js_str, (dict, list)):
-                            content_to_scan = js_str.decode('utf-8', errors='ignore') if isinstance(js_str, bytes) else str(js_str)
+                        content_to_scan = js_str.decode('utf-8', errors='ignore') if isinstance(js_str, bytes) else str(js_str)
                         
                         if aggregator:
                             aggregator.add_script(content_to_scan, location_label, source_object=location_label)
                             
-                        l_findings, _, _, _ = analyze_links(content_to_scan)
-                        stream_findings.extend(l_findings)
-                        
-                        c_findings = analyze_content(content_to_scan, aggregator=aggregator)
-                        stream_findings.extend(c_findings)
-
+                        dummy_content = ExtractedContent(extracted_text=content_to_scan)
+                        c_threats = analyze_content(dummy_content, aggregator=aggregator)
+                        for t in c_threats:
+                            t.location = f"{location_label} (JS Stream)"
+                            threats.append(t)
                     except: pass
                     
                 # ----------------------------------------------------------
@@ -605,20 +639,17 @@ def analyze_streams_and_objects(reader, aggregator=None):
                     xfa_data = obj.get("/XFA")
                     try:
                         xfa_obj = xfa_data.get_object()
-                        raw_xfa_bytes = None
-                        if hasattr(xfa_obj, "get_data"):
-                            raw_xfa_bytes = xfa_obj.get_data()
-                        elif isinstance(xfa_obj, bytes):
-                            raw_xfa_bytes = xfa_obj
-                            
+                        raw_xfa_bytes = xfa_obj.get_data() if hasattr(xfa_obj, "get_data") else (xfa_obj if isinstance(xfa_obj, bytes) else None)
                         if raw_xfa_bytes:
                             xfa_text = raw_xfa_bytes.decode('utf-8', errors='ignore')
-                            
                             if aggregator:
                                 aggregator.add_script(xfa_text, location_label, script_type="XFA/XML-Form")
                                 
-                            xfa_findings = analyze_content(xfa_text, aggregator=aggregator)
-                            stream_findings.extend(xfa_findings)
+                            dummy_content = ExtractedContent(extracted_text=xfa_text)
+                            xfa_threats = analyze_content(dummy_content, aggregator=aggregator)
+                            for t in xfa_threats:
+                                t.location = f"{location_label} (XFA Stream)"
+                                threats.append(t)
                     except Exception: pass
 
                 # ----------------------------------------------------------
@@ -632,8 +663,7 @@ def analyze_streams_and_objects(reader, aggregator=None):
                         f_name = str(f)
                         for s_filt in suspicious_filters:
                             if s_filt in f_name:
-                                if f_name not in filter_objs: filter_objs[f_name] = []
-                                filter_objs[f_name].append(location_label)
+                                add_threat("STR-OBJ-SUSP-FILTER", 8, f"Suspicious stream filter ({f_name}) detected", location_label)
                                 
                 # ----------------------------------------------------------
                 # 7. Deep EmbeddedFile Stream Scan (HTML / JS Carriers)
@@ -645,19 +675,16 @@ def analyze_streams_and_objects(reader, aggregator=None):
                             raw_stream_data = obj.get_data()
                             if raw_stream_data:
                                 decoded_stream_text = raw_stream_data.decode('utf-8', errors='ignore')
-                                
                                 if any(k in decoded_stream_text.lower() for k in ["<script", "html", "javascript:"]):
                                     if aggregator:
-                                        aggregator.add_script(
-                                            decoded_stream_text, 
-                                            f"{location_label} (Inside embedded file content)",
-                                            script_type="Embedded HTML/JS Payload"
-                                        )
+                                        aggregator.add_script(decoded_stream_text, f"{location_label} (Embedded)", script_type="Embedded HTML/JS Payload")
                                     
-                                    embedded_findings = analyze_content(decoded_stream_text, aggregator=aggregator)
-                                    stream_findings.extend(embedded_findings)
-                                        
-                    except Exception as stream_e: pass
+                                    dummy_content = ExtractedContent(extracted_text=decoded_stream_text)
+                                    emb_threats = analyze_content(dummy_content, aggregator=aggregator)
+                                    for t in emb_threats:
+                                        t.location = f"{location_label} (Embedded File)"
+                                        threats.append(t)
+                    except Exception: pass
                     
                 # ----------------------------------------------------------
                 # 8. Recursive Traversal of Nested Objects / Arrays
@@ -676,19 +703,11 @@ def analyze_streams_and_objects(reader, aggregator=None):
                         aa_obj = aa.get_object() if hasattr(aa, "get_object") else aa
                         if isinstance(aa_obj, dict):
                             if "/E" in aa_obj:
-                                msg = "ALERT: Event-based execution trigger (Mouse-over /E)"                               
-                                if msg not in remote_refs: remote_refs[msg] = []
-                                remote_refs[msg].append(location_label)
-                                
+                                add_threat("STR-OBJ-AA-E", 12, "Event-based execution trigger (Mouse-over /E)", location_label)
                             elif "/PV" in aa_obj or "/PC" in aa_obj:
-                                msg = "ALERT: Event-based execution trigger (Page Visibility/Close)"
-                                if msg not in remote_refs: remote_refs[msg] = []
-                                remote_refs[msg].append(location_label)
-                                
+                                add_threat("STR-OBJ-AA-PAGE", 12, "Event-based execution trigger (Page Visibility/Close)", location_label)
                             elif any(k in aa_obj for k in ["/WC", "/WS", "/DS", "/WP", "/DP"]):
-                                msg = "ALERT: Silent background trigger (Save/Print/Close)"
-                                if msg not in remote_refs: remote_refs[msg] = []
-                                remote_refs[msg].append(location_label)
+                                add_threat("STR-OBJ-AA-SILENT", 12, "Silent background trigger (Save/Print/Close)", location_label)
                     except: pass
 
                 if "/Names" in obj:
@@ -696,9 +715,7 @@ def analyze_streams_and_objects(reader, aggregator=None):
                     try:
                         names_obj = names.get_object() if hasattr(names, "get_object") else names
                         if isinstance(names_obj, dict) and "/JavaScript" in names_obj:
-                            msg = "ALERT: Document-level automatic execution trigger (/Names)"
-                            if msg not in remote_refs: remote_refs[msg] = []
-                            remote_refs[msg].append(location_label)
+                            add_threat("STR-OBJ-NAMES-JS", 12, "Document-level automatic execution trigger (/Names -> /JavaScript)", location_label)
                     except: pass
 
             # --------------------------------------------------------------
@@ -735,19 +752,14 @@ def analyze_streams_and_objects(reader, aggregator=None):
     except: pass
     
     # ---------------------------------------------------------------------
-    # Build Final Findings
+    # Build Final Threats
     # ---------------------------------------------------------------------
+    for (t_id, category, severity, desc), locations in threat_map.items():
+        loc_counts = Counter(locations)
+        loc_summary = ", ".join([f"{loc}" + (f" (x{count})" if count > 1 else "") for loc, count in loc_counts.items()])
+        threats.append(Threat(
+            id=t_id, category=category, severity=severity,
+            description=desc, location=f"Found in: [{loc_summary}]"
+        ))
 
-    for msg, locations in font_threats.items():
-        unique_locs = sorted(list(set(locations)))
-        stream_findings.append(f"{msg} found in: [{', '.join(unique_locs)}]")
-
-    for msg, locations in remote_refs.items():
-        unique_locs = sorted(list(set(locations)))
-        stream_findings.append(f"{msg} found in: [{', '.join(unique_locs)}]")
-
-    for filt, locations in filter_objs.items():
-        unique_locs = sorted(list(set(locations)))
-        stream_findings.append(f"ALERT: Suspicious stream filter ({filt}) detected in: [{', '.join(unique_locs)}]")
-         
-    return stream_findings
+    return threats
