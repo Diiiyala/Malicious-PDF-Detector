@@ -25,7 +25,10 @@ def analyze_structure(reader, file_stream, aggregator=None):
         
         if header_index == -1:
             header_display = "".join([chr(b) if 32 <= b <= 126 else f"\\x{b:02x}" for b in raw_data[:10]])
-            findings.append(f"ALERT: Malformed PDF header (Found: '{header_display}' instead of %PDF- signature)")
+            threats.append(Threat(
+                id="STR-HDR-MALFORMED", category="Structure", severity=10,
+                description=f"Malformed PDF header (Found: '{header_display}' instead of %PDF- signature)", location="Header"
+            ))
             
         # Check for Signature Offset
         elif header_index > 0:
