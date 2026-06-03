@@ -1,5 +1,5 @@
 from pdfminer.high_level import extract_text as pdfminer_extract
-import logging
+import logging, re
 
 from analysis.core.extractor import extract_all_data
 from analysis.core.risk import calculate_risk
@@ -126,15 +126,35 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
 # ----------------------------------------------------------------------------
  
 def deduplicate_threats(threats: list[Threat]) -> list[Threat]:
-
     grouped = {}
+    
     for t in threats:
-        key = f"{t.id}_{t.description}"
+        base_desc = re.sub(r"\s*\(Found:\s*'[^']+'\)", "", t.description)
+        key = f"{t.id}_{base_desc}"
+        
         if key not in grouped:
             grouped[key] = t
         else:
             existing = grouped[key]
+            
             if t.location not in existing.location:
                 existing.location = f"{existing.location}, {t.location}"
+
+            match_new = re.search(r"\(Found:\s*'([^']+)'\)", t.description)
+            match_existing = re.search(r"\(Found:\s*'([^']+)'\)", existing.description)
+            
+            if match_new and match_existing:
+                existing_words = match_existing.group(1).split("', '")
+                new_word = match_new.group(1)
+                
+                if new_word not in existing_words:
+                    existing_words.append(new_word)
+                    combined_words = "', '".join(existing_words)
+                    
+                    existing.description = re.sub(
+                        r"\(Found:\s*'[^']+'\)",
+                        f"(Found: '{combined_words}')",
+                        existing.description
+                    )
 
     return sorted(list(grouped.values()), key=lambda x: x.severity, reverse=True)
