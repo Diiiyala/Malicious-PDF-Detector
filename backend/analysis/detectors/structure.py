@@ -296,8 +296,8 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
             
             if found_silent_triggers:
                 triggers_str = ", ".join(found_silent_triggers)
-                add_threat("STR-ACT-SILENT-ROOT", 12, f"Dangerous silent trigger ({triggers_str}) detected", "Catalog")
-            
+                add_threat("STR-ACT-SILENT-ROOT", 12, f"Silent background trigger detected (Found: '{triggers_str}')", "Catalog")
+                
             add_threat("STR-ACT-AA-ROOT", 10, "Automatic triggers (/AA) detected", "Catalog")
 
     # Analyze Page-Level Actions and Annotations  
@@ -706,8 +706,10 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                                 add_threat("STR-OBJ-AA-E", 12, "Event-based execution trigger (Mouse-over /E)", location_label)
                             elif "/PV" in aa_obj or "/PC" in aa_obj:
                                 add_threat("STR-OBJ-AA-PAGE", 12, "Event-based execution trigger (Page Visibility/Close)", location_label)
-                            elif any(k in aa_obj for k in ["/WC", "/WS", "/DS", "/WP", "/DP"]):
-                                add_threat("STR-OBJ-AA-SILENT", 12, "Silent background trigger (Save/Print/Close)", location_label)
+                            else:
+                                found_keys = [k for k in ["/WC", "/WS", "/DS", "/WP", "/DP"] if k in aa_obj]
+                                if found_keys:
+                                    add_threat("STR-OBJ-AA-SILENT", 12, f"Silent background trigger detected (Found: '{', '.join(found_keys)}')", location_label)
                     except: pass
 
                 if "/Names" in obj:
