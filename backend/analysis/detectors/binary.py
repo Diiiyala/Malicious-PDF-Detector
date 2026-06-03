@@ -113,8 +113,8 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
                 id=t_id,
                 category="Binary Content",
                 severity=severity,
-                description=f"{desc} (Found: '{keyword_found}') [Context: {context_str}]",
-                location=f"Offset: {start}"
+                description=f"{desc} (Found: '{keyword_found}')",
+                location=f"Offset: {start} [Context: {context_str}]"
             ))
                 
             # ----------------------------------------------------------

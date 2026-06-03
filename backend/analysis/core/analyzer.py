@@ -129,17 +129,22 @@ def deduplicate_threats(threats: list[Threat]) -> list[Threat]:
     grouped = {}
     
     for t in threats:
-        base_desc = re.sub(r"\s*\(Found:\s*'[^']+'\)", "", t.description)
-        key = f"{t.id}_{base_desc}"
+        core_desc = re.sub(r"\s*\(Found:\s*'.*'\)", "", t.description).strip()
+        key = core_desc.lower()
         
         if key not in grouped:
             grouped[key] = t
         else:
             existing = grouped[key]
             
-            if t.location not in existing.location:
-                existing.location = f"{existing.location}, {t.location}"
-
+            if t.severity > existing.severity:
+                existing.severity = t.severity
+                existing.id = t.id 
+            
+            existing_locs = [l.strip() for l in existing.location.split(",")]
+            new_locs = [l.strip() for l in t.location.split(",")]
+            existing.location = ", ".join(sorted(list(set(existing_locs + new_locs))))
+            
             match_new = re.search(r"\(Found:\s*'([^']+)'\)", t.description)
             match_existing = re.search(r"\(Found:\s*'([^']+)'\)", existing.description)
             
@@ -149,12 +154,8 @@ def deduplicate_threats(threats: list[Threat]) -> list[Threat]:
                 
                 if new_word not in existing_words:
                     existing_words.append(new_word)
-                    combined_words = "', '".join(existing_words)
-                    
-                    existing.description = re.sub(
-                        r"\(Found:\s*'[^']+'\)",
-                        f"(Found: '{combined_words}')",
-                        existing.description
-                    )
+                
+                combined_words = "', '".join(existing_words)
+                existing.description = f"{core_desc} (Found: '{combined_words}')"
 
     return sorted(list(grouped.values()), key=lambda x: x.severity, reverse=True)

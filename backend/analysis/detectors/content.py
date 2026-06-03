@@ -126,7 +126,7 @@ def _analyze_text_recursive(text: str, depth=0, aggregator=None) -> list[Threat]
                     id=f"CONT-SYS-{threat_name[:4].upper()}", 
                     category="Content", 
                     severity=severity,
-                    description=f"Specific threats detected: {threat_name} (Found: '{matched_str}')",
+                    description=f"{threat_name} (Found: '{matched_str}')",
                     location=f"Offset: {match.start()} (Layer {depth})"
                 ))
     
