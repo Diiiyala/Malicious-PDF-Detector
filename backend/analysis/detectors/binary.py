@@ -1,6 +1,6 @@
 import re
-from analysis.utils.normalizer import normalize_all
 from analysis.utils.models import ExtractedContent, Threat
+from analysis.utils.normalizer import normalize_all, decode_pdf_octal, decode_pdf_hex_names
 
 # -----------------------------------------------------------------------
 # Threat Signatures
@@ -234,9 +234,12 @@ def extract_embedded_paths(file_content) -> list[Threat]:
             content.append(char)
 
         path_str = content.decode('utf-8', errors='ignore')
+        path_str = decode_pdf_octal(path_str)
+        path_str = decode_pdf_hex_names(path_str)
+        
         threats.append(Threat(
             id="BIN-REMOTE-PATH", category="Binary Discovery", severity=11,
-            description=f"Remote path detected (/F): ({path_str})", location="Raw Binary"
+            description=f"Remote path detected (/F) (Found: '{path_str}')", location="Raw Binary"
         ))
 
     return threats
@@ -248,9 +251,12 @@ def extract_hidden_uris(file_content) -> list[Threat]:
 
     for uri in raw_uris:
         uri_str = uri.decode('utf-8', errors='ignore')
+        uri_str = decode_pdf_octal(uri_str)
+        uri_str = decode_pdf_hex_names(uri_str)
+        
         threats.append(Threat(
             id="BIN-HIDDEN-URI", category="Binary Discovery", severity=12,
-            description=f"Hidden URI found in raw scan: {uri_str}", location="Raw Binary"
+            description=f"Hidden URI found in raw scan (Found: '{uri_str}')", location="Raw Binary"
         ))
 
     return threats
