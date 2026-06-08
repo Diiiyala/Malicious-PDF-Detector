@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from io import BytesIO
 from pypdf import PdfReader
 import logging, pikepdf
@@ -6,6 +7,7 @@ import logging, pikepdf
 from analysis.core.analyzer import analyze_all_aspects
 
 app = Flask(__name__)
+CORS(app)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 logging.basicConfig(
