@@ -12,15 +12,6 @@ def detect_text_anomalies(content: ExtractedContent) -> list[Threat]:
             location="Document Tree"
         ))
 
-    for page_num in content.image_only_pages:
-        threats.append(Threat(
-            id="TXT-IMG-ONLY",
-            category="Text Extraction",
-            severity=2,
-            description="Page contains images but no extractable text",
-            location=f"Page {page_num}"
-        ))
-
     for anomaly in content.visual_anomalies:
         a_type = anomaly.get("type")
         
