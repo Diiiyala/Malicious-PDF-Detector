@@ -46,11 +46,6 @@ def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> lis
             
             if version_match:
                 header_version = version_match.group(0).decode('utf-8', errors='ignore').strip()
-                if is_version_older(header_version, "1.4"):
-                    threats.append(Threat(
-                        id="STR-HDR-OLDVER", category="Structure", severity=1,
-                        description=f"Old PDF version detected in header ({header_version})", location="Header"
-                    ))
             else:
                 threats.append(Threat(
                     id="STR-HDR-NOVER", category="Structure", severity=7,
@@ -149,17 +144,7 @@ def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> lis
                         id="STR-ROOT-AF-FAIL", category="Structure", severity=12,
                         description="PDF 2.0 Associated Files (/AF) detected (Failed to parse details)", location="Root Catalog"
                     ))
-                        
-            # Check for Version Mismatch
-            catalog_version = root.get("/Version")
-            if catalog_version and header_version:
-                cat_v_str = str(catalog_version).replace("/", "")
-                if cat_v_str != header_version:
-                    threats.append(Threat(
-                        id="STR-ROOT-VER-MISMATCH", category="Structure", severity=6,
-                        description=f"Version mismatch (Header: {header_version}, Catalog: {cat_v_str})", location="Root Catalog"
-                    ))
-                    
+                                       
     except Exception as e: pass
         
     # -------------------------------------------------------------------------
@@ -449,7 +434,7 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
             category=category,
             severity=severity,
             description=desc,
-            location=f"Found in: [{loc_summary}]"
+            location=loc_summary
         ))
 
     return threats
@@ -761,7 +746,7 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
         loc_summary = ", ".join([f"{loc}" + (f" (x{count})" if count > 1 else "") for loc, count in loc_counts.items()])
         threats.append(Threat(
             id=t_id, category=category, severity=severity,
-            description=desc, location=f"Found in: [{loc_summary}]"
+            description=desc, location=loc_summary
         ))
 
     return threats
