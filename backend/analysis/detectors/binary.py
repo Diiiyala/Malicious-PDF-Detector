@@ -9,7 +9,6 @@ from analysis.utils.normalizer import normalize_all, decode_pdf_octal, decode_pd
 STRUCTURE_PATTERNS = {
     rb"/AA\s*<<\s*/O": ("Silent page trigger (/O or /C)", 12, "BIN-STR-SILENT"),
     rb"/OpenAction": ("Automatic execution trigger (/OpenAction)", 10, "BIN-STR-OPEN"),
-    rb"/AA": ("Automatic triggers (/AA)", 9, "BIN-STR-AA"),
     rb"/Launch": ("Annotation (/Launch)", 10, "BIN-STR-LAUNCH")
 }
     
