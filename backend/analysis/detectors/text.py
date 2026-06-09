@@ -33,15 +33,6 @@ def detect_text_anomalies(content: ExtractedContent) -> list[Threat]:
                 location="Text Elements"
             ))
             
-        elif a_type == "encoding":
-            threats.append(Threat(
-                id="TXT-FONT-ENCODING",
-                category="Text Extraction",
-                severity=3,
-                description=f"Non-standard font encoding detected ({anomaly.get('details')})",
-                location="Text Elements"
-            ))
-            
         elif a_type == "transformation":
             threats.append(Threat(
                 id="TXT-TRANSFORM",
@@ -49,15 +40,6 @@ def detect_text_anomalies(content: ExtractedContent) -> list[Threat]:
                 severity=3,
                 description=f"Text transformation detected ({anomaly.get('details')})",
                 location="Text Elements"
-            ))
-            
-        elif a_type == "flipped":
-            threats.append(Threat(
-                id="TXT-FLIPPED",
-                category="Text Extraction",
-                severity=4,
-                description=f"Flipped/mirrored text detected ({anomaly.get('details')})",
-                location="Text Elements"
-            ))
+            ))           
 
     return threats
