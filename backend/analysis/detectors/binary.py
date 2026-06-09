@@ -13,7 +13,6 @@ STRUCTURE_PATTERNS = {
 }
     
 CONTENT_PATTERNS = {
-    rb"/S\s*/URI": ("Direct URI action detected in hidden object", 12, "BIN-URI-ACTION"),
     rb"/JS\s*\(": ("Suspicious Scripting found in malformed object", 11, "BIN-JS-MALFORMED"),
     rb"/JavaScript": ("Suspicious Scripting found", 9, "BIN-JS"),
     rb"/JS\b": ("Suspicious Scripting found", 9, "BIN-JS"),
@@ -238,7 +237,7 @@ def extract_embedded_paths(file_content) -> list[Threat]:
         
         threats.append(Threat(
             id="BIN-REMOTE-PATH", category="Binary Discovery", severity=11,
-            description=f"Remote path detected (/F) (Found: '{path_str}')", location="Raw Binary"
+            description=f"Remote path detected (/F) ('{path_str}')", location="Raw Binary"
         ))
 
     return threats
@@ -254,8 +253,8 @@ def extract_hidden_uris(file_content) -> list[Threat]:
         uri_str = decode_pdf_hex_names(uri_str)
         
         threats.append(Threat(
-            id="BIN-HIDDEN-URI", category="Binary Discovery", severity=12,
-            description=f"Hidden URI found in raw scan (Found: '{uri_str}')", location="Raw Binary"
+            id="URI-DETECTED", category="Network / Links", severity=3,
+            description=f"Embedded URI detected ('{uri_str}')", location="Raw Binary"
         ))
 
     return threats
