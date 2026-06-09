@@ -372,7 +372,7 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
                             a_type = action_dict.get("/S")
                             
                             if a_type == "/URI":
-                                add_threat("STR-ACT-ANNOT-URI", 5, f"Annotation (URI: {extracted_path}) - Potential DNS/HTTP Request", loc_str)
+                                add_threat("URI-DETECTED", 3, f"Embedded URI detected ('{extracted_path}')", loc_str)
                             elif a_type == "/ImportData":
                                 add_threat("STR-ACT-IMPORTDATA", 12, f"External data import trigger (/ImportData) pointing to: ({extracted_path})", loc_str)
                             elif a_type == "/GoToR":
