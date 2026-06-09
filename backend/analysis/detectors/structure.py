@@ -288,108 +288,113 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
     # Analyze Page-Level Actions and Annotations  
     try:
         for i, page in enumerate(reader.pages):
-            page_obj = page.get_object()
             loc_str = f"Page {i+1}"
             
-            mediabox = page_obj.get("/MediaBox")
-            page_area = 0
-            if mediabox:
-                page_area = abs(float(mediabox[2]) - float(mediabox[0])) * abs(float(mediabox[3]) - float(mediabox[1]))
-            
-            if "/AA" in page_obj:
-                aa_page = page_obj["/AA"].get_object()
-                if "/O" in aa_page or "/C" in aa_page:
-                     add_threat("STR-ACT-PAGE-SILENT", 12, "Silent page trigger (/O or /C)", loc_str)
-                add_threat("STR-ACT-PAGE-AA", 10, "Automatic triggers (/AA)", loc_str)
+            try:
+                page_obj = page.get_object()
+                    
+                mediabox = page_obj.get("/MediaBox")
+                page_area = 0
+                if mediabox:
+                    page_area = abs(float(mediabox[2]) - float(mediabox[0])) * abs(float(mediabox[3]) - float(mediabox[1]))
+                
+                if "/AA" in page_obj:
+                    aa_page = page_obj["/AA"].get_object()
+                    if "/O" in aa_page or "/C" in aa_page:
+                        add_threat("STR-ACT-PAGE-SILENT", 12, "Silent page trigger (/O or /C)", loc_str)
+                    add_threat("STR-ACT-PAGE-AA", 10, "Automatic triggers (/AA)", loc_str)
 
-            if "/Annots" in page_obj:
-                visible_widgets_on_page = 0
-                for annot in page_obj["/Annots"]:
-                    obj = annot.get_object()
-                    if not obj: continue
-                                          
-                    rect = obj.get("/Rect")
-                    subtype = obj.get("/Subtype")
-                    is_widget = (subtype == "/Widget")
-                    
-                    is_transparent = (obj.get("/F") == 2 or not obj.get("/AP"))
-                    has_js = False
-                    trigger_type = "Unknown trigger"
-                    extracted_path = None
-                    
-                    if "/A" in obj:
-                        action_dict = obj["/A"].get_object()
-                        a_type = action_dict.get("/S")
-                        extracted_path = extract_action_path(action_dict)
+                if "/Annots" in page_obj:
+                    visible_widgets_on_page = 0
+                    for annot in page_obj["/Annots"]:
+                        obj = annot.get_object()
+                        if not obj: continue
+                                            
+                        rect = obj.get("/Rect")
+                        subtype = obj.get("/Subtype")
+                        is_widget = (subtype == "/Widget")
                         
-                        if a_type == "/JavaScript":
-                            has_js = True
-                            trigger_type = "JavaScript trigger"
+                        is_transparent = (obj.get("/F") == 2 or not obj.get("/AP"))
+                        has_js = False
+                        trigger_type = "Unknown trigger"
+                        extracted_path = None
+                        
+                        if "/A" in obj:
+                            action_dict = obj["/A"].get_object()
+                            a_type = action_dict.get("/S")
+                            extracted_path = extract_action_path(action_dict)
                             
-                        elif a_type == "/URI":
-                            uri_link = str(action_dict.get("/URI", "Unknown Link"))
-                            trigger_type = f"DNS/HTTP trigger: {uri_link}"
-                            extracted_path = uri_link
-                            
-                        elif a_type == "/SubmitForm":
-                            trigger_type = f"Data exfiltration trigger: {extracted_path}" if extracted_path else "Data exfiltration trigger"
-                            
-                        elif a_type in ["/Launch", "/GoToR", "/ImportData", "/Thread", "/GoToE"]:
-                            a_clean = str(a_type).replace("/", "")
-                            trigger_type = f"{a_clean} trigger: {extracted_path}" if extracted_path else f"{a_clean} trigger (Internal)"
-                            
-                        elif a_type:
-                            trigger_type = f"{str(a_type).replace('/', '')} trigger"
-                            
-                    is_link_trigger = (subtype == "/Link" and "/A" in obj)
-                    is_clickjacking = False
-
-                    if rect and page_area > 0:
-                        width = abs(float(rect[2]) - float(rect[0]))
-                        height = abs(float(rect[3]) - float(rect[1]))
-                        annot_area = width * height
-                        coverage = annot_area / page_area
-                                                   
-                        if coverage > 0.9:
-                            if has_js or is_widget or is_link_trigger:
-                                add_threat("STR-ACT-CLICKJACK", 13, f"Clickjacking overlay ({trigger_type})", loc_str)
-                                is_clickjacking = True
-
-                    if is_widget and is_transparent and coverage < 0.05:
-                        visible_widgets_on_page += 1
-                            
-                    if "/T" in obj:
-                        t_val = str(obj["/T"])
-                        if any(k in t_val.lower() for k in ["<script", "javascript:", "<img", "onerror="]):
-                            add_threat("STR-ACT-STORED-XSS", 12, f"Stored XSS injection attempt detected in Annotation field (/T): {t_val[:50]}", loc_str)
-                            if aggregator:
-                                aggregator.add_script(t_val, f"{loc_str} Annotation /T Field", script_type="Stored XSS Payload")
+                            if a_type == "/JavaScript":
+                                has_js = True
+                                trigger_type = "JavaScript trigger"
                                 
-                    if "/A" in obj and not is_clickjacking:
-                        action_dict = obj["/A"].get_object()
-                        a_type = action_dict.get("/S")
-                        
-                        if a_type == "/URI":
-                            add_threat("STR-ACT-ANNOT-URI", 5, f"Annotation (URI: {extracted_path}) - Potential DNS/HTTP Request", loc_str)
-                        elif a_type == "/ImportData":
-                            add_threat("STR-ACT-IMPORTDATA", 12, f"External data import trigger (/ImportData) pointing to: ({extracted_path})", loc_str)
-                        elif a_type == "/GoToR":
-                            add_threat("STR-ACT-GOTOR", 12, f"Annotation (/GoToR) pointing to: ({extracted_path})", loc_str)
-                        elif a_type == "/GoToE":
-                            add_threat("STR-ACT-GOTOE", 11, f"Suspicious /GoToE pointing to: {extracted_path if extracted_path else 'Internal'}", loc_str)
-                        elif a_type in ["/Launch", "/SubmitForm", "/Thread"]:
-                            a_clean = str(a_type).replace("/", "")
-                            desc = f"Annotation (/{a_clean}) pointing to: ({extracted_path})" if extracted_path else f"Annotation (/{a_clean})"
-                            add_threat(f"STR-ACT-{a_clean.upper()}", 10, desc, loc_str)
-                        else:
-                            a_type_clean = str(a_type).replace("/", "")
-                            add_threat(f"STR-ACT-ANNOT-{a_type_clean}", 4, f"Annotation (/{a_type_clean})", loc_str)
+                            elif a_type == "/URI":
+                                uri_link = str(action_dict.get("/URI", "Unknown Link"))
+                                trigger_type = f"DNS/HTTP trigger: {uri_link}"
+                                extracted_path = uri_link
+                                
+                            elif a_type == "/SubmitForm":
+                                trigger_type = f"Data exfiltration trigger: {extracted_path}" if extracted_path else "Data exfiltration trigger"
+                                
+                            elif a_type in ["/Launch", "/GoToR", "/ImportData", "/Thread", "/GoToE"]:
+                                a_clean = str(a_type).replace("/", "")
+                                trigger_type = f"{a_clean} trigger: {extracted_path}" if extracted_path else f"{a_clean} trigger (Internal)"
+                                
+                            elif a_type:
+                                trigger_type = f"{str(a_type).replace('/', '')} trigger"
+                                
+                        is_link_trigger = (subtype == "/Link" and "/A" in obj)
+                        is_clickjacking = False
+
+                        if rect and page_area > 0:
+                            width = abs(float(rect[2]) - float(rect[0]))
+                            height = abs(float(rect[3]) - float(rect[1]))
+                            annot_area = width * height
+                            coverage = annot_area / page_area
+                                                    
+                            if coverage > 0.9:
+                                if has_js or is_widget or is_link_trigger:
+                                    add_threat("STR-ACT-CLICKJACK", 13, f"Clickjacking overlay ({trigger_type})", loc_str)
+                                    is_clickjacking = True
+
+                        if is_widget and is_transparent and coverage < 0.05:
+                            visible_widgets_on_page += 1
+                                
+                        if "/T" in obj:
+                            t_val = str(obj["/T"])
+                            if any(k in t_val.lower() for k in ["<script", "javascript:", "<img", "onerror="]):
+                                add_threat("STR-ACT-STORED-XSS", 12, f"Stored XSS injection attempt detected in Annotation field (/T): {t_val[:50]}", loc_str)
+                                if aggregator:
+                                    aggregator.add_script(t_val, f"{loc_str} Annotation /T Field", script_type="Stored XSS Payload")
+                                    
+                        if "/A" in obj and not is_clickjacking:
+                            action_dict = obj["/A"].get_object()
+                            a_type = action_dict.get("/S")
+                            
+                            if a_type == "/URI":
+                                add_threat("STR-ACT-ANNOT-URI", 5, f"Annotation (URI: {extracted_path}) - Potential DNS/HTTP Request", loc_str)
+                            elif a_type == "/ImportData":
+                                add_threat("STR-ACT-IMPORTDATA", 12, f"External data import trigger (/ImportData) pointing to: ({extracted_path})", loc_str)
+                            elif a_type == "/GoToR":
+                                add_threat("STR-ACT-GOTOR", 12, f"Annotation (/GoToR) pointing to: ({extracted_path})", loc_str)
+                            elif a_type == "/GoToE":
+                                add_threat("STR-ACT-GOTOE", 11, f"Suspicious /GoToE pointing to: {extracted_path if extracted_path else 'Internal'}", loc_str)
+                            elif a_type in ["/Launch", "/SubmitForm", "/Thread"]:
+                                a_clean = str(a_type).replace("/", "")
+                                desc = f"Annotation (/{a_clean}) pointing to: ({extracted_path})" if extracted_path else f"Annotation (/{a_clean})"
+                                add_threat(f"STR-ACT-{a_clean.upper()}", 10, desc, loc_str)
+                            else:
+                                a_type_clean = str(a_type).replace("/", "")
+                                add_threat(f"STR-ACT-ANNOT-{a_type_clean}", 4, f"Annotation (/{a_type_clean})", loc_str)
+                    
+                if visible_widgets_on_page > 3:
+                    add_threat("STR-ACT-CLICKJACK-GRID", 12, "Clickjacking Suspicious invisible button grid detected", loc_str)
             
-            if visible_widgets_on_page > 3:
-                add_threat("STR-ACT-CLICKJACK-GRID", 12, "Clickjacking Suspicious invisible button grid detected", loc_str)
-                        
+            except Exception as page_error:
+                continue
+                               
     except Exception as e:
-        add_threat("STR-ACT-ERROR", 8, "Could not fully analyze actions on all pages (Potential obfuscation/Structure corruption)", "Document Body")
+        add_threat("STR-ACT-ERROR", 2, "Could not access document pages array", "Document Body")
         
     # Analyze AcroForm
     try:
