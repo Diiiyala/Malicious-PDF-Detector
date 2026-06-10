@@ -7,6 +7,16 @@ from analysis.detectors.content import analyze_content
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
 
+SUSPICIOUS_URI_KEYWORDS = [
+    "javascript:", "vbscript:", "data:", "file://", "expect://", 
+    "smb://", "ftp://", "ldap://", "gopher://", "ms-msdt:", "search-ms:",
+    ".exe", ".bat", ".cmd", ".vbs", ".vbe", ".wsf", ".wsc", ".scr", 
+    ".ps1", ".sh", ".py", ".jar", ".msi", ".dll", ".sys", ".elf",
+    ".docm", ".xlsm", ".pptm",
+    "cmd.exe", "powershell", "wscript", "cscript", "mshta", 
+    "rundll32", "regsvr32", "certutil", "bitsadmin", "wmic"
+]
+
 def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> list[Threat]:
     threats = []
     js_scripts = set()
@@ -367,7 +377,12 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
                             a_type = action_dict.get("/S")
                             
                             if a_type == "/URI":
-                                add_threat("URI-DETECTED", 3, f"Embedded URI detected ('{extracted_path}')", loc_str)
+                                uri_lower = extracted_path.lower() if extracted_path else ""                               
+                                is_suspicious = any(k in uri_lower for k in SUSPICIOUS_URI_KEYWORDS) or \
+                                                re.search(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', uri_lower)
+                                if is_suspicious:
+                                    add_threat("URI-DETECTED", 8, f"Suspicious URI detected ('{extracted_path}')", loc_str)
+                                    
                             elif a_type == "/ImportData":
                                 add_threat("STR-ACT-IMPORTDATA", 12, f"External data import trigger (/ImportData) pointing to: ({extracted_path})", loc_str)
                             elif a_type == "/GoToR":
