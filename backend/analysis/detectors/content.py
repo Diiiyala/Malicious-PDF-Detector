@@ -195,7 +195,7 @@ def _analyze_text_recursive(text: str, depth=0, aggregator=None) -> list[Threat]
     # ---------------------------------------------------------------------
 
     ent = calculate_entropy(text_clean)
-    if len(text_clean) > 200 and ent > 5.5:
+    if len(text_clean) > 200 and ent > 6.5:
         diag = diagnose_content(text_clean, ent)
         severity = 8 if "Encrypted" in diag else (5 if "Obfuscated" in diag else 3)
         threats.append(Threat(
