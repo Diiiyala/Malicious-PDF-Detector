@@ -90,12 +90,7 @@ def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> lis
                     threats.append(Threat(
                         id="STR-ROOT-OCG-AA", category="Structure", severity=11,
                         description="Optional Content Groups (OCG) detected - Suspicious Automatic Trigger coupling (Potential Hidden Layer Exploit)", location="Root Catalog"
-                    ))
-                else:
-                    threats.append(Threat(
-                        id="STR-ROOT-OCG", category="Structure", severity=7,
-                        description="Optional Content Groups (OCG) detected - potential hidden layer exploit", location="Root Catalog"
-                    ))
+                    ))               
 
             # Verify PDF 2.0 Associated Files
             if "/AF" in root:
