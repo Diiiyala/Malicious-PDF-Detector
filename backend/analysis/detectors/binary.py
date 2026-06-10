@@ -1,4 +1,4 @@
-import re
+import re, ipaddress
 from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.normalizer import normalize_all, decode_pdf_octal, decode_pdf_hex_names
 
@@ -37,6 +37,20 @@ CONTENT_PATTERNS = {
     rb"expect://": ("XXE Injection Attempt", 13, "BIN-XXE"),
 }
  
+# -----------------------------------------------------------------------
+# Global Threat Constants
+# -----------------------------------------------------------------------
+
+SUSPICIOUS_URI_KEYWORDS = [
+    "javascript:", "vbscript:", "data:", "file://", "expect://", 
+    "smb://", "ftp://", "ldap://", "gopher://", "ms-msdt:", "search-ms:",
+    ".exe", ".bat", ".cmd", ".vbs", ".vbe", ".wsf", ".wsc", ".scr", 
+    ".ps1", ".sh", ".py", ".jar", ".msi", ".dll", ".sys", ".elf",
+    ".docm", ".xlsm", ".pptm",
+    "cmd.exe", "powershell", "wscript", "cscript", "mshta", 
+    "rundll32", "regsvr32", "certutil", "bitsadmin", "wmic"
+]
+
 # -----------------------------------------------------------------------
 # Aggregator Maps
 # -----------------------------------------------------------------------
@@ -211,50 +225,124 @@ def detect_pdf_context(file_content, position):
 
     return detected or ["/Unknown"]
 
+def extract_pdf_literal_string(data: bytes, start_pos: int) -> str | None:
 
-def extract_embedded_paths(file_content) -> list[Threat]:
+    depth = 1
+    escaped = False
+    result = bytearray()
+
+    for i in range(start_pos, len(data)):
+        c = data[i]
+
+        if escaped:
+            result.append(c)
+            escaped = False
+            continue
+
+        if c == ord('\\'):
+            escaped = True
+            result.append(c)
+            continue
+
+        if c == ord('('):
+            depth += 1
+            result.append(c)
+            continue
+
+        if c == ord(')'):
+            depth -= 1
+            if depth == 0:
+                break
+            result.append(c)
+            continue
+
+        result.append(c)
+
+    try:
+        value = result.decode("utf-8", errors="ignore").strip()
+        value = decode_pdf_octal(value)
+        value = decode_pdf_hex_names(value)
+        return value
+    
+    except Exception:
+        return None
+
+def is_valid_ip(text: str) -> bool:
+    try:
+        ipaddress.ip_address(text)
+        return True
+    except Exception:
+        return False
+
+def contains_ip(text: str) -> bool:
+    candidates = re.findall(r'(?:\d{1,3}\.){3}\d{1,3}', text)
+    for candidate in candidates:
+        if is_valid_ip(candidate):
+            return True
+    return False
+
+def extract_hidden_uris(file_content: bytes) -> list[Threat]:
     threats = []
-    raw_f_matches = re.finditer(rb'/F\s*\(', file_content)
 
-    for match in raw_f_matches:
-        start_pos = match.end()
-        depth = 1
-        content = bytearray()
-
-        for i in range(start_pos, len(file_content)):
-            char = file_content[i]
-            if char == ord(b'('):
-                depth += 1
-            elif char == ord(b')'):
-                depth -= 1
-                if depth == 0:
-                    break
-            content.append(char)
-
-        path_str = content.decode('utf-8', errors='ignore')
-        path_str = decode_pdf_octal(path_str)
-        path_str = decode_pdf_hex_names(path_str)
+    for match in re.finditer(rb'/URI\s*\(', file_content):
+        uri = extract_pdf_literal_string(file_content, match.end())
         
-        threats.append(Threat(
-            id="BIN-REMOTE-PATH", category="Binary Discovery", severity=11,
-            description=f"Remote path detected (/F) ('{path_str}')", location="Raw Binary"
-        ))
+        if not uri:
+            continue
+
+        uri_lower = uri.lower()
+        suspicious = (any(k in uri_lower for k in SUSPICIOUS_URI_KEYWORDS) or contains_ip(uri))
+
+        if suspicious:
+            threats.append(Threat(
+                id="URI-DETECTED", category="Network / Links", severity=8,
+                description=f"Suspicious URI detected ('{uri}')", location="Raw Binary"
+            ))
+
+    for match in re.finditer(rb'/URI\s*<([0-9A-Fa-f]+)>', file_content):
+        try:
+            uri = bytes.fromhex(match.group(1).decode()).decode("utf-8", errors="ignore").strip()
+            uri_lower = uri.lower()
+            
+            suspicious = (any(k in uri_lower for k in SUSPICIOUS_URI_KEYWORDS) or contains_ip(uri))
+
+            if suspicious:
+                threats.append(Threat(
+                    id="URI-DETECTED-HEX", category="Network / Links", severity=8,
+                    description=f"Suspicious Hex URI detected ('{uri}')", location="Raw Binary"
+                ))
+        except Exception:
+            pass
 
     return threats
 
-
-def extract_hidden_uris(file_content) -> list[Threat]:
+def extract_embedded_paths(file_content) -> list[Threat]:
     threats = []
-    raw_uris = re.findall(rb'/URI\s*\((.*?)\)', file_content)
 
-    for uri in raw_uris:
-        uri_str = uri.decode('utf-8', errors='ignore')
-        uri_str = decode_pdf_octal(uri_str)
-        uri_str = decode_pdf_hex_names(uri_str)
+    for match in re.finditer(rb'/F\s*\(', file_content):
+        path = extract_pdf_literal_string(file_content, match.end())
+
+        if not path: continue
+        if "endstream" in path.lower() or "endobj" in path.lower(): continue
+
+        path_lower = path.lower()
+
+        suspicious = (
+            any(k in path_lower for k in SUSPICIOUS_URI_KEYWORDS)
+            or contains_ip(path)
+        )
+
+        very_long = len(path) > 500
+
+        if suspicious or very_long:
+            severity = 11
+
+            if re.search(r'(powershell|cmd\.exe|wscript|cscript)', path_lower):
+                severity = 12
         
         threats.append(Threat(
-            id="URI-DETECTED", category="Network / Links", severity=3,
-            description=f"Embedded URI detected ('{uri_str}')", location="Raw Binary"
+            id="BIN-REMOTE-PATH", category="Binary Discovery", severity=severity,
+            description=f"Remote path detected (/F) ('{path}')", location="Raw Binary"
         ))
 
     return threats
