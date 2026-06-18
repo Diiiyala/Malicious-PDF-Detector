@@ -40,16 +40,12 @@ def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> lis
                 description=f"PDF signature is not at the start (Offset: {header_index} bytes - potential hiding)", location="Header"
             ))
         
-        header_version = None
-        
-       # Extract and Validate PDF Version
+        # Validate PDF Version presence
         if header_index != -1:
             version_area = raw_data[header_index+5 : header_index+15]
             version_match = re.search(b"^[0-9.]+", version_area)
-            
-            if version_match:
-                header_version = version_match.group(0).decode('utf-8', errors='ignore').strip()
-            else:
+
+            if not version_match:
                 threats.append(Threat(
                     id="STR-HDR-NOVER", category="Structure", severity=7,
                     description="PDF version missing or malformed in header", location="Header"
@@ -211,14 +207,6 @@ def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> lis
 #  Helpers
 # -------------------------------------------------------------------------
 
-def is_version_older(current, target):
-        try:
-            return tuple(map(int, current.split('.'))) < tuple(map(int, target.split('.')))
-        except Exception as e:
-            logger.debug("PDF version comparison failed: %s", e)
-            return False
-        
-        
 def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
     threats = []
     threat_map = {}
