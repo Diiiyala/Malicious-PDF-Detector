@@ -1,4 +1,5 @@
 import logging
+logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------
 # Constants for Visual Anomaly Detection
@@ -89,7 +90,7 @@ def extract_text_and_visuals(reader):
                 image_only_pages.append(i + 1)
 
     except Exception:
-        logging.exception("Text Analysis collapsed during extraction")
+        logger.exception("Text Analysis collapsed during extraction")
 
     return {
         "text": "".join(full_text),
