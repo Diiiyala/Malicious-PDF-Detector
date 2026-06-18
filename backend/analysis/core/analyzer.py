@@ -10,7 +10,7 @@ from analysis.utils.models import Threat, ExtractedContent
 
 from analysis.detectors.text import detect_text_anomalies
 from analysis.detectors.content import analyze_content
-from analysis.detectors.structure import analyze_structure
+from analysis.detectors.structure.main import analyze_structure
 from analysis.detectors.metadata import analyze_metadata
 from analysis.detectors.binary import analyze_binary
 
