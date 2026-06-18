@@ -1,6 +1,7 @@
 import re, ipaddress
 from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.normalizer import normalize_all, decode_pdf_octal, decode_pdf_hex_names
+from analysis.signatures import SUSPICIOUS_URI_KEYWORDS
 
 # -----------------------------------------------------------------------
 # Threat Signatures
@@ -40,16 +41,6 @@ CONTENT_PATTERNS = {
 # -----------------------------------------------------------------------
 # Global Threat Constants
 # -----------------------------------------------------------------------
-
-SUSPICIOUS_URI_KEYWORDS = [
-    "javascript:", "vbscript:", "data:", "file://", "expect://", 
-    "smb://", "ftp://", "ldap://", "gopher://", "ms-msdt:", "search-ms:",
-    ".exe", ".bat", ".cmd", ".vbs", ".vbe", ".wsf", ".wsc", ".scr", 
-    ".ps1", ".sh", ".py", ".jar", ".msi", ".dll", ".sys", ".elf",
-    ".docm", ".xlsm", ".pptm",
-    "cmd.exe", "powershell", "wscript", "cscript", "mshta", 
-    "rundll32", "regsvr32", "certutil", "bitsadmin", "wmic"
-]
 
 # -----------------------------------------------------------------------
 # Aggregator Maps

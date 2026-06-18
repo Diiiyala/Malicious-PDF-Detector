@@ -2,32 +2,11 @@ import re
 from datetime import datetime
 from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.links import analyze_links
-
-SUSPICIOUS_WORDS = [
-    "exploit", "payload", "shell", "malware", "hack", "xss", "script", "eval", 
-    "dropper", "backdoor", "reverse_shell", "bind_shell", "stager", "obfuscated", 
-    "bypass", "noprofile", "hidden", "executionpolicy", "encodedcommand", 
-    "downloadstring", "cmd.exe", "/bin/sh", "/bin/bash", "socket", "pickle", 
-    "subprocess", "mimikatz", "pwdump", "keystroke", "keylogger", "credential", "token"
-]
-
-HACKING_TOOLS = [
-    "metasploit", "cobalt strike", "empire", "veil", "mimikatz", "powersploit",  
-    "nishang", "bloodhound", "beacon", "sherlock", "brute ratel", "sliper", 
-    "sqlmap", "nmap", "burp suite", "wireshark", "hydra", "aircrack", "responder", 
-    "kali linux", "parrot os", "backbox", "pentoo", "blackarch"
-]
-
-SUSPICIOUS_SOURCE_INDICATORS = [
-    "attacker", "malicious", "script", "exploit", "payload", "shell",
-    "dropper", "backdoor", "stager", "bypass", "encoded", "obfuscated",
-
-    "metasploit", "cobalt strike", "mimikatz", "powersploit", "empire",
-    "burp", "collaborator", "interact.sh", "jonaslejon", "deepzec",
-
-    "callback", "phone-home", "exfiltration", "tunneling", "beacon",
-    "injection", "unauthorized", "suspicious", "leak", "harvesting"
-]
+from analysis.signatures import (
+    SUSPICIOUS_WORDS,
+    HACKING_TOOLS,
+    SUSPICIOUS_SOURCE_INDICATORS,
+)
 
 TARGET_SOURCE_FIELDS = ["/Author", "/Creator", "/Producer"]
 

@@ -1,4 +1,5 @@
 import re
+from analysis.signatures import SHORTENERS, SUSPICIOUS_KEYWORDS, MALICIOUS_PARAMS
 
 IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
 URL_PATTERN = re.compile(r'\b(?:https?|ftp|ftps|file|smb|ssh|telnet|gopher|ldap|mailto|news|nntp|irc|data|javascript|ws|wss|vnd\.sun\.star\.expand)://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
@@ -10,10 +11,6 @@ JS_URL_PATTERN = re.compile(
     r'([^"\'\s\)\+]+)', 
     re.IGNORECASE
 )
-
-SHORTENERS = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "is.gd", "buff.ly", "adf.ly"]
-SUSPICIOUS_KEYWORDS = ["pastebin", "discordapp", "githubusercontent", "ngrok", "000webhost", "script", "image", "jonaslejon", "malicious-pdf", "deepzec", "modzero"]
-MALICIOUS_PARAMS = ["download", "payload", "sh", "py", "cmd", "php", "exe", "exec", "bin", "cSubmitAs", "cFS", "CHTTP", "xdpContent", "textEncoding", "cookie", "steal", "script"]
 
 def analyze_links(text):
     findings = []

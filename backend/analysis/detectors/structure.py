@@ -3,19 +3,10 @@ from collections import Counter
 from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.links import analyze_links
 from analysis.detectors.content import analyze_content
+from analysis.signatures import SUSPICIOUS_URI_KEYWORDS
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
-
-SUSPICIOUS_URI_KEYWORDS = [
-    "javascript:", "vbscript:", "data:", "file://", "expect://", 
-    "smb://", "ftp://", "ldap://", "gopher://", "ms-msdt:", "search-ms:",
-    ".exe", ".bat", ".cmd", ".vbs", ".vbe", ".wsf", ".wsc", ".scr", 
-    ".ps1", ".sh", ".py", ".jar", ".msi", ".dll", ".sys", ".elf",
-    ".docm", ".xlsm", ".pptm",
-    "cmd.exe", "powershell", "wscript", "cscript", "mshta", 
-    "rundll32", "regsvr32", "certutil", "bitsadmin", "wmic"
-]
 
 def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> list[Threat]:
     threats = []
