@@ -1,8 +1,8 @@
+import logging, pikepdf
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from io import BytesIO
 from pypdf import PdfReader
-import logging, pikepdf
 
 from analysis.core.analyzer import analyze_all_aspects
 
@@ -59,7 +59,8 @@ def upload_file():
                         if isinstance(obj, pikepdf.Stream):
                             try:
                                 all_extracted_content.extend(obj.read_bytes())
-                            except:
+                            except Exception as e:
+                                logger.debug("Could not read stream object during repair: %s", e)
                                 continue
                     
                     repaired_stream = BytesIO()
@@ -72,7 +73,8 @@ def upload_file():
                     
                     try:
                         _ = len(reader.pages)
-                    except:
+                    except Exception as e:
+                        logger.debug("Repaired PDF still unreadable: %s", e)
                         reader = None
                         
                     initial_structure_findings.append("ALERT: Malformed structure repaired and analyzed")

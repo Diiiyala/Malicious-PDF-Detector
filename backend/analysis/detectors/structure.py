@@ -1,9 +1,11 @@
-import re
+import re, logging
 from collections import Counter
 from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.links import analyze_links
 from analysis.detectors.content import analyze_content
 from analysis.signatures import SUSPICIOUS_URI_KEYWORDS
+
+logger = logging.getLogger(__name__)
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
 SUSPICIOUS_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
@@ -135,7 +137,8 @@ def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> lis
                             id="STR-ROOT-AF", category="Structure", severity=12,
                             description=f"PDF 2.0 Associated Files (/AF) detected: ({details_str})", location="Root Catalog"
                         ))
-                except:
+                except Exception as e:
+                    logger.debug("/AF (Associated Files) parsing failed: %s", e)
                     threats.append(Threat(
                         id="STR-ROOT-AF-FAIL", category="Structure", severity=12,
                         description="PDF 2.0 Associated Files (/AF) detected (Failed to parse details)", location="Root Catalog"
@@ -211,7 +214,8 @@ def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> lis
 def is_version_older(current, target):
         try:
             return tuple(map(int, current.split('.'))) < tuple(map(int, target.split('.')))
-        except:
+        except Exception as e:
+            logger.debug("PDF version comparison failed: %s", e)
             return False
         
         
@@ -421,13 +425,15 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
                         a_type_clean = str(a_type).replace("/", "")
                         desc = f"Form Field Action (/{a_type_clean}) pointing to: ({extracted_path})" if extracted_path else f"Form Field Action (/{a_type_clean})"
                         add_threat("STR-ACT-FORM-ACTION", 5, desc, f"Field: {field_name}")
-    except: pass
+    except Exception as e:
+        logger.debug("Form field action analysis failed: %s", e)
     
     # Analyze Outlines
     try:
         if root and "/Outlines" in root:
             check_outlines_recursive(root["/Outlines"].get_object(), add_threat)
-    except: pass
+    except Exception as e:
+        logger.debug("Outlines analysis failed: %s", e)
     
     # Aggregate results
     for (t_id, category, severity, desc), locations in threat_map.items():
@@ -494,9 +500,10 @@ def process_name_node(key, value_obj, threats, whitelist, untrusted_items, js_sc
                 id="STR-NAMES-EMPTY", category="Structure", severity=1, 
                 description=f"Entry [{key}] points to an empty object", location=f"NameTree: {category}"
             ))
-    except:
+    except Exception as e:
+        logger.debug("Name-tree walk failed: %s", e)
         threats.append(Threat(
-            id="STR-NAMES-CORRUPT", category="Structure", severity=7, 
+            id="STR-NAMES-CORRUPT", category="Structure", severity=7,
             description=f"Could not parse object for [{key}] - potential corruption", location=f"NameTree: {category}"
         ))
         
@@ -542,7 +549,8 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
         try:
             size_obj = reader.trailer.get("/Size", 100)
             all_obj_nums = range(1, int(size_obj))
-        except:
+        except Exception as e:
+            logger.debug("Trailer /Size unavailable, falling back to page estimate: %s", e)
             all_obj_nums = range(1, len(reader.pages) * 50)
 
     # ---------------------------------------------------------------------
@@ -578,7 +586,8 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                         for t in xml_threats:
                             t.location = f"{location_label} (Metadata XML)"
                             threats.append(t)
-                    except: pass
+                    except Exception as e:
+                        logger.debug("Metadata XML stream analysis failed: %s", e)
                     
                 # ----------------------------------------------------------
                 # 2. FontMatrix Injection Detection (CVE-2024-4367)
@@ -620,7 +629,8 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                         for t in c_threats:
                             t.location = f"{location_label} (JS Stream)"
                             threats.append(t)
-                    except: pass
+                    except Exception as e:
+                        logger.debug("JS stream analysis failed: %s", e)
                     
                 # ----------------------------------------------------------
                 # 5. XFA / FormCalc Injection
@@ -701,7 +711,8 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                                 found_keys = [k for k in ["/WC", "/WS", "/DS", "/WP", "/DP"] if k in aa_obj]
                                 if found_keys:
                                     add_threat("STR-OBJ-AA-SILENT", 12, f"Silent background trigger detected (Found: '{', '.join(found_keys)}')", location_label)
-                    except: pass
+                    except Exception as e:
+                        logger.debug("/AA silent-trigger analysis failed: %s", e)
 
                 if "/Names" in obj:
                     names = obj.get("/Names")
@@ -709,7 +720,8 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                         names_obj = names.get_object() if hasattr(names, "get_object") else names
                         if isinstance(names_obj, dict) and "/JavaScript" in names_obj:
                             add_threat("STR-OBJ-NAMES-JS", 12, "Document-level automatic execution trigger (/Names -> /JavaScript)", location_label)
-                    except: pass
+                    except Exception as e:
+                        logger.debug("/Names -> /JavaScript analysis failed: %s", e)
 
             # --------------------------------------------------------------
             # Process Individual Objects
@@ -719,7 +731,8 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                 for index, item in enumerate(obj, start=1):
                     process_obj(item, f"{location_label} (Element {index})")
 
-        except: pass
+        except Exception as e:
+            logger.debug("Object processing failed for %s: %s", location_label, e)
         
     # ---------------------------------------------------------------------
     # Iterate Through All PDF Objects
@@ -730,7 +743,9 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
             obj = reader.get_object(obj_num)
             if obj is not None:
                 process_obj(obj, f"Obj {obj_num}")
-        except: continue
+        except Exception as e:
+            logger.debug("Could not process object %s: %s", obj_num, e)
+            continue
 
     # ---------------------------------------------------------------------
     # Deep Font Scan Inside Pages
@@ -742,7 +757,8 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                 fonts = page["/Resources"]["/Font"].get_object()
                 for f_name in fonts:
                     process_obj(fonts[f_name], f"Page {i+1} Font:{f_name}")
-    except: pass
+    except Exception as e:
+        logger.debug("Page font processing failed: %s", e)
     
     # ---------------------------------------------------------------------
     # Build Final Threats

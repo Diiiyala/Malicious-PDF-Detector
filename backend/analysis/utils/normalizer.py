@@ -1,5 +1,7 @@
-import re, base64, urllib.parse
+import re, base64, urllib.parse, logging
 from analysis.utils.text_metrics import calculate_entropy
+
+logger = logging.getLogger(__name__)
 
 SUSPICIOUS_KEYS = [ "eval", "exec", "cmd", "powershell",
         "http", "https", "script", "function",
@@ -65,7 +67,8 @@ def decode_pdf_hex_names(text):
         try:
             hex_val = match.group(1)
             return bytes.fromhex(hex_val).decode('utf-8', errors='ignore')
-        except:
+        except Exception as e:
+            logger.debug("PDF hex-name decode failed: %s", e)
             return match.group(0)
 
     return re.sub(r'#([0-9a-fA-F]{2})', replace_hex, text)
@@ -134,7 +137,8 @@ def normalize_urls(text):
 
     try:
         text = urllib.parse.unquote(text)
-    except: pass
+    except Exception as e:
+        logger.debug("URL unquote failed: %s", e)
 
     text = re.sub(r'\[\.\]', '.', text, flags=re.IGNORECASE)
     text = re.sub(r'\(\.\)', '.', text, flags=re.IGNORECASE)
@@ -168,7 +172,8 @@ def decode_pdf_octal(text):
 def decode_unicode_escapes(text):
     try:
         return text.encode().decode('unicode_escape')
-    except:
+    except Exception as e:
+        logger.debug("unicode-escape decode failed: %s", e)
         return text
 
 
@@ -178,7 +183,8 @@ def decode_atob(text):
     def repl(m):
         try:
             return base64.b64decode(m.group(1)).decode('utf-8', errors='ignore')
-        except:
+        except Exception as e:
+            logger.debug("atob base64 decode failed: %s", e)
             return m.group(0)
 
     return re.sub(pattern, repl, text)
@@ -236,7 +242,9 @@ def decode_staged_base64(text, seen):
                     seen.add(b64)
                     new_parts.append(decoded)
 
-            except: continue
+            except Exception as e:
+                logger.debug("staged base64 decode failed: %s", e)
+                continue
 
     return text, new_parts
 
@@ -257,6 +265,8 @@ def decode_generic_base64(text, seen):
                 seen.add(m)
                 new_parts.append(decoded)
 
-        except: continue
+        except Exception as e:
+            logger.debug("generic base64 decode failed: %s", e)
+            continue
 
     return text, new_parts
