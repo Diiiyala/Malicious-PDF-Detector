@@ -1,6 +1,8 @@
-import re
+import logging, re
 from analysis.utils.models import ExtractedContent
 from analysis.utils.text_extractor import extract_text_and_visuals
+
+logger = logging.getLogger(__name__)
 
 def extract_all_data(reader, raw_file_content, filename) -> ExtractedContent:
     content = ExtractedContent(filename=filename, raw_binary=raw_file_content)
@@ -19,7 +21,7 @@ def extract_all_data(reader, raw_file_content, filename) -> ExtractedContent:
             content.has_malformed_pages_tree = text_data["malformed_tree"]
             
         except Exception as e:
-            print(f"Text extraction failed: {e}")
+            logger.warning("Text extraction failed: %s", e)
             content.extracted_text = ""
         
     # 3. URI
