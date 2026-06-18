@@ -2,7 +2,7 @@ from pdfminer.high_level import extract_text as pdfminer_extract
 import logging, re
 
 from analysis.core.extractor import extract_all_data
-from analysis.core.risk import calculate_risk
+from analysis.core.risk import calculate_risk, SEVERITY_MAX
 
 from analysis.utils.normalizer import normalize_all
 from analysis.utils.script_aggregator import ScriptAggregator
@@ -86,7 +86,7 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
     # -------------------------------------------------------------------------
     # 5. Risk Calculation
     # -------------------------------------------------------------------------
-    score, risk_percentage, level = calculate_risk(unique_threats)
+    score, risk_percentage, level, status = calculate_risk(unique_threats)
     
     # -------------------------------------------------------------------------
     # 6. Formatting Output 
@@ -101,7 +101,7 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
     }
 
     for t in unique_threats:
-        formatted_string = f"[Severity: {t.severity}/15] {t.description} | Location: {t.location}"
+        formatted_string = f"[Severity: {t.severity}/{SEVERITY_MAX}] {t.description} | Location: {t.location}"
         
         cat_key = t.category.lower()
         if "metadata" in cat_key: target_cat = "metadata"
@@ -118,7 +118,8 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
         "extracted_scripts": aggregator.get_all_scripts(),
         "risk_score": score,
         "risk_percentage": risk_percentage,
-        "risk_level": level
+        "risk_level": level,
+        "status": status
     }
     
 # ----------------------------------------------------------------------------
