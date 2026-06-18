@@ -305,13 +305,10 @@ function App() {
       }
 
       setTimeout(() => {
-        let maxSeverity = 0;
-        parsedThreats.forEach(t => {
-          const severityNumber = parseInt(t.risk.split('/')[0]);
-          if (severityNumber > maxSeverity) maxSeverity = severityNumber;
-        });
-        let fileStatus = 'safe';
-        if (parsedThreats.length > 0) fileStatus = maxSeverity >= 5 ? 'danger' : 'warning';
+        const validStatuses = ['safe', 'warning', 'danger'];
+        const fileStatus = validStatuses.includes(data.status)
+          ? data.status
+          : (parsedThreats.length === 0 ? 'safe' : 'warning');
 
         setScanResult({
           status: fileStatus,
