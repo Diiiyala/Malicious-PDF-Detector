@@ -1,8 +1,8 @@
-import re, math, base64, string
-from collections import Counter
+import re, base64, string
 from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.links import analyze_links
 from analysis.utils.normalizer import is_valid_decoded
+from analysis.utils.text_metrics import calculate_entropy
 
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
@@ -211,12 +211,6 @@ def _analyze_text_recursive(text: str, depth=0, aggregator=None) -> list[Threat]
 # -------------------------------------------------------------------------
 #  Helpers
 # -------------------------------------------------------------------------
-
-def calculate_entropy(data):
-    if not data: return 0
-    counts = Counter(data)
-    length = len(data)
-    return -sum((count/length) * math.log2(count/length) for count in counts.values())
 
 def check_obfuscation(text, compact_text):
     if not text: return False

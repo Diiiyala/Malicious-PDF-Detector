@@ -1,6 +1,5 @@
 import re, base64, urllib.parse
-from collections import Counter
-import math
+from analysis.utils.text_metrics import calculate_entropy
 
 SUSPICIOUS_KEYS = [ "eval", "exec", "cmd", "powershell",
         "http", "https", "script", "function",
@@ -212,13 +211,7 @@ def is_valid_decoded(text):
 
     return False
 
-
-def calculate_entropy(data):
-    counts = Counter(data)
-    length = len(data)
-    return -sum((c/length) * math.log2(c/length) for c in counts.values())
-
-# 5.1 Staged Base64 
+# 5.1 Staged Base64
 def decode_staged_base64(text, seen):
 
     patterns = [
