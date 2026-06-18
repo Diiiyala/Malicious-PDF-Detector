@@ -1,70 +1,13 @@
 import re, ipaddress
 from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.normalizer import normalize_all, decode_pdf_octal, decode_pdf_hex_names
-from analysis.signatures import SUSPICIOUS_URI_KEYWORDS
-
-# -----------------------------------------------------------------------
-# Threat Signatures
-# -----------------------------------------------------------------------
-
-STRUCTURE_PATTERNS = {
-    rb"/AA\s*<<\s*/O": ("Silent page trigger (/O or /C)", 12, "BIN-STR-SILENT"),
-    rb"/OpenAction": ("Automatic execution trigger (/OpenAction)", 10, "BIN-STR-OPEN"),
-    rb"/Launch": ("Annotation (/Launch)", 10, "BIN-STR-LAUNCH")
-}
-    
-CONTENT_PATTERNS = {
-    rb"/JS\s*\(": ("Suspicious Scripting found in malformed object", 11, "BIN-JS-MALFORMED"),
-    rb"/JavaScript": ("Suspicious Scripting found", 9, "BIN-JS"),
-    rb"/JS\b": ("Suspicious Scripting found", 9, "BIN-JS"),
-    rb"/SubmitForm": ("Form submission trigger (/SubmitForm) found in raw data", 11, "BIN-SUBMIT"),
-    rb"application/x-formcalc": ("Scripting indicators found in raw binary data (FormCalc)", 13, "BIN-FORMCALC"),
-    rb"<?xml-stylesheet": ("Scripting indicators found in raw binary data (XSLT/XML)", 13, "BIN-XSLT"),
-    rb"/RichMedia": ("RichMedia object (Potential exploit carrier) found in raw data", 10, "BIN-RICHMEDIA"),
-    rb"/Crypt": ("Custom encryption filter (/Crypt) found in raw data", 8, "BIN-CRYPT"),
-    rb"/JBIG2Decode": ("Suspicious compression filter (/JBIG2Decode) detected", 8, "BIN-JBIG2"),
-    rb"<template": ("Specific threats detected: XFA/SOAP Attack", 13, "BIN-XFA-SOAP"),
-    rb"<subform": ("Specific threats detected: XFA/SOAP Attack", 13, "BIN-XFA-SOAP"),
-    rb"<img\s+src=": ("XSS injection attempt detected via HTML tag", 12, "BIN-XSS"),
-    rb"onerror\s*=": ("XSS injection attempt detected via HTML tag", 12, "BIN-XSS"),
-    rb'method="soap"': ("Specific threats detected: XFA/SOAP Attack", 13, "BIN-XFA-SOAP"),
-    rb'soapAction': ("Specific threats detected: XFA/SOAP Attack", 13, "BIN-XFA-SOAP"),
-    rb"vnd\.sun\.star\.expand": ("Specific threats detected: Environment Leak Pattern (LibreOffice)", 12, "BIN-ENV-LEAK"),
-    rb"<!DOCTYPE": ("XXE Injection Attempt", 13, "BIN-XXE"),
-    rb"<!ENTITY": ("XXE Injection Attempt", 13, "BIN-XXE"),
-    rb"SYSTEM\s+[\"']": ("XXE Injection Attempt", 13, "BIN-XXE"),
-    rb"PUBLIC\s+[\"']": ("XXE Injection Attempt", 13, "BIN-XXE"),
-    rb"file://": ("XXE Injection Attempt", 13, "BIN-XXE"),
-    rb"expect://": ("XXE Injection Attempt", 13, "BIN-XXE"),
-}
- 
-# -----------------------------------------------------------------------
-# Global Threat Constants
-# -----------------------------------------------------------------------
-
-# -----------------------------------------------------------------------
-# Aggregator Maps
-# -----------------------------------------------------------------------
-   
-SCRIPT_TYPE_MAP = {
-    rb"/JavaScript": "JavaScript",
-    rb"/JS": "JavaScript",
-    rb"/JS\b": "JavaScript",
-    rb"/JS\s*\(": "JavaScript",
-    rb"application/x-formcalc": "XFA/FormCalc",
-    rb"<?xml-stylesheet": "XSLT/XML",
-    rb"<template": "XFA/XML-Form",
-    rb"<subform": "XFA/XML-Form",
-    rb'method="soap"': "XFA/SOAP Payload",
-    rb'soapAction': "XFA/SOAP Payload",
-    rb"<img\s+src=": "Stored XSS Payload",
-    rb"onerror\s*=": "Stored XSS Payload",
-    rb"vnd\.sun\.star\.expand": "Environment Leak Exploit",
-    rb"<!DOCTYPE": "XML/XXE Payload",
-    rb"<?xml": "XML/XXE Payload"
-}
-
-AGGREGATOR_PATTERNS = set(SCRIPT_TYPE_MAP.keys())
+from analysis.signatures import (
+    SUSPICIOUS_URI_KEYWORDS,
+    STRUCTURE_PATTERNS,
+    CONTENT_PATTERNS,
+    SCRIPT_TYPE_MAP,
+    AGGREGATOR_PATTERNS,
+)
 
 def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
     threats = []

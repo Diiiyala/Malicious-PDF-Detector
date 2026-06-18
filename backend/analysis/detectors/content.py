@@ -3,33 +3,10 @@ from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.links import analyze_links
 from analysis.utils.normalizer import is_valid_decoded
 from analysis.utils.text_metrics import calculate_entropy
+from analysis.signatures import EXEC_PATTERNS, SYSTEM_THREATS
 
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
-
-EXEC_PATTERNS = {
-    r"\beval\s*\(": ("eval() function", 12),
-    r"\bexec\s*\(": ("exec() function", 12),
-    r"String\.fromCharCode": ("Charcode obfuscation", 8),
-    r"app\s*(?:\.\s*openDoc|\[\s*['\"]openDoc['\"]\s*\])": ("Remote document opening", 11),
-    r"launchURL": ("URL launching", 11),
-    r"<\s*script": ("Embedded HTML Script tag", 12),
-    r"new\s+Image\s*\(": ("JS Beacon", 10),
-    r"new\s+WebSocket\s*\(": ("WebSocket C2 Channel", 12),
-    r"\bPost\s*\(\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']+[\"']\s*,\s*[\"']": ("FormCalc Post() Arbitrary Header Injection", 12)
-}
-
-SYSTEM_THREATS = {
-    "Parameter/Header Injection Attempt": ([r"textEncoding\s*=\s*.*?&#x(?:0D|0A|D|A);?", r"textEncoding\s*=\s*.*?\\r\\n", r"X-Injected"], 12),
-    "Ransomware Indicators": ([r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked"], 12),
-    "Registry Tampering": ([r"reg add", r"HKEY_LOCAL_MACHINE", r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"], 10),
-    "Security Disabling": ([r"netsh advfirewall", r"Set-MpPreference", r"DisableRealtimeMonitoring", r"taskkill /f /im"], 10),
-    "Stealer/Spyware": ([r"cookie", r"password", r"wallet\.dat", r"Login Data", r"autofill", r"getPageNthWord", r"getPageNumWords"], 10),
-    "Environment Leak": ([r"\$\{HOME\}", r"\.env", r"AWS_CREDENTIALS", r"vnd\.sun\.star\.expand"], 12), 
-    "XFA/SOAP Attack": ([r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT", r"<?xml-stylesheet"], 13),
-    "XXE Injection Attempt": ([r"<!ENTITY", r"SYSTEM\s+['\"]http", r"<!DOCTYPE"], 13),
-    "EICAR Standard Anti-Virus Test File": ([r"EICAR-STANDARD-ANTIVIRUS", r"X5O!P%@AP\[4\\PZX54\(P\^\)7CC\)7\}\$EICAR"], 15)
-}
 
 def analyze_content(content: ExtractedContent, aggregator=None) -> list[Threat]:
 
