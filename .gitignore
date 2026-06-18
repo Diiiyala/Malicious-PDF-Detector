@@ -1,28 +1,33 @@
-# Python cache
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.log
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.env
+.env.*
+!.env.example
+*.local
 __pycache__/
 *.pyc
 *.pyo
-
-# Virtual environment
+*.pyd
 venv/
 env/
 .venv/
-
-# IDE files
-.vscode/
-.idea/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Environment variables
-.env
-
-# React / Node.js
+.pytest_cache/
 node_modules
 dist
+dist-ssr
 package-lock.json
