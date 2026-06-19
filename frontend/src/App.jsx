@@ -116,20 +116,23 @@ const Icon = {
 };
 
 
-const ExpandableText = ({ text, maxLength = 150, isAr }) => {
+const ExpandableText = ({ text, maxLength = 150, isAr, forceExpand = false }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   if (!text || text.length <= maxLength) return <span>{text}</span>;
+  const expanded = isExpanded || forceExpand;
   return (
     <div className="inline-block">
       <span className="break-all whitespace-pre-wrap">
-        {isExpanded ? text : `${text.substring(0, maxLength)}...`}
+        {expanded ? text : `${text.substring(0, maxLength)}...`}
       </span>
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="inline-flex items-center text-brand-400 hover:text-brand-300 font-bold transition-colors text-sm mx-2"
-      >
-        {isExpanded ? (isAr ? 'عرض أقل' : 'Show Less') : (isAr ? 'قراءة المزيد' : 'Read More')}
-      </button>
+      {!forceExpand && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="inline-flex items-center text-brand-400 hover:text-brand-300 font-bold transition-colors text-sm mx-2"
+        >
+          {isExpanded ? (isAr ? 'عرض أقل' : 'Show Less') : (isAr ? 'قراءة المزيد' : 'Read More')}
+        </button>
+      )}
     </div>
   );
 };
@@ -251,6 +254,7 @@ function App() {
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [fileName, setFileName] = useState('');
   const [sharing, setSharing] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const resultRef = useRef(null);
 
   useEffect(() => {
@@ -370,8 +374,6 @@ function App() {
     setSharing(true);
 
     const node = resultRef.current;
-    // Temporarily expand any inner scroll areas so the capture shows the full
-    // content with no scrollbars.
     const scrollers = node.querySelectorAll('.overflow-x-auto, .overflow-y-auto, .overflow-auto');
     const restore = [];
     scrollers.forEach((el) => {
@@ -379,6 +381,9 @@ function App() {
       el.style.overflow = 'visible';
       el.style.maxHeight = 'none';
     });
+
+    setCapturing(true);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     try {
       const { toBlob } = await import('html-to-image');
@@ -413,6 +418,7 @@ function App() {
       if (e?.name !== 'AbortError') console.error('Share failed:', e);
     } finally {
       restore.forEach(([el, ov, mh]) => { el.style.overflow = ov; el.style.maxHeight = mh; });
+      setCapturing(false);
       setSharing(false);
     }
   };
@@ -698,7 +704,7 @@ function App() {
                             {scanResult.threats.map((threat) => (
                               <tr key={threat.id} className="hover:bg-white/[0.03] transition">
                                 <td className={`px-6 py-4 font-medium text-white ${isAr ? 'text-right' : 'text-left'}`}>
-                                  <ExpandableText text={threat.name} maxLength={120} isAr={isAr} />
+                                  <ExpandableText text={threat.name} maxLength={120} isAr={isAr} forceExpand={capturing} />
                                 </td>
                                 <td className={`px-6 py-4 ${isAr ? 'text-right' : 'text-left'}`}>
                                   <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">{threat.category}</span>
@@ -743,7 +749,7 @@ function App() {
                           </div>
                           <pre className="bg-black/40 p-5 overflow-x-auto" dir="ltr">
                             <code className="text-white font-mono text-sm leading-relaxed">
-                              <ExpandableText text={script.code} maxLength={300} isAr={isAr} />
+                              <ExpandableText text={script.code} maxLength={300} isAr={isAr} forceExpand={capturing} />
                             </code>
                           </pre>
                         </div>
