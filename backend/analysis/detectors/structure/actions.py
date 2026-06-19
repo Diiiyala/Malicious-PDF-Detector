@@ -51,7 +51,8 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
                         uri_val = str(oa_obj.get("/URI", "Unknown"))
                         add_threat("STR-ACT-OPEN-URI", 12, f"OpenAction triggers URI: {uri_val}", "Catalog")
 
-            except Exception as e: pass
+            except Exception as e:
+                logger.debug("OpenAction parsing failed: %s", e)
 
             if not action_traced:
                 add_threat("STR-ACT-OPENACTION", 11, "Automatic execution trigger (/OpenAction) detected", "Catalog")
