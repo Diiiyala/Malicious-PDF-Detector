@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 
 
@@ -73,6 +73,17 @@ const Icon = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}>
       <rect x="9" y="9" width="11" height="11" rx="2" />
       <path strokeLinecap="round" d="M5 15V5a2 2 0 012-2h10" />
+    </svg>
+  ),
+  share: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0L8 8m4-4l4 4" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4" />
+    </svg>
+  ),
+  scanFrame: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2M3 12h18" />
     </svg>
   ),
   scan: (p) => (
@@ -239,6 +250,8 @@ function App() {
   const [dots, setDots] = useState('');
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [fileName, setFileName] = useState('');
+  const [sharing, setSharing] = useState(false);
+  const resultRef = useRef(null);
 
   useEffect(() => {
     setTimeout(() => setIsLoaded(true), 100);
@@ -350,6 +363,58 @@ function App() {
       setCopiedIdx(idx);
       setTimeout(() => setCopiedIdx(null), 1500);
     } catch { /* ignore */ }
+  };
+
+  const shareResult = async () => {
+    if (!resultRef.current || sharing) return;
+    setSharing(true);
+
+    const node = resultRef.current;
+    // Temporarily expand any inner scroll areas so the capture shows the full
+    // content with no scrollbars.
+    const scrollers = node.querySelectorAll('.overflow-x-auto, .overflow-y-auto, .overflow-auto');
+    const restore = [];
+    scrollers.forEach((el) => {
+      restore.push([el, el.style.overflow, el.style.maxHeight]);
+      el.style.overflow = 'visible';
+      el.style.maxHeight = 'none';
+    });
+
+    try {
+      const { toBlob } = await import('html-to-image');
+      const blob = await toBlob(node, {
+        pixelRatio: 2,
+        backgroundColor: '#0d0d10',
+        cacheBust: true,
+        width: node.scrollWidth,
+        height: node.scrollHeight,
+        style: { overflow: 'visible' },
+      });
+      if (!blob) throw new Error('Capture returned no image');
+
+      const safeName = (fileName || 'result').replace(/\.pdf$/i, '');
+      const file = new File([blob], `scan-${safeName}.png`, { type: 'image/png' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Malicious PDF Detector',
+          text: isAr ? 'نتيجة فحص ملف PDF' : 'PDF scan result',
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      if (e?.name !== 'AbortError') console.error('Share failed:', e);
+    } finally {
+      restore.forEach(([el, ov, mh]) => { el.style.overflow = ov; el.style.maxHeight = mh; });
+      setSharing(false);
+    }
   };
 
   const tones = {
@@ -552,6 +617,7 @@ function App() {
         {/* Results state */}
         {appState === 'result' && scanResult && (
           <div className="w-full max-w-6xl animate-fade-up">
+            <div ref={resultRef} className="bg-ink rounded-2xl p-2 sm:p-4">
             {scanResult.status === 'safe' ? (
               <div className="tile p-12 text-center">
                 <div className="relative mx-auto mb-6 grid place-items-center w-24 h-24 rounded-full bg-safe/10 border border-safe/30">
@@ -687,8 +753,17 @@ function App() {
                 )}
               </div>
             )}
+            </div>
 
-            <div className="mt-10 text-center">
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={shareResult}
+                disabled={sharing}
+                className={`inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 px-7 py-3.5 rounded-2xl font-bold transition-all hover:-translate-y-0.5 ${sharing ? 'opacity-60 cursor-wait' : ''}`}
+              >
+                <Icon.share className="w-5 h-5" />
+                {sharing ? (isAr ? 'جارٍ التحضير...' : 'Preparing...') : (isAr ? 'مشاركة النتيجة' : 'Share result')}
+              </button>
               <button
                 onClick={() => {
                   setAppState('upload');
@@ -696,9 +771,9 @@ function App() {
                     document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }, 60);
                 }}
-                className="inline-flex items-center gap-2 bg-brand-gradient text-white px-8 py-3.5 rounded-2xl font-bold transition-all hover:-translate-y-0.5"
+                className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 px-8 py-3.5 rounded-2xl font-bold transition-all hover:-translate-y-0.5"
               >
-                <Icon.upload className="w-5 h-5" />
+                <Icon.scanFrame className="w-5 h-5" />
                 {isAr ? 'فحص ملف آخر' : 'Scan Another File'}
               </button>
             </div>
