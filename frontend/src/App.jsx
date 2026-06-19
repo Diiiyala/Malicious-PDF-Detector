@@ -238,6 +238,7 @@ function App() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [dots, setDots] = useState('');
   const [copiedIdx, setCopiedIdx] = useState(null);
+  const [fileName, setFileName] = useState('');
 
   useEffect(() => {
     setTimeout(() => setIsLoaded(true), 100);
@@ -258,6 +259,7 @@ function App() {
   const processFile = async (file) => {
     setAppState('scanning');
     setTerminalLines([]);
+    setFileName(file.name);
 
     const lines = isAr
       ? ["جاري إنشاء اتصال آمن مع الخادم...", "جاري رفع الملف لمحرك الفحص...", "جاري تحليل الهيكل والبيانات الوصفية..."]
@@ -515,6 +517,12 @@ function App() {
               <h2 className="text-2xl font-display font-bold">
                 {isAr ? 'جاري الفحص' : 'Scanning'}<span className="text-brand-400">{dots}</span>
               </h2>
+              {fileName && (
+                <div className="mt-3 inline-flex items-center gap-2 max-w-full glass border border-white/10 rounded-xl px-3 py-1.5" dir="ltr">
+                  <Icon.layers className="w-4 h-4 text-brand-400 shrink-0" />
+                  <span className="text-sm text-slate-300 truncate font-mono" title={fileName}>{fileName}</span>
+                </div>
+              )}
             </div>
 
             <div className="relative glass border border-white/10 rounded-2xl p-6 shadow-2xl font-mono text-sm md:text-base overflow-hidden">
@@ -555,6 +563,12 @@ function App() {
                 <p className="relative text-slate-300 max-w-xl mx-auto">
                   {isAr ? 'لم يتم العثور على أي تهديدات أو أنماط مشبوهة داخل هذا الملف.' : 'No threats or suspicious patterns were found in this file.'}
                 </p>
+                {fileName && (
+                  <div className="relative mt-5 inline-flex items-center gap-2 max-w-full glass border border-white/10 rounded-xl px-3 py-1.5" dir="ltr">
+                    <Icon.layers className="w-4 h-4 text-safe shrink-0" />
+                    <span className="text-sm text-slate-300 truncate font-mono" title={fileName}>{fileName}</span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="grid md:grid-cols-3 gap-4">
@@ -577,8 +591,13 @@ function App() {
                         <h2 className={`text-3xl font-display font-bold mb-2 ${t.text}`}>{headline}</h2>
                         <p className="text-slate-400">{sub}</p>
                         <div className={`flex flex-wrap gap-3 mt-6 ${isAr ? 'flex-row-reverse' : ''}`}>
-                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5"><Icon.alert className="w-4 h-4 text-slate-500" />{scanResult.threats.length} {isAr ? 'تهديد' : 'threats'}</span>
-                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5"><Icon.code className="w-4 h-4 text-slate-500" />{scanResult.extractedScripts.length} {isAr ? 'سكريبت' : 'scripts'}</span>
+                          {fileName && (
+                            <span className="inline-flex items-center gap-2 max-w-[16rem] text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono" dir="ltr" title={fileName}>
+                              <Icon.layers className="w-4 h-4 text-slate-500 shrink-0" /><span className="truncate">{fileName}</span>
+                            </span>
+                          )}
+                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.alert className="w-4 h-4 text-slate-500" />{scanResult.threats.length} {isAr ? 'تهديد' : 'threats'}</span>
+                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.code className="w-4 h-4 text-slate-500" />{scanResult.extractedScripts.length} {isAr ? 'سكريبت' : 'scripts'}</span>
                         </div>
                       </div>
 
