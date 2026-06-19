@@ -106,7 +106,8 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                             for t in xfa_threats:
                                 t.location = f"{location_label} (XFA Stream)"
                                 threats.append(t)
-                    except Exception: pass
+                    except Exception as e:
+                        logger.debug("XFA stream analysis failed: %s", e)
 
                 # 6. Suspicious Compression Filters
                 filt = obj.get("/Filter")
@@ -134,7 +135,8 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                                     for t in emb_threats:
                                         t.location = f"{location_label} (Embedded File)"
                                         threats.append(t)
-                    except Exception: pass
+                    except Exception as e:
+                        logger.debug("Embedded-file stream analysis failed: %s", e)
 
                 # 8. Recursive Traversal of Nested Objects / Arrays
                 for key, value in obj.items():
