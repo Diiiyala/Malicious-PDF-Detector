@@ -441,7 +441,7 @@ function App() {
             {/* Feature tiles */}
             {[
               { icon: Icon.scan, ar: 'تحليل الهيكل', en: 'Structure analysis', arD: 'فحص الكائنات وهيكل المستند', enD: 'Objects & document tree' },
-              { icon: Icon.code, ar: 'كشف السكريبتات', en: 'Script detection', arD: 'جافاسكربت والأكواد المضمّنة', enD: 'JavaScript & embedded code' },
+              { icon: Icon.code, ar: 'كشف السكريبتات', en: 'Script detection', arD: 'جافاسكريبت والأكواد المضمّنة', enD: 'JavaScript & embedded code' },
               { icon: Icon.bolt, ar: 'نتائج فورية', en: 'Instant results', arD: 'تقرير مفصّل خلال ثوانٍ', enD: 'A detailed report in seconds' },
             ].map((f, i) => {
               const F = f.icon;
@@ -596,8 +596,8 @@ function App() {
                               <Icon.layers className="w-4 h-4 text-slate-500 shrink-0" /><span className="truncate">{fileName}</span>
                             </span>
                           )}
-                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.alert className="w-4 h-4 text-slate-500" />{scanResult.threats.length} {isAr ? 'تهديد' : 'threats'}</span>
-                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.code className="w-4 h-4 text-slate-500" />{scanResult.extractedScripts.length} {isAr ? 'سكريبت' : 'scripts'}</span>
+                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.alert className="w-4 h-4 text-slate-500" />{scanResult.threats.length} {isAr ? 'تهديدات' : 'threats'}</span>
+                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.code className="w-4 h-4 text-slate-500" />{scanResult.extractedScripts.length} {isAr ? 'سكريبتات' : 'scripts'}</span>
                         </div>
                       </div>
 
@@ -720,8 +720,8 @@ function App() {
           <div className="grid md:grid-cols-3 gap-4">
             {[
               { n: '01', icon: Icon.upload, enT: 'Upload a PDF', arT: 'ارفع ملف PDF', enD: 'Drag and drop your file or browse to select it.', arD: 'اسحب وأفلت الملف أو اختره من جهازك.' },
-              { n: '02', icon: Icon.scan, enT: 'Deep analysis', arT: 'تحليل عميق', enD: 'The engine inspects structure, scripts, links, and metadata.', arD: 'يفحص المحرك الهيكل والسكربتات والروابط والبيانات الوصفية.' },
-              { n: '03', icon: Icon.layers, enT: 'Get your report', arT: 'احصل على تقريرك', enD: 'See detected threats, a risk score, and any extracted scripts.', arD: 'اطّلع على التهديدات ودرجة الخطورة والسكربتات المستخرجة.' },
+              { n: '02', icon: Icon.scan, enT: 'Deep analysis', arT: 'تحليل عميق', enD: 'The engine inspects structure, scripts, links, and metadata.', arD: 'يفحص المحرك الهيكل والسكريبتات والروابط والبيانات الوصفية.' },
+              { n: '03', icon: Icon.layers, enT: 'Get your report', arT: 'احصل على تقريرك', enD: 'See detected threats, a risk score, and any extracted scripts.', arD: 'اطّلع على التهديدات ودرجة الخطورة والسكريبتات المستخرجة.' },
             ].map((s, i) => {
               const S = s.icon;
               return (
@@ -746,7 +746,7 @@ function App() {
               <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
                 {[
                   { en: 'Document structure and objects', ar: 'هيكل المستند وكائناته' },
-                  { en: 'JavaScript and embedded scripts', ar: 'السكربتات وأكواد جافاسكربت' },
+                  { en: 'JavaScript and embedded scripts', ar: 'السكريبتات وأكواد جافاسكريبت' },
                   { en: 'Suspicious links and URIs', ar: 'الروابط والعناوين المشبوهة' },
                   { en: 'Launch and embedded-file actions', ar: 'إجراءات التشغيل والملفات المضمّنة' },
                   { en: 'Metadata and encoding anomalies', ar: 'شذوذ البيانات الوصفية والترميز' },
