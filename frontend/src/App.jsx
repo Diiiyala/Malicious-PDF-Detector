@@ -583,14 +583,14 @@ function App() {
                     : (isAr ? 'يحتوي هذا الملف على عناصر خبيثة ومؤشرات اختراق.' : 'This file contains malicious elements and indicators of compromise.');
                   return (
                     <>
-                      <div className={`tile md:col-span-2 p-8 flex flex-col justify-center ${isAr ? 'text-right items-end' : 'items-start'}`}>
+                      <div className={`tile md:col-span-2 p-8 flex flex-col justify-center items-start ${isAr ? 'text-right' : ''}`}>
                         <div className={`inline-flex items-center gap-2 ${t.pill} border rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider mb-4`}>
                           <Icon.alert className="w-3.5 h-3.5" />
                           {isAr ? 'تقرير الفحص' : 'Scan Report'}
                         </div>
                         <h2 className={`text-3xl font-display font-bold mb-2 ${t.text}`}>{headline}</h2>
                         <p className="text-slate-400">{sub}</p>
-                        <div className={`flex flex-wrap gap-3 mt-6 ${isAr ? 'flex-row-reverse' : ''}`}>
+                        <div className="flex flex-wrap gap-3 mt-6">
                           {fileName && (
                             <span className="inline-flex items-center gap-2 max-w-[16rem] text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono" dir="ltr" title={fileName}>
                               <Icon.layers className="w-4 h-4 text-slate-500 shrink-0" /><span className="truncate">{fileName}</span>
