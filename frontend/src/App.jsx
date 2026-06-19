@@ -211,7 +211,7 @@ const ScanIllustration = ({ isAr }) => {
             </div>
             <div className="text-left">
               <div className="text-lg font-display font-bold text-white leading-none transition-all">{found}</div>
-              <div className="text-[10px] text-slate-400 uppercase tracking-wider">{isAr ? 'تهديد' : 'threats'}</div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider">{isAr ? 'تهديدات' : 'threats'}</div>
             </div>
           </div>
 
