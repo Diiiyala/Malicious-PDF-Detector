@@ -1,17 +1,19 @@
-import logging
+import logging, math
 logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------
 # Constants for Visual Anomaly Detection
 # -------------------------------------------------------------------------
 MIN_VISIBLE_FONT_SIZE = 1.0
-OUT_OF_BOUNDS_THRESHOLD = -50
+OFF_CANVAS_MARGIN = 72
+DEFAULT_PAGE_BOUNDS = (0.0, 0.0, 612.0, 792.0)
 
 def extract_text_and_visuals(reader):
     full_text = []
     visual_anomalies = []
     image_only_pages = []
     has_malformed_tree = False
+    page_bounds = DEFAULT_PAGE_BOUNDS
 
     # -------------------------------------------------------------------------
     # Internal Visitor Function
@@ -21,48 +23,53 @@ def extract_text_and_visuals(reader):
             return
 
         clean_text = text.strip()
-        x, y = tm[4], tm[5]
 
-        # ----------------------------
-        # Transformation analysis
-        # ----------------------------
-        if cm and len(cm) >= 4:
-            scale_x = cm[0]
-            scale_y = cm[3]
-            rotation_a = cm[1]
-            rotation_b = cm[2]
+        if not cm or len(cm) < 6:
+            cm = [1, 0, 0, 1, 0, 0]
 
-            if rotation_a != 0 or rotation_b != 0:
-                visual_anomalies.append({"type": "transformation", "details": "rotation/skew"})
+        # Composed 2x2 linear part (controls size / rotation / mirroring)
+        a = tm[0] * cm[0] + tm[1] * cm[2]
+        b = tm[0] * cm[1] + tm[1] * cm[3]
+        c = tm[2] * cm[0] + tm[3] * cm[2]
+        d = tm[2] * cm[1] + tm[3] * cm[3]
 
-            if scale_x < 0 or scale_y < 0:
-                visual_anomalies.append({"type": "flipped", "details": "mirrored text"})
+        # Composed origin (true device position of the text)
+        dx = tm[4] * cm[0] + tm[5] * cm[2] + cm[4]
+        dy = tm[4] * cm[1] + tm[5] * cm[3] + cm[5]
 
-        # ----------------------------
-        # Font analysis
-        # ----------------------------
-        if font_dict:
-            encoding = str(font_dict.get('/Encoding', 'Standard')).lower()
-            if any(target in encoding for target in ['identity', 'custom', 'difference']):
-                visual_anomalies.append({"type": "encoding", "details": encoding})
+        det = a * d - b * c
+        eff_scale = math.sqrt(abs(det))
+        nominal = font_size if (font_size and font_size > 0) else 1.0
+        eff_size = nominal * eff_scale
 
-        # ----------------------------
+        # ----------------------------------------------------------------------
+        # Transformation / mirroring
+        # ----------------------------------------------------------------------
+        if abs(b) > 1e-6 or abs(c) > 1e-6:
+            visual_anomalies.append({"type": "transformation", "details": "rotation/skew"})
+        if det < 0:
+            visual_anomalies.append({"type": "flipped", "details": "mirrored text"})
+
+        # ----------------------------------------------------------------------
         # Hidden text detection
-        # ----------------------------
-        if font_size is not None and font_size < MIN_VISIBLE_FONT_SIZE:
+        # ----------------------------------------------------------------------
+        if eff_scale <= 1e-3 or eff_size < MIN_VISIBLE_FONT_SIZE:
             visual_anomalies.append({
                 "type": "tiny_font",
-                "size": font_size,
+                "size": round(eff_size, 3),
                 "text": clean_text[:50]
             })
 
-        elif x < OUT_OF_BOUNDS_THRESHOLD or y < OUT_OF_BOUNDS_THRESHOLD:
-            visual_anomalies.append({
-                "type": "off_canvas",
-                "x": int(x),
-                "y": int(y),
-                "text": clean_text[:50]
-            })
+        else:
+            x0, y0, x1, y1 = page_bounds
+            m = OFF_CANVAS_MARGIN
+            if dx < x0 - m or dx > x1 + m or dy < y0 - m or dy > y1 + m:
+                visual_anomalies.append({
+                    "type": "off_canvas",
+                    "x": int(dx),
+                    "y": int(dy),
+                    "text": clean_text[:50]
+                })
 
         full_text.append(text)
 
@@ -78,6 +85,12 @@ def extract_text_and_visuals(reader):
             has_malformed_tree = True
 
         for i, page in pages_iterator:
+            try:
+                box = page.cropbox if page.cropbox is not None else page.mediabox
+                page_bounds = (float(box[0]), float(box[1]), float(box[2]), float(box[3]))
+            except Exception:
+                page_bounds = DEFAULT_PAGE_BOUNDS
+
             text_count_before = len(full_text)
             try:
                 page.extract_text(visitor_text=text_inspection_visitor)
