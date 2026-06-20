@@ -60,7 +60,8 @@ def analyze_links(text):
             findings.append(f"ALERT: Direct IP access detected: {domain}")
             indicators["network"] = True
 
-        if any(s in domain for s in SHORTENERS) or any(k in domain for k in SUSPICIOUS_KEYWORDS):
+        is_shortener = any(domain == s or domain.endswith("." + s) for s in SHORTENERS)
+        if is_shortener or any(k in domain for k in SUSPICIOUS_KEYWORDS):
             suspicious_hosts.append(domain)
             indicators["network"] = True
         
