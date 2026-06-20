@@ -194,25 +194,17 @@ def decode_atob(text):
 # -------------------------------------------------------------------------
 
 def is_valid_decoded(text):
-    if not text or len(text) < 10:
+    if not text or len(text) < 12:
         return False
 
-    printable_ratio = sum(c.isprintable() for c in text) / len(text)
-
-    if printable_ratio < 0.6:
+    ascii_printable = sum(1 for c in text if 32 <= ord(c) <= 126 or c in "\t\n\r")
+    if ascii_printable / len(text) < 0.85:
         return False
 
-    entropy = calculate_entropy(text)
+    if calculate_entropy(text) > 5.2:
+        return False
 
-    has_suspicious = any(k in text.lower() for k in SUSPICIOUS_KEYS)
-    
-    if entropy > 4.5:
-        return True
-
-    if entropy > 3.0 and has_suspicious:
-        return True
-
-    if has_suspicious and len(text) > 15:
+    if any(k in text.lower() for k in SUSPICIOUS_KEYS) and len(text) > 15:
         return True
 
     return False
