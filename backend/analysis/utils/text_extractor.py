@@ -62,8 +62,9 @@ def extract_text_and_visuals(reader):
 
         else:
             x0, y0, x1, y1 = page_bounds
-            m = OFF_CANVAS_MARGIN
-            if dx < x0 - m or dx > x1 + m or dy < y0 - m or dy > y1 + m:
+            mx = max(OFF_CANVAS_MARGIN, x1 - x0)
+            my = max(OFF_CANVAS_MARGIN, y1 - y0)
+            if dx < x0 - mx or dx > x1 + mx or dy < y0 - my or dy > y1 + my:
                 visual_anomalies.append({
                     "type": "off_canvas",
                     "x": int(dx),
