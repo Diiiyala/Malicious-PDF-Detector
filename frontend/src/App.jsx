@@ -240,6 +240,7 @@ const ScanIllustration = ({ isAr }) => {
   );
 };
 
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB, matches the backend limit
 
 function App() {
   const [lang, setLang] = useState('en');
@@ -255,6 +256,7 @@ function App() {
   const [fileName, setFileName] = useState('');
   const [sharing, setSharing] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [scanFailed, setScanFailed] = useState(false);
   const resultRef = useRef(null);
 
   useEffect(() => {
@@ -277,20 +279,28 @@ function App() {
     setAppState('scanning');
     setTerminalLines([]);
     setFileName(file.name);
+    setScanFailed(false);
 
     const lines = isAr
       ? ["جاري إنشاء اتصال آمن مع الخادم...", "جاري رفع الملف لمحرك الفحص...", "جاري تحليل الهيكل والبيانات الوصفية..."]
       : ["Establishing secure connection...", "Uploading file to analysis engine...", "Analyzing structure and metadata..."];
 
-    lines.forEach((line, index) => {
-      setTimeout(() => setTerminalLines(prev => [...prev, line]), index * 800);
-    });
+    const progressTimers = lines.map((line, index) =>
+      setTimeout(() => setTerminalLines(prev => [...prev, line]), index * 800)
+    );
 
     try {
       const formData = new FormData();
       formData.append("file", file);
       const response = await fetch("http://localhost:5000/upload", { method: "POST", body: formData });
-      if (!response.ok) throw new Error("Scan failed on server");
+      if (!response.ok) {
+        let serverMsg = "";
+        try { serverMsg = (await response.json())?.error || ""; } catch { /* no JSON body */ }
+        const err = new Error(serverMsg || "Scan failed on server");
+        err.serverReached = true;
+        err.tooLarge = response.status === 413;
+        throw err;
+      }
       const data = await response.json();
 
       setTimeout(() => {
@@ -338,16 +348,33 @@ function App() {
         setAppState('result');
       }, (lines.length * 800) + 1000);
     } catch (error) {
-      setTimeout(() => {
-        setTerminalLines(prev => [...prev, isAr ? "[ERROR] فشل الاتصال! تأكدي من تشغيل خادم Flask." : "[ERROR] Connection failed! Ensure Flask is running."]);
-      }, 1000);
+      progressTimers.forEach(clearTimeout);
+      let msg;
+      if (error?.tooLarge) {
+        msg = isAr ? "[ERROR] الملف كبير جدًا، الحد الأقصى 100 ميجابايت." : "[ERROR] File too large, maximum size is 100 MB.";
+      } else if (error?.serverReached) {
+        msg = isAr ? "[ERROR] فشل الفحص على الخادم." : "[ERROR] Scan failed on the server.";
+      } else {
+        msg = isAr ? "[ERROR] فشل الاتصال! تأكد من تشغيل خادم Flask." : "[ERROR] Connection failed! Ensure Flask is running.";
+      }
+      setScanFailed(true);
+      setTerminalLines([msg]);
       console.error("Upload error:", error);
     }
   };
 
   const onDrop = useCallback(acceptedFiles => {
     setUploadError(null);
-    if (acceptedFiles.length > 0) processFile(acceptedFiles[0]);
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setUploadError(isAr
+        ? "الملف كبير جدًا، الحد الأقصى 100 ميجابايت."
+        : "File too large, maximum size is 100 MB.");
+      return;
+    }
+    processFile(file);
   }, [isAr]);
 
   const onDropRejected = useCallback((fileRejections) => {
@@ -603,11 +630,13 @@ function App() {
           <div className="w-full max-w-3xl animate-fade-in">
             <div className="flex flex-col items-center mb-8">
               <div className="relative grid place-items-center w-24 h-24 mb-4">
-                <div className="absolute inset-0 rounded-full border-2 border-white/10 border-t-brand-400 animate-spin-slow" />
-                <Icon.scan className="w-9 h-9 text-slate-300" />
+                <div className={`absolute inset-0 rounded-full border-2 ${scanFailed ? 'border-danger/40' : 'border-white/10 border-t-brand-400 animate-spin-slow'}`} />
+                <Icon.scan className={`w-9 h-9 ${scanFailed ? 'text-danger' : 'text-slate-300'}`} />
               </div>
               <h2 className="text-2xl font-display font-bold">
-                {isAr ? 'جاري الفحص' : 'Scanning'}<span className="text-brand-400">{dots}</span>
+                {scanFailed
+                  ? (isAr ? 'فشل الفحص' : 'Scan Failed')
+                  : <>{isAr ? 'جاري الفحص' : 'Scanning'}<span className="text-brand-400">{dots}</span></>}
               </h2>
               {fileName && (
                 <div className="mt-3 inline-flex items-center gap-2 max-w-full glass border border-white/10 rounded-xl px-3 py-1.5" dir="ltr">
@@ -631,13 +660,35 @@ function App() {
                       {isError
                         ? <Icon.alert className="w-4 h-4 text-danger shrink-0" />
                         : <Icon.check className="w-4 h-4 text-brand-400 shrink-0" />}
-                      <span className={isError ? 'text-danger' : 'text-slate-300'}>{line}</span>
+                      <span className={isError ? 'text-danger' : 'text-slate-300'}>{isError ? line.replace(/\[ERROR\]\s*/i, '') : line}</span>
                     </div>
                   );
                 })}
-                <div className="inline-block text-brand-400 font-bold text-xl tracking-widest min-w-[32px]" dir="ltr">{dots}</div>
+                {!scanFailed && (
+                  <div className="inline-block text-brand-400 font-bold text-xl tracking-widest min-w-[32px]" dir="ltr">{dots}</div>
+                )}
               </div>
             </div>
+
+            {scanFailed && (
+              <div className="flex justify-center mt-8">
+                <button
+                  onClick={() => {
+                    setScanFailed(false);
+                    setTerminalLines([]);
+                    setFileName('');
+                    setAppState('upload');
+                    setTimeout(() => {
+                      document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 60);
+                  }}
+                  className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 px-8 py-3.5 rounded-2xl font-bold transition-all hover:-translate-y-0.5"
+                >
+                  <Icon.scanFrame className="w-5 h-5" />
+                  {isAr ? 'فحص ملف آخر' : 'Scan Another File'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

@@ -3,12 +3,20 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from io import BytesIO
 from pypdf import PdfReader
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from analysis.core.analyzer import analyze_all_aspects
 
+MAX_UPLOAD_MB = 100
+
 app = Flask(__name__)
 CORS(app)
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_MB * 1024 * 1024
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def file_too_large(_e):
+    return jsonify({"error": f"File too large, maximum size is {MAX_UPLOAD_MB} MB."}), 413
 
 logging.basicConfig(
     level=logging.INFO,
