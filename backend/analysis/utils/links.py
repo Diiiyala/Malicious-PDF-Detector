@@ -49,7 +49,7 @@ def analyze_links(text):
     for url in urls:
         c_url = url.strip('()<>[]"\'').lower()
         
-        if any(x in c_url for x in MALICIOUS_PARAMS):
+        if any(re.search(r'\b' + re.escape(x) + r'\b', c_url) for x in MALICIOUS_PARAMS):
             findings.append(f"ALERT: Suspicious link detected ({url})")
             indicators["network"] = True
             
