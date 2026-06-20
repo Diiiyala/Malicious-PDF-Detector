@@ -76,7 +76,17 @@ EXEC_PATTERNS = {
 
 SYSTEM_THREATS = {
     "Parameter/Header Injection Attempt": ([r"textEncoding\s*=\s*.*?&#x(?:0D|0A|D|A);?", r"textEncoding\s*=\s*.*?\\r\\n", r"X-Injected"], 12),
-    "Ransomware Indicators": ([r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked\b"], 12),
+    "Ransomware Indicators": ([
+        r"\byour\s+(?:files|documents|photos|videos|important\s+files|personal\s+files)\b[^.\n]{0,40}\bencrypted\b",
+        r"\bdecrypt\s+(?:all\s+)?your\s+(?:files|documents|data)\b",
+        r"\b(?:buy|purchase|get|obtain)\s+(?:the\s+)?decrypt(?:or|ion\s+(?:tool|software|key))\b",
+        r"\bpay\b[^.\n]{0,40}\b(?:ransom|bitcoin|btc|monero)\b[^.\n]{0,40}\b(?:decrypt|recover|unlock)\b",
+        r"\byour\s+(?:files|documents|network)\b[^.\n]{0,30}\b(?:no\s+longer|not)\s+accessible\b",
+        r"\b(?:how[\s_-]?to[\s_-]?decrypt|decrypt[\s_-]?instructions?|help[\s_-]?(?:to[\s_-]?)?decrypt|restore[\s_-]?(?:my[\s_-]?)?files?|read[\s_-]?me[\s_-]?decrypt)\b",
+        r"recover_files",
+        r"private_key",
+        r"\.(?:locked|crypted|crypt|cryptolocker|cryptowall|teslacrypt|wannacry|wncry|wcry|locky|zepto|odin|cerber|aesir|thor|vault|petya|ryuk|revil|sodinokibi|conti|lockbit|darkside|phobos|dharma|gandcrab|makop|avaddon|egregor|clop)\b",
+    ], 12),
     "Registry Tampering": ([r"reg add", r"HKEY_LOCAL_MACHINE", r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"], 10),
     "Security Disabling": ([r"netsh advfirewall", r"Set-MpPreference", r"DisableRealtimeMonitoring", r"taskkill /f /im"], 10),
     "Stealer/Spyware": ([
