@@ -126,7 +126,10 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                             raw_stream_data = obj.get_data()
                             if raw_stream_data:
                                 decoded_stream_text = raw_stream_data.decode('utf-8', errors='ignore')
-                                if any(k in decoded_stream_text.lower() for k in ["<script", "html", "javascript:"]):
+                                control = sum(1 for c in decoded_stream_text if ord(c) < 32 and c not in "\t\r\n")
+                                text_like = decoded_stream_text and (control / len(decoded_stream_text)) <= 0.05
+                                has_markup = any(k in decoded_stream_text.lower() for k in ["<script", "<html", "javascript:"])
+                                if text_like and has_markup:
                                     if aggregator:
                                         aggregator.add_script(decoded_stream_text, f"{location_label} (Embedded)", script_type="Embedded HTML/JS Payload")
 
