@@ -76,7 +76,7 @@ EXEC_PATTERNS = {
 
 SYSTEM_THREATS = {
     "Parameter/Header Injection Attempt": ([r"textEncoding\s*=\s*.*?&#x(?:0D|0A|D|A);?", r"textEncoding\s*=\s*.*?\\r\\n", r"X-Injected"], 12),
-    "Ransomware Indicators": ([r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked"], 12),
+    "Ransomware Indicators": ([r"decrypt", r"encrypt", r"private_key", r"recover_files", r"\.locked\b"], 12),
     "Registry Tampering": ([r"reg add", r"HKEY_LOCAL_MACHINE", r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"], 10),
     "Security Disabling": ([r"netsh advfirewall", r"Set-MpPreference", r"DisableRealtimeMonitoring", r"taskkill /f /im"], 10),
     "Stealer/Spyware": ([
@@ -84,7 +84,7 @@ SYSTEM_THREATS = {
         r"getField\s*\(\s*[\"'][^\"']*(?:pass(?:word|wd)?|pwd|cookie|secret|token|otp|pin|cvv|ssn|card)[^\"']*[\"']",
         r"getPageNthWord(?:Quads)?\s*\(", r"getPageNumWords\s*\(", r"wallet\.dat", r"[\\/]Login Data\b", r"[\\/]Local State\b",
         r"key[34]\.db", r"logins\.json", r"signons\.sqlite", r"cookies\.sqlite", r"\.kdbx\b", r"\.keystore\b", ], 10),
-    "Environment Leak": ([r"\$\{HOME\}", r"\.env", r"AWS_CREDENTIALS", r"vnd\.sun\.star\.expand"], 12),
+    "Environment Leak": ([r"\$\{HOME\}", r"\.env\b", r"AWS_CREDENTIALS", r"vnd\.sun\.star\.expand"], 12),
     "XFA/SOAP Attack": ([r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT", r"<?xml-stylesheet"], 13),
     "XXE Injection Attempt": ([r"<!ENTITY", r"SYSTEM\s+['\"]http", r"<!DOCTYPE"], 13),
     "EICAR Standard Anti-Virus Test File": ([r"EICAR-STANDARD-ANTIVIRUS", r"X5O!P%@AP\[4\\PZX54\(P\^\)7CC\)7\}\$EICAR"], 15)
