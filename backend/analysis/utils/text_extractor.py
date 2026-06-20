@@ -43,13 +43,6 @@ def extract_text_and_visuals(reader):
         eff_size = nominal * eff_scale
 
         # ----------------------------------------------------------------------
-        # Transformation / mirroring
-        # ----------------------------------------------------------------------
-        if abs(b) > 1e-6 or abs(c) > 1e-6:
-            visual_anomalies.append({"type": "transformation", "details": "rotation/skew"})
-        if det < 0:
-            visual_anomalies.append({"type": "flipped", "details": "mirrored text"})
-
         # ----------------------------------------------------------------------
         # Hidden text detection
         # ----------------------------------------------------------------------
