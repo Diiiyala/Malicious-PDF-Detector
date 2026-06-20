@@ -32,14 +32,5 @@ def detect_text_anomalies(content: ExtractedContent) -> list[Threat]:
                 description=f"Hidden text detected (Off-Canvas at {anomaly.get('x')},{anomaly.get('y')}): '{anomaly.get('text')}'",
                 location="Text Elements"
             ))
-            
-        elif a_type == "transformation":
-            threats.append(Threat(
-                id="TXT-TRANSFORM",
-                category="Text Extraction",
-                severity=3,
-                description=f"Text transformation detected ({anomaly.get('details')})",
-                location="Text Elements"
-            ))           
 
     return threats
