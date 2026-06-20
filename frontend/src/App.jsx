@@ -369,21 +369,36 @@ function App() {
     } catch { /* ignore */ }
   };
 
+
   const shareResult = async () => {
     if (!resultRef.current || sharing) return;
     setSharing(true);
 
     const node = resultRef.current;
+    const parent = node.parentNode;
+    const rect = node.getBoundingClientRect();
+
+    const placeholder = node.cloneNode(true);
+    parent.insertBefore(placeholder, node);
+
+    const prev = {
+      position: node.style.position, left: node.style.left, top: node.style.top,
+      width: node.style.width, zIndex: node.style.zIndex, pointerEvents: node.style.pointerEvents,
+    };
+    node.style.position = 'fixed';
+    node.style.top = '0';
+    node.style.left = '-100000px';
+    node.style.width = `${rect.width}px`;
+    node.style.zIndex = '-1';
+    node.style.pointerEvents = 'none';
+
     const scrollers = node.querySelectorAll('.overflow-x-auto, .overflow-y-auto, .overflow-auto');
-    const restore = [];
-    scrollers.forEach((el) => {
-      restore.push([el, el.style.overflow, el.style.maxHeight]);
-      el.style.overflow = 'visible';
-      el.style.maxHeight = 'none';
-    });
+    scrollers.forEach((el) => { el.style.overflow = 'visible'; el.style.maxHeight = 'none'; });
+    const codeBlocks = node.querySelectorAll('pre');
+    codeBlocks.forEach((el) => { el.style.whiteSpace = 'pre-wrap'; el.style.wordBreak = 'break-all'; el.style.overflow = 'visible'; });
 
     setCapturing(true);
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await nextFrame();
 
     try {
       const { toBlob } = await import('html-to-image');
@@ -393,7 +408,7 @@ function App() {
         cacheBust: true,
         width: node.scrollWidth,
         height: node.scrollHeight,
-        style: { overflow: 'visible' },
+        style: { overflow: 'visible', position: 'static', left: '0', top: '0', margin: '0' },
       });
       if (!blob) throw new Error('Capture returned no image');
 
@@ -401,11 +416,7 @@ function App() {
       const file = new File([blob], `scan-${safeName}.png`, { type: 'image/png' });
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'Malicious PDF Detector',
-          text: isAr ? 'نتيجة فحص ملف PDF' : 'PDF scan result',
-        });
+        await navigator.share({ files: [file] });
       } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -417,8 +428,17 @@ function App() {
     } catch (e) {
       if (e?.name !== 'AbortError') console.error('Share failed:', e);
     } finally {
-      restore.forEach(([el, ov, mh]) => { el.style.overflow = ov; el.style.maxHeight = mh; });
       setCapturing(false);
+      await nextFrame();
+      node.style.position = prev.position;
+      node.style.left = prev.left;
+      node.style.top = prev.top;
+      node.style.width = prev.width;
+      node.style.zIndex = prev.zIndex;
+      node.style.pointerEvents = prev.pointerEvents;
+      scrollers.forEach((el) => { el.style.overflow = ''; el.style.maxHeight = ''; });
+      codeBlocks.forEach((el) => { el.style.whiteSpace = ''; el.style.wordBreak = ''; el.style.overflow = ''; });
+      placeholder.remove();
       setSharing(false);
     }
   };
@@ -624,6 +644,15 @@ function App() {
         {appState === 'result' && scanResult && (
           <div className="w-full max-w-6xl animate-fade-up">
             <div ref={resultRef} className="bg-ink rounded-2xl p-2 sm:p-4">
+            {/* Brand header — included in the shared image */}
+            {capturing && (
+              <div className="flex items-center gap-2.5 px-4 pt-2 pb-6" dir="ltr">
+                <Icon.logo className="w-8 h-8 text-slate-100" />
+                <div className="text-lg font-display font-bold tracking-tight">
+                  Malicious PDF <span className="text-gradient">Detector</span>
+                </div>
+              </div>
+            )}
             {scanResult.status === 'safe' ? (
               <div className="tile p-12 text-center">
                 <div className="relative mx-auto mb-6 grid place-items-center w-24 h-24 rounded-full bg-safe/10 border border-safe/30">
@@ -757,6 +786,20 @@ function App() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Page footer — included in the shared image */}
+            {capturing && (
+              <div className="mt-6 pt-4 border-t border-white/10 bg-ink text-center text-sm">
+                <p className="text-slate-400">
+                  {isAr ? 'تم تطويره بواسطة ديالى التركي' : 'Developed by Diyala Alturki'}
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-2" dir="ltr">
+                  <span className="flex items-center gap-2 text-slate-400"><Icon.github className="w-4 h-4" /> Diiiyala</span>
+                  <span className="text-white/15">|</span>
+                  <span className="flex items-center gap-2 text-slate-400"><Icon.mail className="w-4 h-4" /> diyala.alturki@gmail.com</span>
+                </div>
               </div>
             )}
             </div>
