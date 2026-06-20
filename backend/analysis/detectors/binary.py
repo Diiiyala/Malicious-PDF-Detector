@@ -28,9 +28,10 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
     # ------------------------------------------------------------------
 
     for pattern, (desc, severity, t_id) in STRUCTURE_PATTERNS.items():
-        if re.search(pattern, file_content, re.IGNORECASE):
+        if any(is_structural_match(file_content, m.start())
+               for m in re.finditer(pattern, file_content, re.IGNORECASE)):
             threats.append(Threat(
-                id=t_id, category="Binary Structure", severity=severity, 
+                id=t_id, category="Binary Structure", severity=severity,
                 description=desc, location="Raw Binary"
             ))
                           
@@ -44,9 +45,12 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
         matches = list(re.finditer(pattern, file_content, re.IGNORECASE))
 
         if not matches: continue
-        for match in matches: 
+        for match in matches:
             start = match.start()
-            
+
+            if not is_structural_match(file_content, start):
+                continue
+
             # ----------------------------------------------------------
             # Contextual Detection
             # ----------------------------------------------------------
@@ -138,6 +142,17 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
 #  Helpers
 # -----------------------------------------------------------------------     
         
+def is_structural_match(file_content: bytes, position: int, radius: int = 80) -> bool:
+
+    lo = max(0, position - radius)
+    hi = min(len(file_content), position + radius)
+    window = file_content[lo:hi]
+    if not window:
+        return False
+    printable = sum(1 for b in window if 32 <= b <= 126 or b in (9, 10, 13))
+    return printable / len(window) >= 0.80
+
+
 def detect_pdf_context(file_content, position):
     search_window = file_content[max(0, position - 3000):position]
 
@@ -219,8 +234,11 @@ def extract_hidden_uris(file_content: bytes) -> list[Threat]:
     threats = []
 
     for match in re.finditer(rb'/URI\s*\(', file_content):
+        if not is_structural_match(file_content, match.start()):
+            continue
+
         uri = extract_pdf_literal_string(file_content, match.end())
-        
+
         if not uri:
             continue
 
@@ -234,6 +252,8 @@ def extract_hidden_uris(file_content: bytes) -> list[Threat]:
             ))
 
     for match in re.finditer(rb'/URI\s*<([0-9A-Fa-f]+)>', file_content):
+        if not is_structural_match(file_content, match.start()):
+            continue
         try:
             uri = bytes.fromhex(match.group(1).decode()).decode("utf-8", errors="ignore").strip()
             uri_lower = uri.lower()
@@ -254,6 +274,9 @@ def extract_embedded_paths(file_content) -> list[Threat]:
     threats = []
 
     for match in re.finditer(rb'/F\s*\(', file_content):
+        if not is_structural_match(file_content, match.start()):
+            continue
+
         path = extract_pdf_literal_string(file_content, match.end())
 
         if not path: continue
