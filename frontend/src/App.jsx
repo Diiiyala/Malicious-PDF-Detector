@@ -240,7 +240,17 @@ const ScanIllustration = ({ isAr }) => {
   );
 };
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB, matches the backend limit
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+const TERMINAL_TEXT = {
+  secure:   { en: 'Establishing secure connection...', ar: 'جاري إنشاء اتصال آمن مع الخادم...' },
+  upload:   { en: 'Uploading file to analysis engine...', ar: 'جاري رفع الملف لمحرك الفحص...' },
+  analyze:  { en: 'Analyzing structure and metadata...', ar: 'جاري تحليل الهيكل والبيانات الوصفية...' },
+  complete: { en: 'Scan complete. Displaying report...', ar: 'اكتمل الفحص. جاري عرض التقرير...' },
+  err_too_large:  { en: 'File too large, maximum size is 100 MB.', ar: 'الملف كبير جدًا، الحد الأقصى 100 ميجابايت.' },
+  err_server:     { en: 'Scan failed on the server.', ar: 'فشل الفحص على الخادم.' },
+  err_connection: { en: 'Connection failed! Ensure Flask is running.', ar: 'فشل الاتصال! تأكد من تشغيل خادم Flask.' },
+};
 
 function App() {
   const [lang, setLang] = useState('en');
@@ -281,12 +291,10 @@ function App() {
     setFileName(file.name);
     setScanFailed(false);
 
-    const lines = isAr
-      ? ["جاري إنشاء اتصال آمن مع الخادم...", "جاري رفع الملف لمحرك الفحص...", "جاري تحليل الهيكل والبيانات الوصفية..."]
-      : ["Establishing secure connection...", "Uploading file to analysis engine...", "Analyzing structure and metadata..."];
+    const lines = ['secure', 'upload', 'analyze'];
 
-    const progressTimers = lines.map((line, index) =>
-      setTimeout(() => setTerminalLines(prev => [...prev, line]), index * 800)
+    const progressTimers = lines.map((code, index) =>
+      setTimeout(() => setTerminalLines(prev => [...prev, code]), index * 800)
     );
 
     try {
@@ -304,7 +312,7 @@ function App() {
       const data = await response.json();
 
       setTimeout(() => {
-        setTerminalLines(prev => [...prev, isAr ? "اكتمل الفحص. جاري عرض التقرير..." : "Scan complete. Displaying report..."]);
+        setTerminalLines(prev => [...prev, 'complete']);
       }, lines.length * 800);
 
       let parsedThreats = [];
@@ -349,16 +357,11 @@ function App() {
       }, (lines.length * 800) + 1000);
     } catch (error) {
       progressTimers.forEach(clearTimeout);
-      let msg;
-      if (error?.tooLarge) {
-        msg = isAr ? "[ERROR] الملف كبير جدًا، الحد الأقصى 100 ميجابايت." : "[ERROR] File too large, maximum size is 100 MB.";
-      } else if (error?.serverReached) {
-        msg = isAr ? "[ERROR] فشل الفحص على الخادم." : "[ERROR] Scan failed on the server.";
-      } else {
-        msg = isAr ? "[ERROR] فشل الاتصال! تأكد من تشغيل خادم Flask." : "[ERROR] Connection failed! Ensure Flask is running.";
-      }
+      const code = error?.tooLarge ? 'err_too_large'
+        : error?.serverReached ? 'err_server'
+        : 'err_connection';
       setScanFailed(true);
-      setTerminalLines([msg]);
+      setTerminalLines([code]);
       console.error("Upload error:", error);
     }
   };
@@ -369,20 +372,15 @@ function App() {
     if (!file) return;
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      setUploadError(isAr
-        ? "الملف كبير جدًا، الحد الأقصى 100 ميجابايت."
-        : "File too large, maximum size is 100 MB.");
+      setUploadError({ type: 'too_large' });
       return;
     }
     processFile(file);
   }, [isAr]);
 
   const onDropRejected = useCallback((fileRejections) => {
-    const fileName = fileRejections[0].file.name;
-    setUploadError(isAr
-      ? `عذراً، الملف "${fileName}" غير مدعوم. يرجى رفع ملفات PDF فقط.`
-      : `Sorry, "${fileName}" is not supported. Please upload PDF files only.`);
-  }, [isAr]);
+    setUploadError({ type: 'unsupported', fileName: fileRejections[0].file.name });
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop, onDropRejected, multiple: false, accept: { 'application/pdf': ['.pdf'] },
@@ -531,16 +529,18 @@ function App() {
             <div className="lg:col-span-2 p-2 sm:p-6 flex flex-col justify-center text-center lg:text-start">
               <h1 className={`text-4xl sm:text-5xl lg:text-6xl font-display font-bold mb-6 ${isAr ? 'leading-[1.5] tracking-normal' : 'leading-[1.07] tracking-tight'}`}>
                 {isAr ? 'اكشف' : 'Detect'}{' '}
-                {!isAr && <br className="hidden sm:block" />}
+                <br className="hidden sm:block" />
                 <span className={`text-gradient ${isAr ? 'inline-block pb-1.5' : ''}`}>{isAr ? 'ملفات PDF الخبيثة' : 'Malicious PDFs'}</span>{' '}
                 <br className="hidden sm:block" />
                 {isAr ? 'قبل أن تشكل تهديدًا' : 'Before They Strike'}
               </h1>
 
-              <p className="text-lg sm:text-xl text-slate-400 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-                {isAr
-                  ? 'اكشف عن التهديدات المخفية، الأنماط المشبوهة، والمؤشرات الخبيثة داخل مستندات PDF قبل أن تعرض أمانك للخطر.'
-                  : 'Uncover hidden threats, suspicious patterns, and indicators of compromise inside PDF documents before they put your security at risk.'}
+              <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+                {isAr ? (
+                  <>اكشف عن التهديدات المخفية، الأنماط المشبوهة، والمؤشرات الخبيثة<br className="hidden sm:block" /> داخل مستندات PDF قبل أن تعرض أمانك للخطر.</>
+                ) : (
+                  <>Uncover hidden threats, suspicious patterns, and indicators of compromise<br className="hidden sm:block" /> inside PDF documents before they put your security at risk.</>
+                )}
               </p>
 
               <div className="mt-8 flex justify-center lg:justify-start">
@@ -593,7 +593,13 @@ function App() {
               <div className="mb-6 glass border border-danger/30 text-white px-5 py-4 rounded-2xl flex items-center justify-between gap-4 animate-fade-in">
                 <div className="flex items-center gap-3">
                   <Icon.alert className="w-6 h-6 text-danger shrink-0" />
-                  <span className="font-medium">{uploadError}</span>
+                  <span className="font-medium">
+                    {uploadError.type === 'too_large'
+                      ? (isAr ? 'الملف كبير جدًا، الحد الأقصى 100 ميجابايت.' : 'File too large, maximum size is 100 MB.')
+                      : (isAr
+                          ? `عذراً، الملف "${uploadError.fileName}" غير مدعوم. يرجى رفع ملفات PDF فقط.`
+                          : `Sorry, "${uploadError.fileName}" is not supported. Please upload PDF files only.`)}
+                  </span>
                 </div>
                 <button onClick={() => setUploadError(null)} className="text-white/60 hover:text-white transition">
                   <Icon.close className="w-5 h-5" />
@@ -653,14 +659,15 @@ function App() {
                 <div className="w-3 h-3 rounded-full bg-safe/80" />
               </div>
               <div className={`space-y-3 ${isAr ? 'text-right' : 'text-left'}`} dir={isAr ? 'rtl' : 'ltr'}>
-                {terminalLines.map((line, idx) => {
-                  const isError = line.includes('[ERROR]');
+                {terminalLines.map((code, idx) => {
+                  const isError = code.startsWith('err_');
+                  const text = (TERMINAL_TEXT[code] || {})[isAr ? 'ar' : 'en'] || code;
                   return (
                     <div key={idx} className="flex items-center gap-2.5 animate-fade-in">
                       {isError
                         ? <Icon.alert className="w-4 h-4 text-danger shrink-0" />
                         : <Icon.check className="w-4 h-4 text-brand-400 shrink-0" />}
-                      <span className={isError ? 'text-danger' : 'text-slate-300'}>{isError ? line.replace(/\[ERROR\]\s*/i, '') : line}</span>
+                      <span className={isError ? 'text-danger' : 'text-slate-300'}>{text}</span>
                     </div>
                   );
                 })}
