@@ -369,6 +369,7 @@ function App() {
     } catch { /* ignore */ }
   };
 
+  const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   const shareResult = async () => {
     if (!resultRef.current || sharing) return;
@@ -629,7 +630,7 @@ function App() {
                     <div key={idx} className="flex items-center gap-2.5 animate-fade-in">
                       {isError
                         ? <Icon.alert className="w-4 h-4 text-danger shrink-0" />
-                        : <Icon.check className="w-4 h-4 text-safe shrink-0" />}
+                        : <Icon.check className="w-4 h-4 text-brand-400 shrink-0" />}
                       <span className={isError ? 'text-danger' : 'text-slate-300'}>{line}</span>
                     </div>
                   );
