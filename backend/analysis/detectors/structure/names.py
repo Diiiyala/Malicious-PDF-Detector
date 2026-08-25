@@ -120,7 +120,3 @@ def process_name_node(key, value_obj, threats, whitelist, untrusted_items, js_sc
             id="STR-NAMES-SUSP-KEY", category="Structure", severity=10,
             description=f"Suspicious key detected in NameTree: {key}", location=f"NameTree: {category}"
         ))
-
-    # Collect Unexpected entries
-    elif key not in whitelist:
-        untrusted_items.add(key)
