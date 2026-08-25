@@ -232,17 +232,27 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
     return collector.render()
 
 
-def check_outlines_recursive(node, add_threat_func):
+def check_outlines_recursive(node, add_threat_func, visited=None):
     if not node: return
+
+    if visited is None:
+        visited = set()
+
+    marker = node.idnum if hasattr(node, "idnum") else id(node)
+    if marker in visited: return
+    visited.add(marker)
+
+    node = node.get_object()
 
     # Check for Action in current Bookmark node
     if "/A" in node:
         title = node.get("/Title", "Untitled Bookmark")
-        action_type = node['/A'].get('/S')
+        action = node["/A"]
+        action_type = action.get("/S") if hasattr(action, "get") else None
         add_threat_func("STR-ACT-BOOKMARK", 4, f"Bookmark ({action_type})", f"Bookmark: {title}")
 
     # Traverse children and siblings
-    if "/First" in node:
-        check_outlines_recursive(node["/First"].get_object(), add_threat_func)
-    if "/Next" in node:
-        check_outlines_recursive(node["/Next"].get_object(), add_threat_func)
+    for link in ("/First", "/Next"):
+        if link in node:
+            child = node.raw_get(link) if hasattr(node, "raw_get") else node[link]
+            check_outlines_recursive(child, add_threat_func, visited)
