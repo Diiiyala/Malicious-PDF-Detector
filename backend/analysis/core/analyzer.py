@@ -126,37 +126,67 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
 #  Helpers
 # ----------------------------------------------------------------------------
  
+MAX_LOCATIONS_PER_THREAT = 20
+MAX_FOUND_VALUES_PER_THREAT = 20
+
+FOUND_SUFFIX_PATTERN = re.compile(r"\s*\(Found:\s*'.*'\)\s*$")
+FOUND_VALUES_PATTERN = re.compile(r"\(Found:\s*'([^']+)'\)")
+
+
 def deduplicate_threats(threats: list[Threat]) -> list[Threat]:
     grouped = {}
-    
+
     for t in threats:
-        core_desc = re.sub(r"\s*\(Found:\s*'.*'\)", "", t.description).strip()
+        core_desc = FOUND_SUFFIX_PATTERN.sub("", t.description).strip()
         key = core_desc.lower()
-        
-        if key not in grouped:
-            grouped[key] = t
+
+        entry = grouped.get(key)
+
+        if entry is None:
+            entry = {"threat": t, "core_desc": core_desc, "locations": set(), "found": {}}
+            grouped[key] = entry
         else:
-            existing = grouped[key]
-            
+            existing = entry["threat"]
+
             if t.severity > existing.severity:
                 existing.severity = t.severity
-                existing.id = t.id 
-            
-            existing_locs = [l.strip() for l in existing.location.split(",")]
-            new_locs = [l.strip() for l in t.location.split(",")]
-            existing.location = ", ".join(sorted(list(set(existing_locs + new_locs))))
-            
-            match_new = re.search(r"\(Found:\s*'([^']+)'\)", t.description)
-            match_existing = re.search(r"\(Found:\s*'([^']+)'\)", existing.description)
-            
-            if match_new and match_existing:
-                existing_words = match_existing.group(1).split("', '")
-                new_word = match_new.group(1)
-                
-                if new_word not in existing_words:
-                    existing_words.append(new_word)
-                
-                combined_words = "', '".join(existing_words)
-                existing.description = f"{core_desc} (Found: '{combined_words}')"
+                existing.id = t.id
 
-    return sorted(list(grouped.values()), key=lambda x: x.severity, reverse=True)
+        for location in t.location.split(","):
+            location = location.strip()
+            if location:
+                entry["locations"].add(location)
+
+        match = FOUND_VALUES_PATTERN.search(t.description)
+        if match:
+            for value in match.group(1).split("', '"):
+                entry["found"].setdefault(value, None)
+
+    merged = []
+
+    for entry in grouped.values():
+        threat = entry["threat"]
+        threat.location = render_capped(sorted(entry["locations"]), MAX_LOCATIONS_PER_THREAT)
+
+        if entry["found"]:
+            values = list(entry["found"])
+            shown = values[:MAX_FOUND_VALUES_PER_THREAT]
+            remaining = len(values) - len(shown)
+            joined = "', '".join(shown)
+            suffix = f", +{remaining} more" if remaining else ""
+            threat.description = f"{entry['core_desc']} (Found: '{joined}'{suffix})"
+
+        merged.append(threat)
+
+    return sorted(merged, key=lambda x: x.severity, reverse=True)
+
+
+def render_capped(items: list[str], limit: int) -> str:
+    shown = items[:limit]
+    remaining = len(items) - len(shown)
+    text = ", ".join(shown)
+
+    if remaining > 0:
+        text = f"{text}, (+{remaining} more)" if text else f"(+{remaining} more)"
+
+    return text
