@@ -57,7 +57,7 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
 
             context = detect_pdf_context(file_content, start)
             context_str = ", ".join(context)
-            keyword_found = pattern.decode('utf-8', errors='ignore')
+            keyword_found = match.group(0).decode('utf-8', errors='ignore').strip()
             
             threats.append(Threat(
                 id=t_id,
