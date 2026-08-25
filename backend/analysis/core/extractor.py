@@ -1,7 +1,7 @@
 import logging, re
 from analysis.utils.models import ExtractedContent
 from analysis.utils.text_extractor import extract_text_and_visuals
-from analysis.utils.pdf_strings import extract_pdf_literal_string
+from analysis.detectors.binary import extract_pdf_literal_string
 
 logger = logging.getLogger(__name__)
 
