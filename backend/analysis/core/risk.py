@@ -3,6 +3,7 @@ from analysis.utils.models import Threat
 SEVERITY_MAX = 15
 RISK_NORMALIZATION = 100
 MAX_SCORED_PER_ID = 3
+SAFE_MAX_SEVERITY = 5
 CRITICAL_SEVERITY = 12
 HIGH_RISK_PCT = 70
 MEDIUM_RISK_PCT = 30
@@ -33,7 +34,9 @@ def calculate_risk(threats: list[Threat]):
     else:
         level = "LOW RISK"
 
-    if not threats:
+    highest_severity = max((t.severity for t in threats), default=0)
+
+    if highest_severity <= SAFE_MAX_SEVERITY and risk_percentage < MEDIUM_RISK_PCT:
         status = STATUS_SAFE
     elif level == "HIGH RISK":
         status = STATUS_DANGER
