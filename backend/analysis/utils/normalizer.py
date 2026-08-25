@@ -8,6 +8,14 @@ SUSPICIOUS_KEYS = [ "eval", "exec", "cmd", "powershell",
         "fromcharcode", "atob", "document", "window"
     ]
 
+ESCAPE_PATTERN = re.compile(
+    r'\\u([dD][89abAB][0-9a-fA-F]{2})\\u([dD][c-fC-F][0-9a-fA-F]{2})'
+    r'|\\u([0-9a-fA-F]{4})'
+    r'|\\x([0-9a-fA-F]{2})'
+)
+
+URL_LIKE_PATTERN = re.compile(r'(?:[a-zA-Z][a-zA-Z0-9+.-]*://|www\.)[^\s"\'<>()\[\]{}]+')
+
 # -------------------------------------------------------------------------
 # 1. Main Normalizer Entry Point
 # -------------------------------------------------------------------------
@@ -135,11 +143,6 @@ def normalize_javascript_protocol(text):
 
 def normalize_urls(text):
 
-    try:
-        text = urllib.parse.unquote(text)
-    except Exception as e:
-        logger.debug("URL unquote failed: %s", e)
-
     text = re.sub(r'\[\.\]', '.', text, flags=re.IGNORECASE)
     text = re.sub(r'\(\.\)', '.', text, flags=re.IGNORECASE)
     text = re.sub(r'hxxp', 'http', text, flags=re.IGNORECASE)
@@ -147,8 +150,15 @@ def normalize_urls(text):
     text = re.sub(r'wxxs', 'wss', text, flags=re.IGNORECASE)
     text = re.sub(r'wxx', 'ws', text, flags=re.IGNORECASE)
     text = re.sub(r'(https?|ftp|smb|file|wss?)\s*:\s*/\s*/', r'\1://', text, flags=re.IGNORECASE)
-    
-    return text
+
+    def unquote_url(match):
+        try:
+            return urllib.parse.unquote(match.group(0))
+        except Exception as e:
+            logger.debug("URL unquote failed: %s", e)
+            return match.group(0)
+
+    return URL_LIKE_PATTERN.sub(unquote_url, text)
 
 # -------------------------------------------------------------------------
 # 5. Decoding
@@ -166,15 +176,31 @@ def decode_pdf_octal(text):
         except (ValueError, TypeError):
             return match.group(0)
 
-    return re.sub(r'\\([0-7]{1,3})', replace_octal, text)
+    return re.sub(r'\\([0-7]{2,3})', replace_octal, text)
 
 
 def decode_unicode_escapes(text):
-    try:
-        return text.encode().decode('unicode_escape')
-    except Exception as e:
-        logger.debug("unicode-escape decode failed: %s", e)
-        return text
+
+    def replace_escape(match):
+        high, low, single, byte = match.groups()
+
+        try:
+            if high and low:
+                code = 0x10000 + ((int(high, 16) - 0xD800) << 10) + (int(low, 16) - 0xDC00)
+                return chr(code)
+
+            digits = single or byte
+            code = int(digits, 16)
+
+            if 0xD800 <= code <= 0xDFFF:
+                return match.group(0)
+
+            return chr(code)
+
+        except (ValueError, OverflowError):
+            return match.group(0)
+
+    return ESCAPE_PATTERN.sub(replace_escape, text)
 
 
 def decode_atob(text):
