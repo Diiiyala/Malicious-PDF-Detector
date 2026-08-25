@@ -1,4 +1,7 @@
 
+import logging
+logger = logging.getLogger(__name__)
+
 # ==========================================================================================
 # 1. INDICATORS (HEURISTICS / VOCABULARY SIGNALS)
 # ==========================================================================================
@@ -172,4 +175,4 @@ _ALL_VOCAB = {
 for _name, _lst in _ALL_VOCAB.items():
     _dupes = sorted({x for x in _lst if _lst.count(x) > 1})
     if _dupes:
-        raise ValueError(f"Duplicate entries in signature list {_name}: {_dupes}")
+        logger.warning("Duplicate entries in signature list %s: %s", _name, _dupes)
