@@ -19,7 +19,14 @@ def analyze_names(root) -> list[Threat]:
 
             # Iterate through all categories in the NameTree
             for category_key in names.keys():
-                walk_names_tree(names[category_key], threats, WHITELIST, unknown_items, js_scripts, embedded_files, category=category_key)
+                try:
+                    walk_names_tree(names[category_key], threats, WHITELIST, unknown_items, js_scripts, embedded_files, category=category_key)
+                except Exception as e:
+                    logger.debug("NameTree category %s could not be walked: %s", category_key, e)
+                    threats.append(Threat(
+                        id="STR-NAMES-WALK-FAIL", category="Structure", severity=7,
+                        description=f"NameTree branch could not be parsed: {category_key}", location="NameTree"
+                    ))
 
             if js_scripts:
                 threats.append(Threat(
@@ -43,20 +50,36 @@ def analyze_names(root) -> list[Threat]:
     return threats
 
 
-def walk_names_tree(node, threats, whitelist, untrusted_items, js_scripts, embedded_files, category=None):
+def walk_names_tree(node, threats, whitelist, untrusted_items, js_scripts, embedded_files, category=None, visited=None):
 
     if not node: return
+
+    if visited is None:
+        visited = set()
+
+    marker = node.idnum if hasattr(node, "idnum") else id(node)
+    if marker in visited: return
+    visited.add(marker)
+
     node = node.get_object()
 
     # Check for Child Nodes
     if "/Kids" in node:
         for kid in node["/Kids"]:
-            walk_names_tree(kid, threats, whitelist, untrusted_items, js_scripts, embedded_files, category)
+            walk_names_tree(kid, threats, whitelist, untrusted_items, js_scripts, embedded_files, category, visited)
 
     # Check for Leaf Nodes with Data
     if "/Names" in node:
         names_list = node["/Names"]
-        for i in range(0, len(names_list), 2):
+
+        if len(names_list) % 2:
+            threats.append(Threat(
+                id="STR-NAMES-MALFORMED", category="Structure", severity=7,
+                description=f"Malformed NameTree leaf ({len(names_list)} entries in a key/value array)",
+                location=f"NameTree: {category}"
+            ))
+
+        for i in range(0, len(names_list) - 1, 2):
             key = str(names_list[i])
             value_obj = names_list[i+1]
             process_name_node(key, value_obj, threats, whitelist, untrusted_items, js_scripts, embedded_files, category)
