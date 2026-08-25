@@ -5,6 +5,7 @@ from analysis.signatures import SUSPICIOUS_URI_KEYWORDS
 
 logger = logging.getLogger(__name__)
 
+NAVIGATION_ACTIONS = ["/GoTo", "/Named"]
 CLICKJACK_COVERAGE = 0.9
 TRANSPARENT_WIDGET_MAX_COVERAGE = 0.05
 WIDGET_GRID_THRESHOLD = 3
@@ -249,7 +250,9 @@ def check_outlines_recursive(node, add_threat_func, visited=None):
         title = node.get("/Title", "Untitled Bookmark")
         action = node["/A"]
         action_type = action.get("/S") if hasattr(action, "get") else None
-        add_threat_func("STR-ACT-BOOKMARK", 4, f"Bookmark ({action_type})", f"Bookmark: {title}")
+
+        if action_type is not None and str(action_type) not in NAVIGATION_ACTIONS:
+            add_threat_func("STR-ACT-BOOKMARK", 4, f"Bookmark ({action_type})", f"Bookmark: {title}")
 
     # Traverse children and siblings
     for link in ("/First", "/Next"):
