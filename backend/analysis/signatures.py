@@ -98,7 +98,7 @@ SYSTEM_THREATS = {
         r"getPageNthWord(?:Quads)?\s*\(", r"getPageNumWords\s*\(", r"wallet\.dat", r"[\\/]Login Data\b", r"[\\/]Local State\b",
         r"key[34]\.db", r"logins\.json", r"signons\.sqlite", r"cookies\.sqlite", r"\.kdbx\b", r"\.keystore\b", ], 10),
     "Environment Leak": ([r"\$\{HOME\}", r"\.env\b", r"AWS_CREDENTIALS", r"vnd\.sun\.star\.expand"], 12),
-    "XFA/SOAP Attack": ([r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT", r"<?xml-stylesheet"], 13),
+    "XFA/SOAP Attack": ([r"method=\"soap\"", r"soapAction", r"xdp:xdp", r"XSLT", r"<\?xml-stylesheet"], 13),
     "XXE Injection Attempt": ([r"<!ENTITY", r"SYSTEM\s+['\"]http", r"<!DOCTYPE"], 13),
     "EICAR Standard Anti-Virus Test File": ([r"EICAR-STANDARD-ANTIVIRUS", r"X5O!P%@AP\[4\\PZX54\(P\^\)7CC\)7\}\$EICAR"], 15)
 }
@@ -117,7 +117,7 @@ CONTENT_PATTERNS = {
     rb"/JS\b": ("Suspicious Scripting found", 9, "BIN-JS"),
     rb"/SubmitForm": ("Form submission trigger (/SubmitForm) found in raw data", 11, "BIN-SUBMIT"),
     rb"application/x-formcalc": ("Scripting indicators found in raw binary data (FormCalc)", 13, "BIN-FORMCALC"),
-    rb"<?xml-stylesheet": ("Scripting indicators found in raw binary data (XSLT/XML)", 13, "BIN-XSLT"),
+    rb"<\?xml-stylesheet": ("Scripting indicators found in raw binary data (XSLT/XML)", 13, "BIN-XSLT"),
     rb"/RichMedia": ("RichMedia object (Potential exploit carrier) found in raw data", 10, "BIN-RICHMEDIA"),
     rb"/Crypt": ("Custom encryption filter (/Crypt) found in raw data", 8, "BIN-CRYPT"),
     rb"/JBIG2Decode": ("Suspicious compression filter (/JBIG2Decode) detected", 8, "BIN-JBIG2"),
@@ -144,7 +144,7 @@ SCRIPT_TYPE_MAP = {
     rb"/JS\b": "JavaScript",
     rb"/JS\s*\(": "JavaScript",
     rb"application/x-formcalc": "XFA/FormCalc",
-    rb"<?xml-stylesheet": "XSLT/XML",
+    rb"<\?xml-stylesheet": "XSLT/XML",
     rb"<template": "XFA/XML-Form",
     rb"<subform": "XFA/XML-Form",
     rb'method="soap"': "XFA/SOAP Payload",
@@ -153,7 +153,7 @@ SCRIPT_TYPE_MAP = {
     rb"onerror\s*=": "Stored XSS Payload",
     rb"vnd\.sun\.star\.expand": "Environment Leak Exploit",
     rb"<!DOCTYPE": "XML/XXE Payload",
-    rb"<?xml": "XML/XXE Payload"
+    rb"<\?xml": "XML/XXE Payload"
 }
 
 AGGREGATOR_PATTERNS = set(SCRIPT_TYPE_MAP.keys())
