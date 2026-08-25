@@ -296,10 +296,10 @@ def extract_embedded_paths(file_content) -> list[Threat]:
 
             if re.search(r'(powershell|cmd\.exe|wscript|cscript)', path_lower):
                 severity = 12
-        
-        threats.append(Threat(
-            id="BIN-REMOTE-PATH", category="Binary Discovery", severity=severity,
-            description=f"Remote path detected (/F) ('{path}')", location="Raw Binary"
-        ))
+
+            threats.append(Threat(
+                id="BIN-REMOTE-PATH", category="Binary Discovery", severity=severity,
+                description=f"Remote path detected (/F) ('{path}')", location="Raw Binary"
+            ))
 
     return threats
