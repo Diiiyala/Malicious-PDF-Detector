@@ -8,6 +8,8 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from analysis.core.analyzer import analyze_all_aspects
 
 MAX_UPLOAD_MB = 100
+MAX_EXPANDED_MB = 200
+MAX_EXPANDED_BYTES = MAX_EXPANDED_MB * 1024 * 1024
 
 app = Flask(__name__)
 CORS(app)
@@ -63,13 +65,25 @@ def upload_file():
                 with pikepdf.open(BytesIO(raw_file_content)) as pdf:
                     all_extracted_content = bytearray(raw_file_content)
 
+                    budget = MAX_EXPANDED_BYTES - len(all_extracted_content)
+
                     for obj in pdf.objects:
+                        if budget <= 0:
+                            logger.warning(
+                                "Decompressed content for %s hit the %d MB analysis cap; remaining streams skipped",
+                                file.filename, MAX_EXPANDED_MB
+                            )
+                            break
+
                         if isinstance(obj, pikepdf.Stream):
                             try:
-                                all_extracted_content.extend(obj.read_bytes())
+                                stream_bytes = obj.read_bytes()
                             except Exception as e:
                                 logger.debug("Could not read stream object during repair: %s", e)
                                 continue
+
+                            all_extracted_content.extend(stream_bytes[:budget])
+                            budget -= len(stream_bytes)
                     
                     repaired_stream = BytesIO()
                     pdf.save(repaired_stream, static_id=True)
