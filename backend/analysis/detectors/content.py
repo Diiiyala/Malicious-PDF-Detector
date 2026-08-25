@@ -1,4 +1,5 @@
 import re, base64, string
+from itertools import islice
 from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.links import analyze_links
 from analysis.utils.normalizer import is_valid_decoded
@@ -7,6 +8,8 @@ from analysis.signatures import EXEC_PATTERNS, SYSTEM_THREATS
 
 B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
 BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
+
+MAX_MATCHES_PER_PATTERN = 25
 
 def analyze_content(content: ExtractedContent, aggregator=None) -> list[Threat]:
 
@@ -97,7 +100,7 @@ def _analyze_text_recursive(text: str, depth=0, aggregator=None) -> list[Threat]
 
     for threat_name, (patterns, severity) in SYSTEM_THREATS.items():
         for p in patterns:
-            for match in re.finditer(p, text, re.IGNORECASE):
+            for match in islice(re.finditer(p, text, re.IGNORECASE), MAX_MATCHES_PER_PATTERN):
                 matched_str = match.group(0).strip()
                 threats.append(Threat(
                     id=f"CONT-SYS-{threat_name[:4].upper()}", 
