@@ -1,6 +1,7 @@
 import logging, re
 from analysis.utils.models import ExtractedContent
 from analysis.utils.text_extractor import extract_text_and_visuals
+from analysis.utils.pdf_strings import extract_pdf_literal_string
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +26,10 @@ def extract_all_data(reader, raw_file_content, filename) -> ExtractedContent:
             content.extracted_text = ""
         
     # 3. URI
-    raw_uris = re.findall(rb'/URI\s*\((.*?)\)', raw_file_content)
-    content.extracted_urls.update([uri.decode('utf-8', errors='ignore') for uri in raw_uris])
+    for match in re.finditer(rb'/URI\s*\(', raw_file_content):
+        uri = extract_pdf_literal_string(raw_file_content, match.end())
+        if uri:
+            content.extracted_urls.add(uri)
     
     # 4. Encryption Status
     if reader and reader.is_encrypted:
