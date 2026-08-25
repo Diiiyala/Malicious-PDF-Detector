@@ -1,7 +1,8 @@
 from analysis.utils.models import Threat
 
 SEVERITY_MAX = 15
-RISK_NORMALIZATION = 75
+RISK_NORMALIZATION = 100
+MAX_SCORED_PER_ID = 3
 CRITICAL_SEVERITY = 12
 HIGH_RISK_PCT = 70
 MEDIUM_RISK_PCT = 30
@@ -13,12 +14,14 @@ STATUS_DANGER = "danger"
 def calculate_risk(threats: list[Threat]):
 
     score = 0
-    used_ids = set()
+    scored_per_id = {}
 
     for t in threats:
-        if t.id not in used_ids:
+        seen = scored_per_id.get(t.id, 0)
+
+        if seen < MAX_SCORED_PER_ID:
             score += t.severity
-            used_ids.add(t.id)
+            scored_per_id[t.id] = seen + 1
 
     risk_percentage = min(int((score / RISK_NORMALIZATION) * 100), 100)
     has_critical_threat = any(t.severity >= CRITICAL_SEVERITY for t in threats)
