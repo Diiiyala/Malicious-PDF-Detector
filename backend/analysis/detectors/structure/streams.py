@@ -6,6 +6,35 @@ from analysis.detectors.content import analyze_content
 logger = logging.getLogger(__name__)
 
 
+def decode_pdf_text(raw: bytes) -> str:
+    if raw[:2] in (b"\xfe\xff", b"\xff\xfe"):
+        return raw.decode("utf-16", errors="ignore")
+    return raw.decode("utf-8", errors="ignore")
+
+
+def resolve_script_text(value):
+    if value is None:
+        return None
+
+    if hasattr(value, "get_object"):
+        value = value.get_object()
+
+    if hasattr(value, "get_data"):
+        try:
+            return decode_pdf_text(value.get_data())
+        except Exception as e:
+            logger.debug("Could not decode JS stream: %s", e)
+            return None
+
+    if isinstance(value, bytes):
+        return decode_pdf_text(value)
+
+    if isinstance(value, str):
+        return str(value)
+
+    return None
+
+
 def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
     threats = []
     collector = ThreatCollector("Stream/Object")
@@ -74,21 +103,27 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
 
                 # 4. JavaScript Injection
                 if "/JS" in obj or "/JavaScript" in obj:
-                    js_content = obj.get("/JS") or obj.get("/JavaScript")
-                    try:
-                        js_str = js_content.get_object() if hasattr(js_content, "get_object") else js_content
-                        content_to_scan = js_str.decode('utf-8', errors='ignore') if isinstance(js_str, bytes) else str(js_str)
+                    js_content = obj.get("/JS")
+                    if js_content is None:
+                        js_content = obj.get("/JavaScript")
 
-                        if aggregator:
-                            aggregator.add_script(content_to_scan, location_label, source_object=location_label)
+                    content_to_scan = resolve_script_text(js_content)
 
-                        dummy_content = ExtractedContent(extracted_text=content_to_scan)
-                        c_threats = analyze_content(dummy_content, aggregator=aggregator)
-                        for t in c_threats:
-                            t.location = f"{location_label} (JS Stream)"
-                            threats.append(t)
-                    except Exception as e:
-                        logger.debug("JS stream analysis failed: %s", e)
+                    if not content_to_scan or not content_to_scan.strip():
+                        logger.debug("No script text carried by /JS entry in %s", location_label)
+                    else:
+                        try:
+                            if aggregator:
+                                aggregator.add_script(content_to_scan, location_label, source_object=location_label)
+
+                            dummy_content = ExtractedContent(extracted_text=content_to_scan)
+                            c_threats = analyze_content(dummy_content, aggregator=aggregator)
+                            for t in c_threats:
+                                t.location = f"{location_label} (JS Stream)"
+                                threats.append(t)
+                        except Exception as e:
+                            logger.debug("JS stream analysis failed: %s", e)
+
 
                 # 5. XFA / FormCalc Injection
                 if "/XFA" in obj:
