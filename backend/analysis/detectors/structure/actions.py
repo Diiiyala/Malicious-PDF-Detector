@@ -90,8 +90,9 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
                         add_threat("STR-ACT-PAGE-SILENT", 12, "Silent page trigger (/O or /C)", loc_str)
                     add_threat("STR-ACT-PAGE-AA", 10, "Automatic triggers (/AA)", loc_str)
 
+                visible_widgets_on_page = 0
+
                 if "/Annots" in page_obj:
-                    visible_widgets_on_page = 0
                     for annot in page_obj["/Annots"]:
                         obj = annot.get_object()
                         if not obj: continue
@@ -132,19 +133,24 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
                         is_link_trigger = (subtype == "/Link" and "/A" in obj)
                         is_clickjacking = False
 
-                        if rect and page_area > 0:
-                            width = abs(float(rect[2]) - float(rect[0]))
-                            height = abs(float(rect[3]) - float(rect[1]))
-                            annot_area = width * height
-                            coverage = annot_area / page_area
+                        coverage = None
 
+                        if rect and page_area > 0:
+                            try:
+                                width = abs(float(rect[2]) - float(rect[0]))
+                                height = abs(float(rect[3]) - float(rect[1]))
+                                coverage = (width * height) / page_area
+                            except (TypeError, ValueError, IndexError) as e:
+                                logger.debug("Could not measure annotation /Rect on %s: %s", loc_str, e)
+
+                        if coverage is not None:
                             if coverage > CLICKJACK_COVERAGE:
                                 if has_js or is_widget or is_link_trigger:
                                     add_threat("STR-ACT-CLICKJACK", 13, f"Clickjacking overlay ({trigger_type})", loc_str)
                                     is_clickjacking = True
 
-                        if is_widget and is_transparent and coverage < TRANSPARENT_WIDGET_MAX_COVERAGE:
-                            visible_widgets_on_page += 1
+                            if is_widget and is_transparent and coverage < TRANSPARENT_WIDGET_MAX_COVERAGE:
+                                visible_widgets_on_page += 1
 
                         if "/T" in obj:
                             t_val = str(obj["/T"])
@@ -182,9 +188,11 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
                     add_threat("STR-ACT-CLICKJACK-GRID", 12, "Clickjacking Suspicious invisible button grid detected", loc_str)
 
             except Exception as page_error:
+                logger.debug("Annotation analysis aborted on %s: %s", loc_str, page_error)
                 continue
 
     except Exception as e:
+        logger.debug("Could not iterate document pages: %s", e)
         add_threat("STR-ACT-ERROR", 2, "Could not access document pages array", "Document Body")
 
     # Analyze AcroForm
