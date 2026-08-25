@@ -1,5 +1,8 @@
 import hashlib
 
+GENERIC_SCRIPT_TYPES = {"", "Unknown", "Binary Discovery"}
+
+
 class ScriptAggregator:
     def __init__(self):
         self.scripts_map = {}
@@ -21,6 +24,10 @@ class ScriptAggregator:
                 "source_objects": set(),
                 "locations": set()
             }
+
+        elif (script_type not in GENERIC_SCRIPT_TYPES
+              and self.scripts_map[script_id]["script_type"] in GENERIC_SCRIPT_TYPES):
+            self.scripts_map[script_id]["script_type"] = script_type
 
         self.scripts_map[script_id]["locations"].add(location)
 
