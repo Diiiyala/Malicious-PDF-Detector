@@ -6,20 +6,64 @@ from analysis.signatures import SUSPICIOUS_URI_KEYWORDS
 logger = logging.getLogger(__name__)
 
 NAVIGATION_ACTIONS = ["/GoTo", "/Named"]
+MAX_SEVERITY = 15
+OBFUSCATION_BONUS = 2
+
+DEFAULT_TARGET_PHRASE = "to redirect the user to"
+TARGET_PHRASE = {
+    "SubmitForm": "to submit the user's data to",
+    "ImportData": "to import external data from",
+}
 CLICKJACK_COVERAGE = 0.9
 TRANSPARENT_WIDGET_MAX_COVERAGE = 0.05
 WIDGET_GRID_THRESHOLD = 3
 
 
-def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=None) -> list[Threat]:
+def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=None,
+                            obfuscated_names=None, merged_names=None) -> list[Threat]:
     collector = ThreatCollector("Action/Trigger")
     add_threat = collector.add
+
+    def obfuscation_note(action_type, host_severity):
+
+        if not obfuscated_names or not action_type:
+            return ""
+
+        key = str(action_type).lower()
+        entry = obfuscated_names.get(key)
+        if not entry:
+            return ""
+
+        written, severity = entry
+        if merged_names is not None and host_severity >= severity:
+            merged_names.add(key)
+
+        return written
+
+    def with_obfuscation(severity, written):
+        return min(MAX_SEVERITY, severity + OBFUSCATION_BONUS) if written else severity
+
+    def obfuscation_clause(action_type, written):
+        return f" (The {action_type} action is obfuscated as {written})" if written else ""
+
+    def describe_clickjack(label, target, written):
+
+        sentence = f"A Clickjacking overlay uses a {label} trigger" if label \
+            else "A Clickjacking overlay uses an unidentified trigger"
+
+        if target:
+            sentence += f" {TARGET_PHRASE.get(label, DEFAULT_TARGET_PHRASE)} {target}"
+
+        if written:
+            sentence += f" (The {label} action is obfuscated as {written})"
+
+        return sentence + decoy_note
 
     decoy_note = ""
     if conflicting_targets:
         decoy_note = (
-            " [displayed target may be a decoy - a duplicate action in the same "
-            "object points elsewhere; see the parser-confusion finding]"
+            " (The displayed target may be a decoy - a duplicate action in the "
+            "same object points elsewhere; see the parser-confusion finding)"
         )
 
     def extract_action_path(action_dict):
@@ -42,7 +86,11 @@ def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=N
                 if isinstance(oa_obj, dict) and "/S" in oa_obj:
                     action_type = str(oa_obj.get("/S")).replace("/", "")
 
-                    add_threat("STR-ACT-OPEN-EXEC", 12, f"Automatic execution trigger (/OpenAction) executing Action (/{action_type})", "Catalog")
+                    open_written = obfuscation_note(f"/{action_type}", 12)
+                    add_threat("STR-ACT-OPEN-EXEC", with_obfuscation(12, open_written),
+                               f"Automatic execution trigger (/OpenAction) executing Action (/{action_type})"
+                               + (f" (The /{action_type} action is obfuscated as {open_written})" if open_written else ""),
+                               "Catalog")
                     action_traced = True
 
                     if action_type == "SubmitForm":
@@ -110,8 +158,10 @@ def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=N
                         is_widget = (subtype == "/Widget")
 
                         is_transparent = (obj.get("/F") == 2 or not obj.get("/AP"))
+                        a_type = None
                         has_js = False
-                        trigger_type = "Unknown trigger"
+                        action_label = None
+                        action_target = None
                         extracted_path = None
 
                         if "/A" in obj:
@@ -119,24 +169,20 @@ def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=N
                             a_type = action_dict.get("/S")
                             extracted_path = extract_action_path(action_dict)
 
+                            if a_type:
+                                action_label = str(a_type).replace("/", "")
+
                             if a_type == "/JavaScript":
                                 has_js = True
-                                trigger_type = "JavaScript trigger"
 
                             elif a_type == "/URI":
                                 uri_link = str(action_dict.get("/URI", "Unknown Link"))
-                                trigger_type = f"DNS/HTTP trigger: {uri_link}"
                                 extracted_path = uri_link
+                                action_target = uri_link
 
-                            elif a_type == "/SubmitForm":
-                                trigger_type = f"Data exfiltration trigger: {extracted_path}" if extracted_path else "Data exfiltration trigger"
-
-                            elif a_type in ["/Launch", "/GoToR", "/ImportData", "/Thread", "/GoToE"]:
-                                a_clean = str(a_type).replace("/", "")
-                                trigger_type = f"{a_clean} trigger: {extracted_path}" if extracted_path else f"{a_clean} trigger (Internal)"
-
-                            elif a_type:
-                                trigger_type = f"{str(a_type).replace('/', '')} trigger"
+                            elif a_type in ["/SubmitForm", "/Launch", "/GoToR",
+                                            "/ImportData", "/Thread", "/GoToE"]:
+                                action_target = extracted_path
 
                         is_link_trigger = (subtype == "/Link" and "/A" in obj)
                         is_clickjacking = False
@@ -154,7 +200,10 @@ def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=N
                         if coverage is not None:
                             if coverage > CLICKJACK_COVERAGE:
                                 if has_js or is_widget or is_link_trigger:
-                                    add_threat("STR-ACT-CLICKJACK", 13, f"Clickjacking overlay ({trigger_type}){decoy_note}", loc_str)
+                                    cj_written = obfuscation_note(a_type, 13)
+                                    add_threat("STR-ACT-CLICKJACK", with_obfuscation(13, cj_written),
+                                               describe_clickjack(action_label, action_target, cj_written),
+                                               loc_str)
                                     is_clickjacking = True
 
                             if is_widget and is_transparent and coverage < TRANSPARENT_WIDGET_MAX_COVERAGE:
@@ -179,15 +228,19 @@ def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=N
                                     add_threat("URI-DETECTED", 8, f"Suspicious URI detected ('{extracted_path}')", loc_str)
 
                             elif a_type == "/ImportData":
-                                add_threat("STR-ACT-IMPORTDATA", 12, f"External data import trigger (/ImportData) pointing to: ({extracted_path})", loc_str)
+                                imp_written = obfuscation_note(a_type, 12)
+                                add_threat("STR-ACT-IMPORTDATA", with_obfuscation(12, imp_written), f"External data import trigger (/ImportData) pointing to: ({extracted_path})" + obfuscation_clause("/ImportData", imp_written), loc_str)
                             elif a_type == "/GoToR":
-                                add_threat("STR-ACT-GOTOR", 12, f"Annotation (/GoToR) pointing to: ({extracted_path})", loc_str)
+                                gotor_written = obfuscation_note(a_type, 12)
+                                add_threat("STR-ACT-GOTOR", with_obfuscation(12, gotor_written), f"Annotation (/GoToR) pointing to: ({extracted_path})" + obfuscation_clause("/GoToR", gotor_written), loc_str)
                             elif a_type == "/GoToE":
-                                add_threat("STR-ACT-GOTOE", 11, f"Suspicious /GoToE pointing to: {extracted_path if extracted_path else 'Internal'}", loc_str)
+                                gotoe_written = obfuscation_note(a_type, 11)
+                                add_threat("STR-ACT-GOTOE", with_obfuscation(11, gotoe_written), f"Suspicious /GoToE pointing to: {extracted_path if extracted_path else 'Internal'}" + obfuscation_clause("/GoToE", gotoe_written), loc_str)
                             elif a_type in ["/Launch", "/SubmitForm", "/Thread"]:
                                 a_clean = str(a_type).replace("/", "")
                                 desc = f"Annotation (/{a_clean}) pointing to: ({extracted_path})" if extracted_path else f"Annotation (/{a_clean})"
-                                add_threat(f"STR-ACT-{a_clean.upper()}", 10, desc, loc_str)
+                                launch_written = obfuscation_note(a_type, 10)
+                                add_threat(f"STR-ACT-{a_clean.upper()}", with_obfuscation(10, launch_written), desc + obfuscation_clause(a_type, launch_written), loc_str)
                             else:
                                 a_type_clean = str(a_type).replace("/", "")
                                 add_threat(f"STR-ACT-ANNOT-{a_type_clean}", 4, f"Annotation (/{a_type_clean})", loc_str)
