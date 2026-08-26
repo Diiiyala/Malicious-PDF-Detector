@@ -11,9 +11,16 @@ TRANSPARENT_WIDGET_MAX_COVERAGE = 0.05
 WIDGET_GRID_THRESHOLD = 3
 
 
-def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
+def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=None) -> list[Threat]:
     collector = ThreatCollector("Action/Trigger")
     add_threat = collector.add
+
+    decoy_note = ""
+    if conflicting_targets:
+        decoy_note = (
+            " [displayed target may be a decoy - a duplicate action in the same "
+            "object points elsewhere; see the parser-confusion finding]"
+        )
 
     def extract_action_path(action_dict):
         f_spec = action_dict.get("/F")
@@ -147,7 +154,7 @@ def perform_action_analysis(reader, root, aggregator=None) -> list[Threat]:
                         if coverage is not None:
                             if coverage > CLICKJACK_COVERAGE:
                                 if has_js or is_widget or is_link_trigger:
-                                    add_threat("STR-ACT-CLICKJACK", 13, f"Clickjacking overlay ({trigger_type})", loc_str)
+                                    add_threat("STR-ACT-CLICKJACK", 13, f"Clickjacking overlay ({trigger_type}){decoy_note}", loc_str)
                                     is_clickjacking = True
 
                             if is_widget and is_transparent and coverage < TRANSPARENT_WIDGET_MAX_COVERAGE:
