@@ -245,6 +245,46 @@ def contains_ip(text: str) -> bool:
             return True
     return False
 
+OCTAL_ESCAPE = re.compile(rb'\\[0-7]{2,3}')
+HEX_NAME_ESCAPE = re.compile(rb'#[0-9A-Fa-f]{2}')
+
+
+def extract_pdf_literal_raw(data: bytes, start_pos: int) -> bytes:
+
+    depth = 1
+    escaped = False
+    result = bytearray()
+
+    for i in range(start_pos, len(data)):
+        c = data[i]
+
+        if escaped:
+            result.append(c)
+            escaped = False
+            continue
+
+        if c == 0x5C:            # backslash
+            escaped = True
+            result.append(c)
+            continue
+
+        if c == 0x28:            # (
+            depth += 1
+            result.append(c)
+            continue
+
+        if c == 0x29:            # )
+            depth -= 1
+            if depth == 0:
+                break
+            result.append(c)
+            continue
+
+        result.append(c)
+
+    return bytes(result)
+
+
 def extract_hidden_uris(file_content: bytes) -> list[Threat]:
     threats = []
 
@@ -257,10 +297,20 @@ def extract_hidden_uris(file_content: bytes) -> list[Threat]:
         if not uri:
             continue
 
+        raw_value = extract_pdf_literal_raw(file_content, match.end())
         uri_lower = uri.lower()
         suspicious = (any(k in uri_lower for k in SUSPICIOUS_URI_KEYWORDS) or contains_ip(uri))
+        obfuscated = bool(OCTAL_ESCAPE.search(raw_value) or HEX_NAME_ESCAPE.search(raw_value))
 
-        if suspicious:
+        if obfuscated:
+            threats.append(Threat(
+                id="URI-OBFUSCATED", category="Network / Links",
+                severity=10 if suspicious else 9,
+                description=f"Obfuscated URI detected (escaped encoding decodes to '{uri}')",
+                location="Raw Binary"
+            ))
+
+        elif suspicious:
             threats.append(Threat(
                 id="URI-DETECTED", category="Network / Links", severity=8,
                 description=f"Suspicious URI detected ('{uri}')", location="Raw Binary"
@@ -271,15 +321,18 @@ def extract_hidden_uris(file_content: bytes) -> list[Threat]:
             continue
         try:
             uri = bytes.fromhex(match.group(1).decode()).decode("utf-8", errors="ignore").strip()
+
+            if not uri:
+                continue
+
             uri_lower = uri.lower()
-            
             suspicious = (any(k in uri_lower for k in SUSPICIOUS_URI_KEYWORDS) or contains_ip(uri))
 
-            if suspicious:
-                threats.append(Threat(
-                    id="URI-DETECTED-HEX", category="Network / Links", severity=8,
-                    description=f"Suspicious Hex URI detected ('{uri}')", location="Raw Binary"
-                ))
+            threats.append(Threat(
+                id="URI-DETECTED-HEX", category="Network / Links",
+                severity=10 if suspicious else 9,
+                description=f"Hex-encoded URI detected ('{uri}')", location="Raw Binary"
+            ))
         except Exception:
             pass
 
