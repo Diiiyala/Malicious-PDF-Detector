@@ -4,7 +4,12 @@ from analysis.detectors.structure.catalog import analyze_catalog
 from analysis.detectors.structure.names import analyze_names
 from analysis.detectors.structure.actions import perform_action_analysis
 from analysis.detectors.structure.streams import analyze_streams_and_objects
-from analysis.detectors.structure.evasion import analyze_dict_evasion
+from analysis.detectors.structure.evasion import (
+    analyze_dict_evasion,
+    scan_name_obfuscation,
+    name_obfuscation_index,
+    build_name_obfuscation_threats,
+)
 
 
 def _resolve_root(reader):
@@ -18,24 +23,32 @@ def _resolve_root(reader):
 def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> list[Threat]:
     threats = list(analyze_header(content.raw_binary))
 
+    name_records = []
     try:
         evasion_threats, conflicting_targets = analyze_dict_evasion(content.raw_binary)
         threats += evasion_threats
+        name_records = scan_name_obfuscation(content.raw_binary)
     except Exception:
         conflicting_targets = []
 
     if reader is None:
-        return threats
+        return threats + build_name_obfuscation_threats(name_records)
 
     root = _resolve_root(reader)
 
     threats += analyze_catalog(root, aggregator)
     threats += analyze_names(root)
 
+    merged_names = set()
     try:
-        threats += perform_action_analysis(reader, root, aggregator, conflicting_targets)
+        threats += perform_action_analysis(
+            reader, root, aggregator, conflicting_targets,
+            name_obfuscation_index(name_records), merged_names,
+        )
     except Exception:
         pass
+
+    threats += build_name_obfuscation_threats(name_records, merged_names)
 
     try:
         threats += analyze_streams_and_objects(reader, aggregator)
