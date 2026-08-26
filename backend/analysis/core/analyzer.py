@@ -133,6 +133,10 @@ SUBSUMABLE_IDS = {
     "URI-OBFUSCATED",
     "URI-DETECTED",
     "URI-DETECTED-HEX",
+    "STR-OBJ-REMOTE-RES",
+    "BIN-STR-LAUNCH",
+    "BIN-STR-OPEN",
+    "BIN-STR-SILENT",
 }
 
 IOC_TOKEN_PATTERN = re.compile(
@@ -140,29 +144,49 @@ IOC_TOKEN_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+NAME_TOKEN_PATTERN = re.compile(r"/([A-Za-z][A-Za-z0-9]{1,24})")
+WORD_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9]*")
 
-def extract_ioc_tokens(text: str) -> set:
-    return {m.rstrip(".,;:'\"") for m in IOC_TOKEN_PATTERN.findall(text)}
+
+def extract_evidence(description: str):
+    urls = {m.rstrip(".,;:'\"") for m in IOC_TOKEN_PATTERN.findall(description)}
+    without_urls = IOC_TOKEN_PATTERN.sub(" ", description)
+    names = {n.lower() for n in NAME_TOKEN_PATTERN.findall(without_urls)}
+    return urls, names
 
 
 def consolidate_threats(threats: list[Threat]) -> list[Threat]:
 
-    evidence = {}
+    url_evidence = {}
+    word_evidence = {}
 
     for t in threats:
         if t.id in SUBSUMABLE_IDS:
             continue
-        for token in extract_ioc_tokens(t.description):
-            evidence[token] = max(evidence.get(token, 0), t.severity)
+
+        urls, _ = extract_evidence(t.description)
+        for url in urls:
+            url_evidence[url] = max(url_evidence.get(url, 0), t.severity)
+
+        without_urls = IOC_TOKEN_PATTERN.sub(" ", t.description)
+        for word in WORD_PATTERN.findall(without_urls):
+            word = word.lower()
+            word_evidence[word] = max(word_evidence.get(word, 0), t.severity)
 
     kept = []
 
     for t in threats:
         if t.id in SUBSUMABLE_IDS:
-            tokens = extract_ioc_tokens(t.description)
-            if tokens and all(evidence.get(tok, -1) >= t.severity for tok in tokens):
+            urls, names = extract_evidence(t.description)
+
+            covered = bool(urls or names) \
+                and all(url_evidence.get(u, -1) >= t.severity for u in urls) \
+                and all(word_evidence.get(n, -1) >= t.severity for n in names)
+
+            if covered:
                 logger.debug("Absorbed redundant finding %s (%s)", t.id, t.description)
                 continue
+
         kept.append(t)
 
     return kept
