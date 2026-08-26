@@ -116,14 +116,20 @@ const Icon = {
 };
 
 
+const truncateAtWord = (value, limit) => {
+  const slice = value.slice(0, limit);
+  const lastSpace = slice.lastIndexOf(' ');
+  return `${lastSpace > limit * 0.6 ? slice.slice(0, lastSpace) : slice}...`;
+};
+
 const ExpandableText = ({ text, maxLength = 150, isAr, forceExpand = false }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   if (!text || text.length <= maxLength) return <span>{text}</span>;
   const expanded = isExpanded || forceExpand;
   return (
     <div className="inline-block">
-      <span className="break-all whitespace-pre-wrap">
-        {expanded ? text : `${text.substring(0, maxLength)}...`}
+      <span className="break-words whitespace-pre-wrap">
+        {expanded ? text : truncateAtWord(text, maxLength)}
       </span>
       {!forceExpand && (
         <button
