@@ -179,7 +179,7 @@ def analyze_timestamps(metadata) -> list[Threat]:
     
 def analyze_suspicious_sources(metadata) -> list[Threat]:
     threats = []
-    found_details = set()
+    found_by_field = {}
 
     for field in TARGET_SOURCE_FIELDS:
         if field not in metadata:
@@ -190,14 +190,22 @@ def analyze_suspicious_sources(metadata) -> list[Threat]:
 
         for indicator in SUSPICIOUS_SOURCE_INDICATORS:
             if indicator in value_lower:
-                found_details.add(f"{field_name}/{indicator.capitalize()}")
+                matches = found_by_field.setdefault(field_name, [])
+                label = indicator.capitalize()
+                if label not in matches:
+                    matches.append(label)
 
-    if found_details:
+    if found_by_field:
+        rendered = "; ".join(
+            f"{field_name}: {', '.join(sorted(matches))}"
+            for field_name, matches in found_by_field.items()
+        )
+
         threats.append(Threat(
             id="META-SUSPICIOUS-SOURCE",
             category="Metadata",
             severity=3,
-            description=f"Suspicious metadata source detected ({', '.join(sorted(found_details))})",
+            description=f"Suspicious metadata source detected ({rendered})",
             location="Source Fields"
         ))
     return threats
