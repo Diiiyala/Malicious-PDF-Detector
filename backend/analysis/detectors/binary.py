@@ -9,6 +9,9 @@ from analysis.signatures import (
     AGGREGATOR_PATTERNS,
 )
 
+INLINE_STRING_WINDOW = 24
+
+
 def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
     threats = []
     file_content = content.raw_binary
@@ -93,8 +96,8 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
                     clean_snippet = snippet.strip()
                 else:
                     raw_chunk = file_content[start:start + 1000]
-                    paren_start = raw_chunk.find(b'(')
-                    
+                    paren_start = raw_chunk.find(b'(', 0, INLINE_STRING_WINDOW)
+
                     if paren_start != -1:
                         depth = 0
                         chunk_content = bytearray()
@@ -115,8 +118,8 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
                             
                         snippet = chunk_content.decode('utf-8', errors='ignore')
                     else:
-                        snippet = raw_chunk.decode('utf-8', errors='ignore')
-                    
+                        continue
+
                     clean_snippet = snippet.strip()
                     while True:
                         prev_len = len(clean_snippet)
@@ -131,6 +134,9 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
                     
                 normalized_snippet = normalize_all(clean_snippet)     
                 
+                if not is_readable_snippet(normalized_snippet):
+                    continue
+
                 if normalized_snippet not in processed_snippets and normalized_snippet.strip():
                     processed_offsets.add(start)
                     processed_snippets.add(normalized_snippet)                          
@@ -142,6 +148,15 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
 #  Helpers
 # -----------------------------------------------------------------------     
         
+def is_readable_snippet(text: str, min_printable: float = 0.9, min_length: int = 3) -> bool:
+
+    if not text or len(text.strip()) < min_length:
+        return False
+
+    printable = sum(1 for c in text if 32 <= ord(c) <= 126 or c in "\t\n\r")
+    return printable / len(text) >= min_printable
+
+
 def is_structural_match(file_content: bytes, position: int, radius: int = 80) -> bool:
 
     lo = max(0, position - radius)
