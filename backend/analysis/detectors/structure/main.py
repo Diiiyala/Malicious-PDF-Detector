@@ -4,6 +4,7 @@ from analysis.detectors.structure.catalog import analyze_catalog
 from analysis.detectors.structure.names import analyze_names
 from analysis.detectors.structure.actions import perform_action_analysis
 from analysis.detectors.structure.streams import analyze_streams_and_objects
+from analysis.detectors.structure.evasion import analyze_dict_evasion
 
 
 def _resolve_root(reader):
@@ -17,6 +18,12 @@ def _resolve_root(reader):
 def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> list[Threat]:
     threats = list(analyze_header(content.raw_binary))
 
+    try:
+        evasion_threats, conflicting_targets = analyze_dict_evasion(content.raw_binary)
+        threats += evasion_threats
+    except Exception:
+        conflicting_targets = []
+
     if reader is None:
         return threats
 
@@ -26,7 +33,7 @@ def analyze_structure(content: ExtractedContent, reader, aggregator=None) -> lis
     threats += analyze_names(root)
 
     try:
-        threats += perform_action_analysis(reader, root, aggregator)
+        threats += perform_action_analysis(reader, root, aggregator, conflicting_targets)
     except Exception:
         pass
 
