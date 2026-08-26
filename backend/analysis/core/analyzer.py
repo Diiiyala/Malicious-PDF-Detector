@@ -81,7 +81,7 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
     # -------------------------------------------------------------------------
     # 4. Deduplication
     # -------------------------------------------------------------------------   
-    unique_threats = deduplicate_threats(all_threats)
+    unique_threats = consolidate_threats(deduplicate_threats(all_threats))
     
     # -------------------------------------------------------------------------
     # 5. Risk Calculation
@@ -128,6 +128,44 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
  
 MAX_LOCATIONS_PER_THREAT = 20
 MAX_FOUND_VALUES_PER_THREAT = 20
+
+SUBSUMABLE_IDS = {
+    "URI-OBFUSCATED",
+    "URI-DETECTED",
+    "URI-DETECTED-HEX",
+}
+
+IOC_TOKEN_PATTERN = re.compile(
+    r"""(?:[a-z][a-z0-9+.\-]{1,15}://[^\s'"()\[\]|]+|\\\\[^\s'"()\[\]|]+)""",
+    re.IGNORECASE,
+)
+
+
+def extract_ioc_tokens(text: str) -> set:
+    return {m.rstrip(".,;:'\"") for m in IOC_TOKEN_PATTERN.findall(text)}
+
+
+def consolidate_threats(threats: list[Threat]) -> list[Threat]:
+
+    evidence = {}
+
+    for t in threats:
+        if t.id in SUBSUMABLE_IDS:
+            continue
+        for token in extract_ioc_tokens(t.description):
+            evidence[token] = max(evidence.get(token, 0), t.severity)
+
+    kept = []
+
+    for t in threats:
+        if t.id in SUBSUMABLE_IDS:
+            tokens = extract_ioc_tokens(t.description)
+            if tokens and all(evidence.get(tok, -1) >= t.severity for tok in tokens):
+                logger.debug("Absorbed redundant finding %s (%s)", t.id, t.description)
+                continue
+        kept.append(t)
+
+    return kept
 
 FOUND_SUFFIX_PATTERN = re.compile(r"\s*\(Found:\s*'.*'\)\s*$")
 FOUND_VALUES_PATTERN = re.compile(r"\(Found:\s*'([^']+)'\)")
