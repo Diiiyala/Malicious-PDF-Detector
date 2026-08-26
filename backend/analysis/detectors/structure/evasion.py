@@ -260,6 +260,119 @@ def _is_obfuscated(raw: bytes) -> bool:
 
 
 # ==========================================================================
+# Hex-escaped name objects  (/#4c#61u#6ech  ==  /Launch)
+# ==========================================================================
+
+NAME_TOKEN = re.compile(rb"/[^\s/\[\]<>(){}%]*#[0-9A-Fa-f]{2}[^\s/\[\]<>(){}%]*")
+NAME_ESCAPE = re.compile(rb"#([0-9A-Fa-f]{2})")
+
+MAX_NAME_SCANS = 5000
+
+DANGEROUS_NAMES = {
+    "/launch": 12, "/javascript": 12, "/js": 12, "/openaction": 12,
+    "/aa": 11, "/embeddedfile": 11, "/embeddedfiles": 11, "/gotor": 11,
+    "/gotoe": 11, "/submitform": 11, "/importdata": 11, "/richmedia": 11,
+    "/xfa": 11, "/uri": 10, "/acroform": 9, "/objstm": 9, "/filespec": 8,
+}
+
+
+def _decode_name(token: bytes) -> bytes:
+    out = bytearray(token[:1])
+    i = 1
+    while i < len(token):
+        if token[i] == 0x23 and i + 2 < len(token):
+            chunk = token[i + 1:i + 3]
+            try:
+                out.append(int(chunk, 16))
+                i += 3
+                continue
+            except ValueError:
+                pass
+        out.append(token[i])
+        i += 1
+    return bytes(out)
+
+
+def decode_name_escapes(data: bytes) -> bytes:
+
+    if not data or b"#" not in data:
+        return data
+    return NAME_TOKEN.sub(lambda m: _decode_name(m.group(0)), data)
+
+
+def scan_name_obfuscation(raw_binary: bytes) -> list:
+    records = []
+
+    if not raw_binary or b"#" not in raw_binary:
+        return records
+
+    skip = _stream_ranges(raw_binary)
+    scanned = 0
+
+    for match in NAME_TOKEN.finditer(raw_binary):
+        scanned += 1
+        if scanned > MAX_NAME_SCANS:
+            logger.debug("Name obfuscation scan hit its cap")
+            break
+
+        start = match.start()
+        if any(lo <= start < hi for lo, hi in skip):
+            continue
+
+        token = match.group(0)
+        escaped = [int(h, 16) for h in NAME_ESCAPE.findall(token)]
+        if not escaped or not all(chr(c).isalnum() for c in escaped):
+            continue
+
+        decoded = _decode_name(token).decode("latin-1")
+
+        records.append({
+            "decoded": decoded,
+            "written": token.decode("latin-1"),
+            "severity": DANGEROUS_NAMES.get(decoded.lower(), 0),
+            "location": f"Offset 0x{start:x}",
+        })
+
+    return records
+
+
+def name_obfuscation_index(records: list) -> dict:
+
+    index = {}
+    for r in records:
+        if r["severity"]:
+            index.setdefault(r["decoded"].lower(), (r["written"], r["severity"]))
+    return index
+
+
+def build_name_obfuscation_threats(records: list, merged: set = None) -> list:
+
+    collector = ThreatCollector("Structure")
+    merged = merged or set()
+
+    for r in records:
+        if r["decoded"].lower() in merged:
+            continue
+
+        if r["severity"]:
+            collector.add(
+                "STR-EVASION-NAME", r["severity"],
+                f"Obfuscated name object hides ({r['decoded']}) - written as ({r['written']}) "
+                f"to defeat signature matching",
+                r["location"],
+            )
+        else:
+            collector.add(
+                "STR-EVASION-NAME-GENERIC", 6,
+                f"Name object written with unnecessary hex escapes "
+                f"({r['written']} resolves to {r['decoded']})",
+                r["location"],
+            )
+
+    return collector.render()
+
+
+# ==========================================================================
 # Public detector
 # ==========================================================================
 
