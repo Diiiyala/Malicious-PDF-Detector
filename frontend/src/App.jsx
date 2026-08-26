@@ -470,6 +470,7 @@ function App() {
   };
 
   const tones = {
+    safe: { text: 'text-safe', ring: 'ring-safe/30', bg: 'bg-safe/5', border: 'border-safe/25', pill: 'bg-safe/10 border-safe/30 text-safe', glow: '' },
     warning: { text: 'text-warn', ring: 'ring-warn/30', bg: 'bg-warn/5', border: 'border-warn/25', pill: 'bg-warn/10 border-warn/30 text-warn', glow: '' },
     danger: { text: 'text-danger', ring: 'ring-danger/30', bg: 'bg-danger/5', border: 'border-danger/25', pill: 'bg-danger/10 border-danger/30 text-danger', glow: '' },
   };
@@ -712,7 +713,7 @@ function App() {
                 </div>
               </div>
             )}
-            {scanResult.status === 'safe' ? (
+            {scanResult.status === 'safe' && scanResult.threats.length === 0 ? (
               <div className="tile p-12 text-center">
                 <div className="relative mx-auto mb-6 grid place-items-center w-24 h-24 rounded-full bg-safe/10 border border-safe/30">
                   <Icon.shieldCheck className="w-12 h-12 text-safe" />
@@ -735,17 +736,23 @@ function App() {
                 {/* Verdict + score tiles */}
                 {(() => {
                   const t = tones[scanResult.status] || tones.danger;
-                  const headline = scanResult.status === 'warning'
+                  const headline = scanResult.status === 'safe'
+                    ? (isAr ? 'لا توجد مؤشرات خطرة' : 'No Risky Indicators')
+                    : scanResult.status === 'warning'
                     ? (isAr ? 'تهديدات محتملة' : 'Possible Threats Detected')
                     : (isAr ? 'تم اكتشاف تهديدات!' : 'Threats Detected!');
-                  const sub = scanResult.status === 'warning'
+                  const sub = scanResult.status === 'safe'
+                    ? (isAr ? 'لم يُعثر على ما يدل على ضرر. الملاحظات أدناه للاطلاع فقط.' : 'Nothing harmful was found. The observations below are for your information only.')
+                    : scanResult.status === 'warning'
                     ? (isAr ? 'يحتوي هذا الملف على روابط أو عناصر منخفضة الخطورة يجب الانتباه لها.' : 'This file contains low-risk elements or links worth reviewing.')
                     : (isAr ? 'يحتوي هذا الملف على عناصر خبيثة ومؤشرات اختراق.' : 'This file contains malicious elements and indicators of compromise.');
                   return (
                     <>
                       <div className={`tile md:col-span-2 p-8 flex flex-col justify-center items-start ${isAr ? 'text-right' : ''}`}>
                         <div className={`inline-flex items-center gap-2 ${t.pill} border rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider mb-4`}>
-                          <Icon.alert className="w-3.5 h-3.5" />
+                          {scanResult.status === 'safe'
+                            ? <Icon.shieldCheck className="w-3.5 h-3.5" />
+                            : <Icon.alert className="w-3.5 h-3.5" />}
                           {isAr ? 'تقرير الفحص' : 'Scan Report'}
                         </div>
                         <h2 className={`text-3xl font-display font-bold mb-2 ${t.text}`}>{headline}</h2>
@@ -756,13 +763,13 @@ function App() {
                               <Icon.layers className="w-4 h-4 text-slate-500 shrink-0" /><span className="truncate">{fileName}</span>
                             </span>
                           )}
-                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.alert className="w-4 h-4 text-slate-500" />{scanResult.threats.length} {isAr ? 'تهديدات' : 'threats'}</span>
+                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.alert className="w-4 h-4 text-slate-500" />{scanResult.threats.length} {scanResult.status === 'safe' ? (isAr ? 'ملاحظات' : 'observations') : (isAr ? 'تهديدات' : 'threats')}</span>
                           <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.code className="w-4 h-4 text-slate-500" />{scanResult.extractedScripts.length} {isAr ? 'سكريبتات' : 'scripts'}</span>
                         </div>
                       </div>
 
                       <div className="tile p-8 flex flex-col items-center justify-center">
-                        <RiskGauge score={scanResult.overallScore} tone={scanResult.status === 'warning' ? 'warn' : 'danger'} />
+                        <RiskGauge score={scanResult.overallScore} tone={scanResult.status === 'safe' ? 'safe' : scanResult.status === 'warning' ? 'warn' : 'danger'} />
                         <div className="text-xs text-slate-400 uppercase tracking-widest mt-2">{isAr ? 'نسبة الخطورة' : 'Risk Score'}</div>
                       </div>
                     </>
@@ -776,7 +783,11 @@ function App() {
                     <div className="tile md:col-span-3 overflow-hidden">
                       <div className={`px-6 py-4 border-b border-white/10 flex items-center gap-3 ${isAr ? 'flex-row-reverse text-right' : ''}`}>
                         <Icon.layers className={`w-5 h-5 ${t.text}`} />
-                        <h3 className="text-lg font-display font-bold">{isAr ? 'التهديدات المكتشفة' : 'Detected Threats'}</h3>
+                        <h3 className="text-lg font-display font-bold">
+                          {scanResult.status === 'safe'
+                            ? (isAr ? 'ملاحظات الفحص' : 'Scan Observations')
+                            : (isAr ? 'التهديدات المكتشفة' : 'Detected Threats')}
+                        </h3>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full">
