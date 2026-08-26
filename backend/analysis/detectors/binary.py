@@ -1,6 +1,7 @@
 import re, ipaddress
 from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.normalizer import normalize_all, decode_pdf_octal, decode_pdf_hex_names
+from analysis.detectors.structure.evasion import decode_name_escapes
 from analysis.signatures import (
     SUSPICIOUS_URI_KEYWORDS,
     STRUCTURE_PATTERNS,
@@ -30,9 +31,11 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
     # 2. Structure-based detection
     # ------------------------------------------------------------------
 
+    scan_view = decode_name_escapes(file_content)
+
     for pattern, (desc, severity, t_id) in STRUCTURE_PATTERNS.items():
-        if any(is_structural_match(file_content, m.start())
-               for m in re.finditer(pattern, file_content, re.IGNORECASE)):
+        if any(is_structural_match(scan_view, m.start())
+               for m in re.finditer(pattern, scan_view, re.IGNORECASE)):
             threats.append(Threat(
                 id=t_id, category="Binary Structure", severity=severity,
                 description=desc, location="Raw Binary"
