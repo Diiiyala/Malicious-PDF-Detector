@@ -252,6 +252,17 @@ const TERMINAL_TEXT = {
   err_connection: { en: 'Connection failed! Ensure Flask is running.', ar: 'فشل الاتصال! تأكد من تشغيل خادم Flask.' },
 };
 
+const CATEGORY_TEXT = {
+  content:         { en: 'CONTENT',         ar: 'المحتوى' },
+  structure:       { en: 'STRUCTURE',       ar: 'البنية' },
+  metadata:        { en: 'METADATA',        ar: 'البيانات الوصفية' },
+  text_extraction: { en: 'TEXT EXTRACTION', ar: 'استخراج النص' },
+  binary:          { en: 'BINARY',          ar: 'المحتوى الثنائي' },
+};
+
+const categoryLabel = (key, isAr) =>
+  (CATEGORY_TEXT[key] || {})[isAr ? 'ar' : 'en'] || String(key || '').replace(/_/g, ' ').toUpperCase();
+
 function App() {
   const [lang, setLang] = useState('en');
   const isAr = lang === 'ar';
@@ -332,7 +343,7 @@ function App() {
               parsedThreats.push({
                 id: threatId++,
                 name: threatName,
-                category: category.replace('_', ' ').toUpperCase(),
+                categoryKey: category,
                 offset: location,
                 risk: riskLevel,
               });
@@ -794,9 +805,9 @@ function App() {
                           <thead className="text-slate-400 text-xs uppercase tracking-wider bg-white/[0.02]">
                             <tr>
                               <th className={`px-6 py-4 font-semibold ${isAr ? 'text-right' : 'text-left'}`}>{isAr ? 'التهديد' : 'Threat'}</th>
-                              <th className={`px-6 py-4 font-semibold ${isAr ? 'text-right' : 'text-left'}`}>{isAr ? 'التصنيف' : 'Category'}</th>
-                              <th className={`px-6 py-4 font-semibold ${isAr ? 'text-right' : 'text-left'}`}>{isAr ? 'الموقع' : 'Location'}</th>
-                              <th className={`px-6 py-4 font-semibold ${isAr ? 'text-right' : 'text-left'}`}>{isAr ? 'الخطورة' : 'Risk'}</th>
+                              <th className="px-6 py-4 font-semibold text-center">{isAr ? 'التصنيف' : 'Category'}</th>
+                              <th className="px-6 py-4 font-semibold text-center">{isAr ? 'الموقع' : 'Location'}</th>
+                              <th className="px-6 py-4 font-semibold text-center">{isAr ? 'الخطورة' : 'Risk'}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-white/5">
@@ -805,12 +816,14 @@ function App() {
                                 <td className={`px-6 py-4 font-medium text-white ${isAr ? 'text-right' : 'text-left'}`}>
                                   <ExpandableText text={threat.name} maxLength={120} isAr={isAr} forceExpand={capturing} />
                                 </td>
-                                <td className={`px-6 py-4 ${isAr ? 'text-right' : 'text-left'}`}>
-                                  <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">{threat.category}</span>
+                                <td className="px-6 py-4 align-middle whitespace-nowrap text-center">
+                                  <span className={`inline-block whitespace-nowrap text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300 ${isAr ? 'font-sans' : 'font-mono'}`}>
+                                    {categoryLabel(threat.categoryKey, isAr)}
+                                  </span>
                                 </td>
-                                <td className={`px-6 py-4 text-slate-400 font-mono text-sm ${isAr ? 'text-right' : 'text-left'}`}>{threat.offset}</td>
-                                <td className={`px-6 py-4 ${isAr ? 'text-right' : 'text-left'}`}>
-                                  <span className={`inline-block px-3.5 py-1 rounded-full text-xs font-bold tracking-wider border ${t.pill}`}>{threat.risk}</span>
+                                <td className="px-6 py-4 text-slate-400 font-mono text-sm text-center align-middle" dir="ltr">{threat.offset}</td>
+                                <td className="px-6 py-4 text-center align-middle whitespace-nowrap">
+                                  <span className={`inline-block px-3.5 py-1 rounded-full text-xs font-bold tracking-wider border ${t.pill}`} dir="ltr">{threat.risk}</span>
                                 </td>
                               </tr>
                             ))}
