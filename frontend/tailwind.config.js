@@ -28,8 +28,8 @@ export default {
         danger: '#f43f5e',
       },
       fontFamily: {
-        sans: ["Tajawal", "system-ui", "sans-serif"],
-        display: ["'Space Grotesk'", "Tajawal", "sans-serif"],
+        sans: ["Satoshi", "Tajawal", "system-ui", "sans-serif"],
+        display: ["Satoshi", "Tajawal", "sans-serif"],
         mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
       },
       backgroundImage: {
