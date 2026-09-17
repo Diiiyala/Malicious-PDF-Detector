@@ -534,10 +534,14 @@ function App() {
 
             <button
               onClick={() => setLang(isAr ? 'en' : 'ar')}
-              className="group flex items-center justify-center gap-2 text-slate-300 hover:text-white transition bg-white/5 hover:bg-white/10 px-4 py-2 border border-white/10 rounded-2xl leading-none"
+              className="group flex items-center justify-center text-slate-300 hover:text-white transition bg-white/5 hover:bg-white/10 px-4 py-2 border border-white/10 rounded-2xl leading-none"
             >
-              <Icon.globe className="w-4 h-4 text-brand-400 group-hover:rotate-12 transition-transform shrink-0" />
-              <span className="font-display font-medium text-sm leading-none -mt-px" dir="ltr">{isAr ? 'EN' : 'AR'}</span>
+              <span className="flex items-center gap-2 translate-y-[2px]">
+                <span className="h-5 w-4 flex items-center justify-center shrink-0 -translate-y-0.5">
+                  <Icon.globe className="w-4 h-4 text-brand-400 group-hover:rotate-12 transition-transform" />
+                </span>
+                <span className="font-display font-medium text-sm leading-none" dir="ltr">{isAr ? 'EN' : 'AR'}</span>
+              </span>
             </button>
           </div>
         </header>
