@@ -113,6 +113,11 @@ const Icon = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 7l9 6 9-6" />
     </svg>
   ),
+  linkedin: (p) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...p}>
+      <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.03-1.85-3.03-1.86 0-2.14 1.45-2.14 2.94v5.66H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 110-4.12 2.06 2.06 0 010 4.12zM7.12 20.45H3.56V9h3.56v11.45z" />
+    </svg>
+  ),
 };
 
 
@@ -885,9 +890,9 @@ function App() {
                   {isAr ? 'تم تطويره بواسطة ديالى التركي' : 'Developed by Diyala Alturki'}
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-2" dir="ltr">
-                  <span className="flex items-center gap-2 text-slate-400"><Icon.github className="w-4 h-4" /> Diiiyala</span>
+                  <span className="flex items-center gap-2 text-slate-400"><span className="h-5 w-4 flex items-center justify-center flex-shrink-0"><Icon.github className="w-4 h-4" /></span> Diiiyala</span>
                   <span className="text-white/15">|</span>
-                  <span className="flex items-center gap-2 text-slate-400"><Icon.mail className="w-4 h-4" /> diyala.alturki@gmail.com</span>
+                  <span className="flex items-center gap-2 text-slate-400"><span className="h-5 w-4 flex items-center justify-center flex-shrink-0"><Icon.mail className="w-4 h-4" /></span> diyala.alturki@gmail.com</span>
                 </div>
               </div>
             )}
@@ -997,16 +1002,31 @@ function App() {
             href="https://github.com/Diiiyala"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition"
+            className="group flex items-center gap-2 text-slate-400 hover:text-white transition"
           >
-            <Icon.github className="w-4 h-4" /> Diiiyala
+            <span className="h-5 w-4 flex items-center justify-center flex-shrink-0">
+              <img src="/github.svg" alt="GitHub" className="w-4 h-4 invert opacity-60 group-hover:opacity-100 transition-opacity" />
+            </span> Diiiyala
           </a>
           <span className="text-white/15">|</span>
           <a
             href="mailto:diyala.alturki@gmail.com"
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition"
+            className="group flex items-center gap-2 text-slate-400 hover:text-white transition"
           >
-            <Icon.mail className="w-4 h-4" /> diyala.alturki@gmail.com
+            <span className="h-5 w-4 flex items-center justify-center flex-shrink-0">
+              <img src="/mail.svg" alt="Email" className="w-4 h-4 invert opacity-60 group-hover:opacity-100 transition-opacity" />
+            </span> diyala.alturki@gmail.com
+          </a>
+          <span className="text-white/15">|</span>
+          <a
+            href="https://www.linkedin.com/in/diyala-alturki"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-2 text-slate-400 hover:text-white transition"
+          >
+            <span className="h-5 w-4 flex items-center justify-center flex-shrink-0">
+              <img src="/linkedin.svg" alt="LinkedIn" className="w-4 h-4 invert opacity-60 group-hover:opacity-100 transition-opacity" />
+            </span> diyala-alturki
           </a>
         </div>
       </footer>
