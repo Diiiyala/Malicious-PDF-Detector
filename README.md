@@ -4,6 +4,7 @@ A web application that analyzes PDF files for potentially malicious content and 
 
 The detector checks for embedded JavaScript, automatic actions, suspicious links, structural evasion techniques, anomalous metadata, and hidden execution indicators.
 
+![Malicious PDF Detector interface](Frontend.jpg)
 
 ## Key Features
 
