@@ -213,3 +213,10 @@ This application uses heuristic detection to identify suspicious indicators.
 A low-risk result does not guarantee that a PDF is safe, and a flagged finding does not confirm malicious intent.
 
 Use the results alongside sandbox analysis, antivirus or EDR scanning, and your organization's security procedures when handling untrusted PDFs.
+
+## License
+
+Copyright © 2026 Diyala Alturki. All rights reserved.
+
+Use, copying, modification, and distribution require prior written
+permission. See [LICENSE](LICENSE) for details.
