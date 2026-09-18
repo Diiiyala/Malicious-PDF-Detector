@@ -1,5 +1,5 @@
 
-import logging
+import re, logging
 logger = logging.getLogger(__name__)
 
 # ==========================================================================================
@@ -57,6 +57,35 @@ SUSPICIOUS_URI_KEYWORDS = [
     ".docm", ".xlsm", ".pptm",
     "cmd.exe", "powershell", "wscript", "cscript", "mshta",
     "rundll32", "regsvr32", "certutil", "bitsadmin", "wmic",
+]
+
+# 1.4 PDF structure keys (Names tree / actions / AA triggers)
+
+NAVIGATION_ACTIONS = ["/GoTo", "/Named"]
+
+SUSPICIOUS_NAME_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
+
+DANGEROUS_NAMES = {
+    "/launch": 12, "/javascript": 12, "/js": 12, "/openaction": 12,
+    "/aa": 11, "/embeddedfile": 11, "/embeddedfiles": 11, "/gotor": 11,
+    "/gotoe": 11, "/submitform": 11, "/importdata": 11, "/richmedia": 11,
+    "/xfa": 11, "/uri": 10, "/acroform": 9, "/objstm": 9, "/filespec": 8,
+}
+
+ACTION_DUP_KEYS = {
+    "/A", "/AA", "/OpenAction", "/URI", "/JS", "/JavaScript", "/F",
+    "/Dest", "/Launch", "/Names", "/EmbeddedFile", "/S", "/Filter",
+}
+
+AA_SILENT_TRIGGERS = ["/WP", "/DP", "/WC", "/WS", "/DS"]
+
+SUSPICIOUS_STREAM_FILTERS = ["/JBIG2Decode", "/Crypt"]
+
+# 1.5 Decoded-payload keyword heuristic
+
+SUSPICIOUS_KEYS = [
+    "eval", "exec", "cmd", "powershell", "http", "https", "script",
+    "function", "fromcharcode", "atob", "document", "window",
 ]
 
 # ==========================================================================================
@@ -158,6 +187,24 @@ SCRIPT_TYPE_MAP = {
 
 AGGREGATOR_PATTERNS = set(SCRIPT_TYPE_MAP.keys())
 
+# 2.4 Raw regex primitives
+
+OCTAL_ESCAPE = re.compile(rb"\\[0-7]{2,3}")
+HEX_ESCAPE = re.compile(rb"#[0-9A-Fa-f]{2}")
+
+B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
+BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
+
+IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
+URL_PATTERN = re.compile(r'\b(?:https?|ftp|ftps|file|smb|ssh|telnet|gopher|ldap|mailto|news|nntp|irc|data|javascript|ws|wss|vnd\.sun\.star\.expand)://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
+UNC_PATTERN = re.compile(r'(?:\\\\|\\\\\\\\)(?:https?://)?[a-zA-Z0-9.-]+\\[^\s\)\>]+', re.IGNORECASE)
+JS_URL_PATTERN = re.compile(
+    r'(?:(?:cPath|url|uri|location|src|cURL|action|target|soapAction)\s*[:=]\s*(?:encodeURI\s*\(\s*)?["\']?|'
+    r'(?:app\.launchURL|this\.getURL|getURL|launchURL)\s*\(\s*(?:encodeURI\s*\(\s*)?["\'])'
+    r'([^"\'\s\)\+]+)',
+    re.IGNORECASE
+)
+
 # ==========================================================================================
 # INTEGRITY CHECK
 # ==========================================================================================
@@ -170,6 +217,11 @@ _ALL_VOCAB = {
     "HACKING_TOOLS": HACKING_TOOLS,
     "SUSPICIOUS_SOURCE_INDICATORS": SUSPICIOUS_SOURCE_INDICATORS,
     "SUSPICIOUS_URI_KEYWORDS": SUSPICIOUS_URI_KEYWORDS,
+    "NAVIGATION_ACTIONS": NAVIGATION_ACTIONS,
+    "SUSPICIOUS_NAME_KEYS": SUSPICIOUS_NAME_KEYS,
+    "AA_SILENT_TRIGGERS": AA_SILENT_TRIGGERS,
+    "SUSPICIOUS_STREAM_FILTERS": SUSPICIOUS_STREAM_FILTERS,
+    "SUSPICIOUS_KEYS": SUSPICIOUS_KEYS,
 }
 
 for _name, _lst in _ALL_VOCAB.items():
