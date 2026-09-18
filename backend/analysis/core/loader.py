@@ -44,6 +44,17 @@ def load_pdf(raw_file_content: bytes, filename: str = ""):
 
                     try:
                         data = obj.read_bytes()
+                    except MemoryError:
+                        logger.warning(
+                            "Stream in %s exceeded memory limits while "
+                            "decompressing (Potential Decompression Bomb) - "
+                            "skipped", filename
+                        )
+                        findings.append(
+                            "ALERT: Stream exceeded memory limits while "
+                            "decompressing (Potential Decompression Bomb)"
+                        )
+                        continue
                     except Exception as e:
                         logger.debug(
                             "Could not read stream object during repair: %s", e
