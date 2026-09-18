@@ -8,6 +8,8 @@ from analysis.signatures import (
     CONTENT_PATTERNS,
     SCRIPT_TYPE_MAP,
     AGGREGATOR_PATTERNS,
+    OCTAL_ESCAPE,
+    HEX_ESCAPE,
 )
 
 INLINE_STRING_WINDOW = 24
@@ -248,10 +250,6 @@ def contains_ip(text: str) -> bool:
             return True
     return False
 
-OCTAL_ESCAPE = re.compile(rb'\\[0-7]{2,3}')
-HEX_NAME_ESCAPE = re.compile(rb'#[0-9A-Fa-f]{2}')
-
-
 def extract_pdf_literal_raw(data: bytes, start_pos: int) -> bytes:
 
     depth = 1
@@ -303,7 +301,7 @@ def extract_hidden_uris(file_content: bytes) -> list[Threat]:
         raw_value = extract_pdf_literal_raw(file_content, match.end())
         uri_lower = uri.lower()
         suspicious = (any(k in uri_lower for k in SUSPICIOUS_URI_KEYWORDS) or contains_ip(uri))
-        obfuscated = bool(OCTAL_ESCAPE.search(raw_value) or HEX_NAME_ESCAPE.search(raw_value))
+        obfuscated = bool(OCTAL_ESCAPE.search(raw_value) or HEX_ESCAPE.search(raw_value))
 
         if obfuscated:
             threats.append(Threat(
