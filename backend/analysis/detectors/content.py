@@ -4,10 +4,7 @@ from analysis.utils.models import ExtractedContent, Threat
 from analysis.utils.links import analyze_links
 from analysis.utils.normalizer import is_valid_decoded
 from analysis.utils.text_metrics import calculate_entropy
-from analysis.signatures import EXEC_PATTERNS, SYSTEM_THREATS
-
-B64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
-BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
+from analysis.signatures import EXEC_PATTERNS, SYSTEM_THREATS, B64_PATTERN, BTC_ADDRESS
 
 MAX_MATCHES_PER_PATTERN = 25
 
