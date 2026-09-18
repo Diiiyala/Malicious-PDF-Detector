@@ -1,15 +1,7 @@
 import re
-from analysis.signatures import SHORTENERS, SUSPICIOUS_KEYWORDS, MALICIOUS_PARAMS
-
-IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b')
-URL_PATTERN = re.compile(r'\b(?:https?|ftp|ftps|file|smb|ssh|telnet|gopher|ldap|mailto|news|nntp|irc|data|javascript|ws|wss|vnd\.sun\.star\.expand)://[^\s"\'\)\(\}\{><,]+', re.IGNORECASE)
-UNC_PATTERN = re.compile(r'(?:\\\\|\\\\\\\\)(?:https?://)?[a-zA-Z0-9.-]+\\[^\s\)\>]+', re.IGNORECASE)
-
-JS_URL_PATTERN = re.compile(
-    r'(?:(?:cPath|url|uri|location|src|cURL|action|target|soapAction)\s*[:=]\s*(?:encodeURI\s*\(\s*)?["\']?|'
-    r'(?:app\.launchURL|this\.getURL|getURL|launchURL)\s*\(\s*(?:encodeURI\s*\(\s*)?["\'])'
-    r'([^"\'\s\)\+]+)', 
-    re.IGNORECASE
+from analysis.signatures import (
+    SHORTENERS, SUSPICIOUS_KEYWORDS, MALICIOUS_PARAMS,
+    IP_PATTERN, URL_PATTERN, UNC_PATTERN, JS_URL_PATTERN,
 )
 
 def analyze_links(text):
