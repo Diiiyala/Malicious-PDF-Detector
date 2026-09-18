@@ -81,6 +81,9 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                             t.category = "Stream/Object"
                             t.location = f"{location_label} (Metadata XML)"
                             threats.append(t)
+                    except MemoryError:
+                        logger.warning("Metadata stream in %s exceeded memory limits while decompressing", location_label)
+                        add_threat("STR-OBJ-BOMB", 10, "Metadata stream exceeded memory limits while decompressing (Potential Decompression Bomb)", location_label)
                     except Exception as e:
                         logger.debug("Metadata XML stream analysis failed: %s", e)
 
@@ -140,6 +143,9 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                                 t.category = "Stream/Object"
                                 t.location = f"{location_label} (XFA Stream)"
                                 threats.append(t)
+                    except MemoryError:
+                        logger.warning("XFA stream in %s exceeded memory limits while decompressing", location_label)
+                        add_threat("STR-OBJ-BOMB", 10, "XFA stream exceeded memory limits while decompressing (Potential Decompression Bomb)", location_label)
                     except Exception as e:
                         logger.debug("XFA stream analysis failed: %s", e)
 
@@ -172,6 +178,9 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                                         t.category = "Stream/Object"
                                         t.location = f"{location_label} (Embedded File)"
                                         threats.append(t)
+                    except MemoryError:
+                        logger.warning("Embedded-file stream in %s exceeded memory limits while decompressing", location_label)
+                        add_threat("STR-OBJ-BOMB", 10, "Embedded-file stream exceeded memory limits while decompressing (Potential Decompression Bomb)", location_label)
                     except Exception as e:
                         logger.debug("Embedded-file stream analysis failed: %s", e)
 
