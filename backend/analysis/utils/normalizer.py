@@ -1,12 +1,8 @@
 import re, base64, urllib.parse, logging
 from analysis.utils.text_metrics import calculate_entropy
+from analysis.signatures import SUSPICIOUS_KEYS
 
 logger = logging.getLogger(__name__)
-
-SUSPICIOUS_KEYS = [ "eval", "exec", "cmd", "powershell",
-        "http", "https", "script", "function",
-        "fromcharcode", "atob", "document", "window"
-    ]
 
 ESCAPE_PATTERN = re.compile(
     r'\\u([dD][89abAB][0-9a-fA-F]{2})\\u([dD][c-fC-F][0-9a-fA-F]{2})'
