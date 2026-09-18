@@ -11,11 +11,14 @@ BTC_ADDRESS = re.compile(r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b')
 
 MAX_MATCHES_PER_PATTERN = 25
 
-def analyze_content(content: ExtractedContent, aggregator=None) -> list[Threat]:
-
-    if not content.extracted_text:
+def scan_text(text: str, aggregator=None) -> list[Threat]:
+    if not text:
         return []
-    return _analyze_text_recursive(content.extracted_text, depth=0, aggregator=aggregator)
+    return _analyze_text_recursive(text, depth=0, aggregator=aggregator)
+
+
+def analyze_content(content: ExtractedContent, aggregator=None) -> list[Threat]:
+    return scan_text(content.extracted_text, aggregator=aggregator)
 
 def _analyze_text_recursive(text: str, depth=0, aggregator=None) -> list[Threat]:
     if depth > 2: return []
