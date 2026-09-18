@@ -4,6 +4,7 @@ import logging
 from analysis.utils.models import Threat
 from analysis.detectors.structure.collector import ThreatCollector
 from analysis.utils.normalizer import decode_pdf_octal, decode_pdf_hex_names
+from analysis.signatures import ACTION_DUP_KEYS, DANGEROUS_NAMES, OCTAL_ESCAPE, HEX_ESCAPE
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +19,6 @@ MAX_VALUE_CHARS = 90
 MAX_CONFLICT_TARGETS = 3
 WS = b"\x00\t\n\x0c\r "
 DELIMS = b"()<>[]{}/%"
-
-ACTION_DUP_KEYS = {
-    "/A", "/AA", "/OpenAction", "/URI", "/JS", "/JavaScript", "/F",
-    "/Dest", "/Launch", "/Names", "/EmbeddedFile", "/S", "/Filter",
-}
-
-OCTAL_ESCAPE = re.compile(rb"\\[0-7]{2,3}")
-HEX_ESCAPE = re.compile(rb"#[0-9A-Fa-f]{2}")
 
 
 # ==========================================================================
@@ -267,14 +260,6 @@ NAME_TOKEN = re.compile(rb"/[^\s/\[\]<>(){}%]*#[0-9A-Fa-f]{2}[^\s/\[\]<>(){}%]*"
 NAME_ESCAPE = re.compile(rb"#([0-9A-Fa-f]{2})")
 
 MAX_NAME_SCANS = 5000
-
-DANGEROUS_NAMES = {
-    "/launch": 12, "/javascript": 12, "/js": 12, "/openaction": 12,
-    "/aa": 11, "/embeddedfile": 11, "/embeddedfiles": 11, "/gotor": 11,
-    "/gotoe": 11, "/submitform": 11, "/importdata": 11, "/richmedia": 11,
-    "/xfa": 11, "/uri": 10, "/acroform": 9, "/objstm": 9, "/filespec": 8,
-}
-
 
 def _decode_name(token: bytes) -> bytes:
     out = bytearray(token[:1])
