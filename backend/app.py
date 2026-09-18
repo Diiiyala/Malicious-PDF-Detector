@@ -41,8 +41,11 @@ def apply_memory_guard(limit_mb: int) -> None:
 
 apply_memory_guard(MAX_PROCESS_MEMORY_MB)
 
+DEFAULT_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", DEFAULT_ORIGINS).split(",")
+
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=ALLOWED_ORIGINS)
 app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_MB * 1024 * 1024
 
 
