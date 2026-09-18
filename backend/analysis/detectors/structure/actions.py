@@ -1,11 +1,10 @@
 import re, logging
 from analysis.utils.models import Threat
 from analysis.detectors.structure.collector import ThreatCollector
-from analysis.signatures import SUSPICIOUS_URI_KEYWORDS
+from analysis.signatures import SUSPICIOUS_URI_KEYWORDS, NAVIGATION_ACTIONS, AA_SILENT_TRIGGERS
 
 logger = logging.getLogger(__name__)
 
-NAVIGATION_ACTIONS = ["/GoTo", "/Named"]
 MAX_SEVERITY = 15
 OBFUSCATION_BONUS = 2
 
@@ -117,7 +116,7 @@ def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=N
             aa_dict = root["/AA"].get_object()
             found_silent_triggers = []
 
-            for silent_trigger in ["/WP", "/DP", "/WC", "/WS", "/DS"]:
+            for silent_trigger in AA_SILENT_TRIGGERS:
                 if silent_trigger in aa_dict:
                     found_silent_triggers.append(silent_trigger)
 
