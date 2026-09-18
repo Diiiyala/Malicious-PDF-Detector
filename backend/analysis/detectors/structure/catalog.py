@@ -1,6 +1,6 @@
 import re, logging
-from analysis.utils.models import ExtractedContent, Threat
-from analysis.detectors.content import analyze_content
+from analysis.utils.models import Threat
+from analysis.detectors.content import scan_text
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +52,10 @@ def analyze_catalog(root, aggregator=None) -> list[Threat]:
                                         if embedded_data:
                                             decoded_text = embedded_data.decode('utf-8', errors='ignore')
 
-                                            dummy_content = ExtractedContent(extracted_text=decoded_text)
-                                            content_threats = analyze_content(dummy_content, aggregator=aggregator)
+                                            content_threats = scan_text(decoded_text, aggregator=aggregator)
 
                                             for ct in content_threats:
+                                                ct.category = "Structure"
                                                 ct.location = f"Inside embedded file: {f_name}"
                                                 threats.append(ct)
 
