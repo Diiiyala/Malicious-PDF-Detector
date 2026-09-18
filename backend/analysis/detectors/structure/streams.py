@@ -2,6 +2,7 @@ import re, logging
 from analysis.utils.models import Threat
 from analysis.detectors.structure.collector import ThreatCollector
 from analysis.detectors.content import scan_text
+from analysis.signatures import SUSPICIOUS_STREAM_FILTERS, AA_SILENT_TRIGGERS
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,6 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
     collector = ThreatCollector("Stream/Object")
     add_threat = collector.add
     visited_objects = set()
-    suspicious_filters = ["/JBIG2Decode", "/Crypt"]
-
     # ---------------------------------------------------------------------
     # Retrieve all object numbers from cross-reference table
     # ---------------------------------------------------------------------
@@ -150,7 +149,7 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                     filt_list = filt if isinstance(filt, list) else [filt]
                     for f in filt_list:
                         f_name = str(f)
-                        for s_filt in suspicious_filters:
+                        for s_filt in SUSPICIOUS_STREAM_FILTERS:
                             if s_filt in f_name:
                                 add_threat("STR-OBJ-SUSP-FILTER", 8, f"Suspicious stream filter ({f_name}) detected", location_label)
 
@@ -192,7 +191,7 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                             elif "/PV" in aa_obj or "/PC" in aa_obj:
                                 add_threat("STR-OBJ-AA-PAGE", 12, "Event-based execution trigger (Page Visibility/Close)", location_label)
                             else:
-                                found_keys = [k for k in ["/WC", "/WS", "/DS", "/WP", "/DP"] if k in aa_obj]
+                                found_keys = [k for k in AA_SILENT_TRIGGERS if k in aa_obj]
                                 if found_keys:
                                     add_threat("STR-OBJ-AA-SILENT", 12, f"Silent background trigger detected (Found: '{', '.join(found_keys)}')", location_label)
                     except Exception as e:
