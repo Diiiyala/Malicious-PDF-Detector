@@ -1,10 +1,10 @@
 import logging
 from analysis.utils.models import Threat
+from analysis.signatures import SUSPICIOUS_NAME_KEYS
 
 logger = logging.getLogger(__name__)
 
 WHITELIST = ["/Dests", "/AP", "/Pages", "/Templates", "/IDS", "/URLS"]
-SUSPICIOUS_NAME_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
 
 def analyze_names(root) -> list[Threat]:
 
