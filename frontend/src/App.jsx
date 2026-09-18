@@ -269,6 +269,7 @@ const CATEGORY_TEXT = {
   metadata:        { en: 'METADATA',        ar: 'البيانات الوصفية' },
   text_extraction: { en: 'TEXT EXTRACTION', ar: 'استخراج النص' },
   binary:          { en: 'BINARY',          ar: 'المحتوى الثنائي' },
+  not_specified:   { en: 'NOT SPECIFIED',   ar: 'غير محدد' },
 };
 
 const categoryLabel = (key, isAr) =>
