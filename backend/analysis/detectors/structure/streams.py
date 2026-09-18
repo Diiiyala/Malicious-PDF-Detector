@@ -1,7 +1,7 @@
 import re, logging
-from analysis.utils.models import ExtractedContent, Threat
+from analysis.utils.models import Threat
 from analysis.detectors.structure.collector import ThreatCollector
-from analysis.detectors.content import analyze_content
+from analysis.detectors.content import scan_text
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +77,9 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                 if obj.get("/Type") == "/Metadata":
                     try:
                         raw_xml = obj.get_data().decode("utf-8", errors="ignore")
-                        dummy_content = ExtractedContent(extracted_text=raw_xml)
-                        xml_threats = analyze_content(dummy_content, aggregator=aggregator)
+                        xml_threats = scan_text(raw_xml, aggregator=aggregator)
                         for t in xml_threats:
+                            t.category = "Stream/Object"
                             t.location = f"{location_label} (Metadata XML)"
                             threats.append(t)
                     except Exception as e:
@@ -116,9 +116,9 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                             if aggregator:
                                 aggregator.add_script(content_to_scan, location_label, source_object=location_label)
 
-                            dummy_content = ExtractedContent(extracted_text=content_to_scan)
-                            c_threats = analyze_content(dummy_content, aggregator=aggregator)
+                            c_threats = scan_text(content_to_scan, aggregator=aggregator)
                             for t in c_threats:
+                                t.category = "Stream/Object"
                                 t.location = f"{location_label} (JS Stream)"
                                 threats.append(t)
                         except Exception as e:
@@ -136,9 +136,9 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                             if aggregator:
                                 aggregator.add_script(xfa_text, location_label, script_type="XFA/XML-Form")
 
-                            dummy_content = ExtractedContent(extracted_text=xfa_text)
-                            xfa_threats = analyze_content(dummy_content, aggregator=aggregator)
+                            xfa_threats = scan_text(xfa_text, aggregator=aggregator)
                             for t in xfa_threats:
+                                t.category = "Stream/Object"
                                 t.location = f"{location_label} (XFA Stream)"
                                 threats.append(t)
                     except Exception as e:
@@ -168,9 +168,9 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                                     if aggregator:
                                         aggregator.add_script(decoded_stream_text, f"{location_label} (Embedded)", script_type="Embedded HTML/JS Payload")
 
-                                    dummy_content = ExtractedContent(extracted_text=decoded_stream_text)
-                                    emb_threats = analyze_content(dummy_content, aggregator=aggregator)
+                                    emb_threats = scan_text(decoded_stream_text, aggregator=aggregator)
                                     for t in emb_threats:
+                                        t.category = "Stream/Object"
                                         t.location = f"{location_label} (Embedded File)"
                                         threats.append(t)
                     except Exception as e:
