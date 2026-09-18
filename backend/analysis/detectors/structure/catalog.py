@@ -59,6 +59,13 @@ def analyze_catalog(root, aggregator=None) -> list[Threat]:
                                                 ct.location = f"Inside embedded file: {f_name}"
                                                 threats.append(ct)
 
+                                    except MemoryError:
+                                        scan_status = " [Scan Failed: Decompression Bomb Suspected]"
+                                        threats.append(Threat(
+                                            id="STR-AF-BOMB", category="Structure", severity=10,
+                                            description=f"Embedded file '{f_name}' exceeded memory limits while decompressing (Potential Decompression Bomb)",
+                                            location="Root Catalog (/AF)"
+                                        ))
                                     except Exception:
                                         scan_status = " [Scan Failed]"
 
