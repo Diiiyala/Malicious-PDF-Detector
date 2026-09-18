@@ -1,15 +1,12 @@
-import logging, pikepdf
+import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from io import BytesIO
-from pypdf import PdfReader
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from analysis.core.analyzer import analyze_all_aspects
+from analysis.core.loader import load_pdf
 
 MAX_UPLOAD_MB = 100
-MAX_EXPANDED_MB = 200
-MAX_EXPANDED_BYTES = MAX_EXPANDED_MB * 1024 * 1024
 
 app = Flask(__name__)
 CORS(app)
@@ -39,90 +36,30 @@ def upload_file():
     if file.filename == "" or not file.filename.lower().endswith(".pdf"):
         return jsonify({"error": "Unsupported file type. Please upload a PDF."}), 400
 
-    # -------------------------------------------------------------------------
-    # Initial Structure Validation
-    # -------------------------------------------------------------------------
     try:
         raw_file_content = file.read()
-        file_stream = BytesIO(raw_file_content)
-        
-        reader = None
-        initial_structure_findings = []
-        
-        current_content_to_analyze = raw_file_content
 
-        # -------------------------------------------------------------------------
-        #  Fallback Recovery (Malformed / Obfuscated PDF Repair Attempt)
-        # -------------------------------------------------------------------------
-        try:
-            reader = PdfReader(file_stream, strict=False)
-            _ = len(reader.pages)
-            
-        except Exception as e:
-            logger.warning(f"Metadata/Structure parsing failed for {file.filename}: {str(e)}")
-            
-            try:
-                with pikepdf.open(BytesIO(raw_file_content)) as pdf:
-                    all_extracted_content = bytearray(raw_file_content)
+        reader, file_stream, current_content_to_analyze, initial_structure_findings = load_pdf(
+            raw_file_content, filename=file.filename
+        )
 
-                    budget = MAX_EXPANDED_BYTES - len(all_extracted_content)
-
-                    for obj in pdf.objects:
-                        if budget <= 0:
-                            logger.warning(
-                                "Decompressed content for %s hit the %d MB analysis cap; remaining streams skipped",
-                                file.filename, MAX_EXPANDED_MB
-                            )
-                            break
-
-                        if isinstance(obj, pikepdf.Stream):
-                            try:
-                                stream_bytes = obj.read_bytes()
-                            except Exception as e:
-                                logger.debug("Could not read stream object during repair: %s", e)
-                                continue
-
-                            all_extracted_content.extend(stream_bytes[:budget])
-                            budget -= len(stream_bytes)
-                    
-                    repaired_stream = BytesIO()
-                    pdf.save(repaired_stream, static_id=True)
-                    
-                    current_content_to_analyze = bytes(all_extracted_content)
-                    
-                    file_stream = BytesIO(repaired_stream.getvalue())
-                    reader = PdfReader(file_stream, strict=False)
-                    
-                    try:
-                        _ = len(reader.pages)
-                    except Exception as e:
-                        logger.debug("Repaired PDF still unreadable: %s", e)
-                        reader = None
-                        
-                    initial_structure_findings.append("ALERT: Malformed structure repaired and analyzed")
-                    
-            except Exception as repair_e:
-                logger.error(f"Deep repair failed: {repair_e}")
-                initial_structure_findings.append("ALERT: Malformed PDF structure detected (Potential Evasion/Corruption)")
-                
         # -------------------------------------------------------------------------
         # Security Analysis Pipeline Execution
         # -------------------------------------------------------------------------
         analysis_results = analyze_all_aspects(
-            reader, 
-            file_stream, 
+            reader,
+            file_stream,
             current_content_to_analyze,
             filename=file.filename,
             initial_structure_findings=initial_structure_findings
         )
-        
+
         analysis_results["filename"] = file.filename
         return jsonify(analysis_results)
-    
+
     except Exception as e:
         logger.error(f"Fatal error during processing {file.filename}: {e}")
         return jsonify({"error": "An internal error occurred during analysis"}), 500
-
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=False)
