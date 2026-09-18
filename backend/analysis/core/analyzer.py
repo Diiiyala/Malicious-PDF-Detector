@@ -16,6 +16,19 @@ from analysis.detectors.binary import analyze_binary
 
 logger = logging.getLogger(__name__)
 
+CATEGORY_BUCKETS = {
+    "Content": "content",
+    "Structure": "structure",
+    "Action/Trigger": "structure",
+    "Stream/Object": "structure",
+    "Metadata": "metadata",
+    "Text Extraction": "text_extraction",
+    "Binary Structure": "binary",
+    "Binary Content": "binary",
+    "Binary Discovery": "binary",
+    "Network / Links": "binary",
+}
+
 def analyze_all_aspects(reader, file_stream, file_content, filename, initial_structure_findings=None):
 
     aggregator = ScriptAggregator()
@@ -97,18 +110,17 @@ def analyze_all_aspects(reader, file_stream, file_content, filename, initial_str
         "structure": {"results": [], "count": 0},
         "metadata": {"results": [], "count": 0},
         "text_extraction": {"results": [], "count": 0},
-        "binary": {"results": [], "count": 0}
+        "binary": {"results": [], "count": 0},
+        "not_specified": {"results": [], "count": 0}
     }
 
     for t in unique_threats:
         formatted_string = f"[Severity: {t.severity}/{SEVERITY_MAX}] {t.description} | Location: {t.location}"
         
-        cat_key = t.category.lower()
-        if "metadata" in cat_key: target_cat = "metadata"
-        elif any(k in cat_key for k in ["structure", "stream", "action"]): target_cat = "structure"
-        elif "text" in cat_key: target_cat = "text_extraction"
-        elif "binary" in cat_key: target_cat = "binary"
-        else: target_cat = "content"
+        target_cat = CATEGORY_BUCKETS.get(t.category)
+        if target_cat is None:
+            logger.warning("Unmapped threat category %r (id=%s) - filing under 'not_specified'", t.category, t.id)
+            target_cat = "not_specified"
 
         categorized_findings[target_cat]["results"].append(formatted_string)
         categorized_findings[target_cat]["count"] += 1
