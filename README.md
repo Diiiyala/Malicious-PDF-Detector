@@ -206,6 +206,18 @@ Each entry in a category's `results` array is a formatted string:
 [Severity: X/15] <description> | Location: <location>
 ```
 
+## Frontend
+
+The interface is a single-page React app with:
+
+* A landing hero with a drag-and-drop zone that accepts one PDF at a time and rejects other file types and files over 100 MB before uploading.
+* A scan progress view followed by a results view with a risk gauge, verdict, and three tabs: **Findings** (severity, location, and category for each item), **Scripts** (extracted code with a copy button), and **File details** (name, size, scan time, and SHA-256).
+* A **How it works** section and a **Detectors** section describing the five modules and their checks.
+* An English/Arabic toggle with full right-to-left support.
+* **Share / export**: renders the full result as an A4 PDF report, shared through the device's share sheet when available and downloaded otherwise.
+
+Additional setup notes are in [`frontend/README.md`](frontend/README.md) and [`backend/README.md`](backend/README.md).
+
 ## Limitations
 
 This application uses heuristic detection to identify suspicious indicators.
