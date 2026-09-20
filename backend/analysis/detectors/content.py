@@ -77,7 +77,7 @@ def _analyze_text_recursive(text: str, depth=0, aggregator=None) -> list[Threat]
     # 4. Auto Execution Triggers
     # ---------------------------------------------------------------------
 
-    has_open_action = bool(re.search(r"/OpenAction", text, re.IGNORECASE))
+    has_open_action = bool(re.search(r"/OpenAction(?!\s*\[\s*(?:\d+\s+\d+\s+R|\d+)\s+/(?:XYZ|Fit)[A-Za-z]*\b)", text, re.IGNORECASE))
     has_aa = bool(re.search(r"/AA", text, re.IGNORECASE))
     has_gotoe = bool(re.search(r"/GoToE", text, re.IGNORECASE))
 
