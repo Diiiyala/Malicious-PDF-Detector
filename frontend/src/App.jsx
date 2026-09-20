@@ -144,7 +144,7 @@ const RiskGauge = ({ score = 0, tone = 'danger' }) => {
   };
   const stroke = colors[tone] || colors.danger;
   return (
-    <div className="relative w-40 h-40 shrink-0" dir="ltr">
+    <div className="relative w-28 h-28 shrink-0" dir="ltr">
       <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
         <circle cx="60" cy="60" r={R} fill="none" stroke="#EDEDED" strokeWidth="10" />
         <circle
@@ -154,7 +154,7 @@ const RiskGauge = ({ score = 0, tone = 'danger' }) => {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-4xl font-display font-bold" style={{ color: tone === 'safe' ? '#136B41' : tone === 'warn' ? '#7F5A00' : '#B92626' }}>{pct}%</span>
+        <span className="text-2xl font-display font-bold" style={{ color: tone === 'safe' ? '#136B41' : tone === 'warn' ? '#7F5A00' : '#B92626' }}>{pct}%</span>
       </div>
     </div>
   );
@@ -647,8 +647,8 @@ function App() {
                     ? (isAr ? 'يحتوي هذا الملف على روابط أو عناصر منخفضة الخطورة يجب الانتباه لها.' : 'This file contains low-risk elements or links worth reviewing.')
                     : (isAr ? 'يحتوي هذا الملف على عناصر خبيثة ومؤشرات اختراق.' : 'This file contains malicious elements and indicators of compromise.');
                   return (
-                    <>
-                      <div className={`tile md:col-span-2 p-8 flex flex-col justify-center items-start ${isAr ? 'text-right' : ''}`}>
+                    <div className="tile md:col-span-3 flex flex-col md:flex-row md:items-center md:justify-between">
+                      <div className={`px-8 py-6 flex flex-col justify-center items-start ${isAr ? 'text-right' : ''}`}>
                         <div className={`inline-flex items-center gap-2 ${t.pill} border rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider mb-4`}>
                           {scanResult.status === 'safe'
                             ? <Icon.shieldCheck className="w-3.5 h-3.5" />
@@ -657,22 +657,13 @@ function App() {
                         </div>
                         <h2 className={`text-3xl font-display font-bold mb-2 ${t.text}`}>{headline}</h2>
                         <p className="text-ink-3">{sub}</p>
-                        <div className="flex flex-wrap gap-3 mt-6">
-                          {fileName && (
-                            <span className="inline-flex items-center gap-2 max-w-[16rem] text-sm text-ink-2 bg-page border border-line rounded-xl px-3 py-1.5 font-mono" dir="ltr" title={fileName}>
-                              <Icon.layers className="w-4 h-4 text-ink-3 shrink-0" /><span className="truncate">{fileName}</span>
-                            </span>
-                          )}
-                          <span className="inline-flex items-center gap-2 text-sm text-ink-2 bg-page border border-line rounded-xl px-3 py-1.5 font-mono"><Icon.alert className="w-4 h-4 text-ink-3" />{scanResult.threats.length} {scanResult.status === 'safe' ? (isAr ? 'ملاحظات' : 'observations') : (isAr ? 'تهديدات' : 'threats')}</span>
-                          <span className="inline-flex items-center gap-2 text-sm text-ink-2 bg-page border border-line rounded-xl px-3 py-1.5 font-mono"><Icon.code className="w-4 h-4 text-ink-3" />{scanResult.extractedScripts.length} {isAr ? 'سكريبتات' : 'scripts'}</span>
-                        </div>
                       </div>
 
-                      <div className="tile p-8 flex flex-col items-center justify-center">
+                      <div className="px-8 py-5 md:px-14 flex flex-col items-center justify-center shrink-0">
                         <RiskGauge score={scanResult.overallScore} tone={scanResult.status === 'safe' ? 'safe' : scanResult.status === 'warning' ? 'warn' : 'danger'} />
-                        <div className="text-xs text-ink-3 uppercase tracking-widest mt-2">{isAr ? 'نسبة الخطورة' : 'Risk Score'}</div>
+                        <div className="text-[11px] text-ink-3 uppercase tracking-widest mt-1">{isAr ? 'نسبة الخطورة' : 'Risk Score'}</div>
                       </div>
-                    </>
+                    </div>
                   );
                 })()}
 
@@ -843,9 +834,9 @@ function App() {
               <button
                 onClick={shareResult}
                 disabled={sharing}
-                className={`inline-flex items-center gap-2 bg-white hover:border-brand hover:text-brand-ink text-ink border border-line-2 px-7 py-3.5 rounded-full font-bold transition-all active:translate-y-px ${sharing ? 'opacity-60 cursor-wait' : ''}`}
+                className={`inline-flex items-center gap-2 bg-white hover:border-brand hover:text-brand-ink text-ink border border-line-2 px-5 py-2 rounded-full text-sm font-bold transition-all active:translate-y-px ${sharing ? 'opacity-60 cursor-wait' : ''}`}
               >
-                <Icon.share className="w-5 h-5" />
+                <Icon.share className="w-4 h-4" />
                 {sharing ? (isAr ? 'جارٍ التحضير...' : 'Preparing...') : (isAr ? 'مشاركة النتيجة' : 'Share result')}
               </button>
               <button
@@ -853,9 +844,9 @@ function App() {
                   setAppState('upload');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="inline-flex items-center gap-2 bg-brand hover:bg-brand-600 text-white px-8 py-3.5 rounded-full font-bold transition-all active:translate-y-px"
+                className="inline-flex items-center gap-2 bg-brand hover:bg-brand-600 text-white px-5 py-2 rounded-full text-sm font-bold transition-all active:translate-y-px"
               >
-                <Icon.scanFrame className="w-5 h-5" />
+                <Icon.scanFrame className="w-4 h-4" />
                 {isAr ? 'فحص ملف آخر' : 'Scan Another File'}
               </button>
             </div>
