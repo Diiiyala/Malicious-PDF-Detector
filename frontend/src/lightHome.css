@@ -172,7 +172,6 @@
 .lp .fnd{right:6%;top:9%;display:flex;align-items:center;gap:1cqw;background:#fff;border:1px solid var(--line);border-radius:99px;padding:1cqw 2cqw 1cqw 1.4cqw;box-shadow:0 1.4cqw 3cqw -1.4cqw rgba(20,20,20,.16);color:var(--crit);font-weight:700;font-size:1.9cqw}
 .lp .fnd svg{width:2.4cqw;height:2.4cqw}
 .lp .vc{left:2%;bottom:4%;width:44%;display:flex;flex-direction:column;gap:1cqw;text-align:start;background:#fff;border:1px solid var(--line);border-radius:2.2cqw;padding:2cqw 2.4cqw;box-shadow:0 2cqw 4cqw -1.6cqw rgba(20,20,20,.16);font-size:2cqw;transition:box-shadow .2s,scale .2s}
-.lp .vc:hover{scale:1.03}
 .lp .vc b,
 .lp .fnd b{unicode-bidi:plaintext}
 .lp .vc b{font-weight:700}
