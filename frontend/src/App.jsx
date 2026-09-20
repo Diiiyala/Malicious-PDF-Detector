@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
+import LightHome from './LightHome.jsx';
 
 
 const Icon = {
@@ -50,23 +51,6 @@ const Icon = {
   code: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16M18 8l4 4-4 4M6 16l-4-4 4-4" />
-    </svg>
-  ),
-  logo: (p) => (
-    <svg viewBox="0 0 48 48" fill="none" {...p}>
-      {/* document with folded corner */}
-      <path d="M13 8 H29 L35 14 V40 H13 Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-      <path d="M29 8 V14 H35" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-      {/* fingerprint, centered inside the document */}
-      <g transform="translate(13.75 15.25) scale(0.82)" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" opacity="0.9">
-        <path d="M18.9 7a8 8 0 0 1 1.1 5v1a6 6 0 0 0 .8 3" />
-        <path d="M8 11a4 4 0 0 1 8 0v1a10 10 0 0 0 2 6" />
-        <path d="M12 11v2a14 14 0 0 0 2.5 8" />
-        <path d="M8 15a18 18 0 0 0 1.8 6" />
-        <path d="M4.9 19a22 22 0 0 1 -.9 -7a8 8 0 0 1 12 -7" />
-      </g>
-      {/* scan bar */}
-      <rect x="7" y="14.5" width="34" height="3" fill="#6366f1" />
     </svg>
   ),
   copy: (p) => (
@@ -139,7 +123,7 @@ const ExpandableText = ({ text, maxLength = 150, isAr, forceExpand = false }) =>
       {!forceExpand && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="inline-flex items-center text-brand-400 hover:text-brand-300 font-bold transition-colors text-sm mx-2"
+          className="inline-flex items-center text-brand-ink hover:text-brand font-bold transition-colors text-sm mx-2"
         >
           {isExpanded ? (isAr ? 'عرض أقل' : 'Show Less') : (isAr ? 'قراءة المزيد' : 'Read More')}
         </button>
@@ -155,15 +139,15 @@ const RiskGauge = ({ score = 0, tone = 'danger' }) => {
   const pct = Math.min(100, Math.max(0, score));
   const offset = C - (pct / 100) * C;
   const colors = {
-    safe: '#34d399',
-    warn: '#fbbf24',
-    danger: '#fb7185',
+    safe: '#22A466',
+    warn: '#E3A600',
+    danger: '#D33A3A',
   };
   const stroke = colors[tone] || colors.danger;
   return (
     <div className="relative w-40 h-40 shrink-0" dir="ltr">
       <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-        <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="10" />
+        <circle cx="60" cy="60" r={R} fill="none" stroke="#EDEDED" strokeWidth="10" />
         <circle
           cx="60" cy="60" r={R} fill="none" stroke={stroke} strokeWidth="10"
           strokeLinecap="round" strokeDasharray={C} strokeDashoffset={offset}
@@ -171,85 +155,61 @@ const RiskGauge = ({ score = 0, tone = 'danger' }) => {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-4xl font-display font-bold" style={{ color: stroke }}>{pct}%</span>
+        <span className="text-4xl font-display font-bold" style={{ color: tone === 'safe' ? '#136B41' : tone === 'warn' ? '#7F5A00' : '#B92626' }}>{pct}%</span>
       </div>
     </div>
   );
 };
 
 
-const ScanIllustration = ({ isAr }) => {
-  const [found, setFound] = useState(0);
+const DETECTORS = [
+  { k: 'text', icon: 'file', en: 'Text', ar: 'النص', enD: 'Anomalies in the extracted text layer', arD: 'شذوذ في طبقة النص المستخرجة',
+    checks: [{ tok: 'hidden text', sev: 'medium', en: 'Hidden text layer', ar: 'طبقة نص مخفية' }] },
+  { k: 'content', icon: 'code', en: 'Content', ar: 'المحتوى', enD: 'Suspicious code, keywords and URLs', arD: 'شيفرة وكلمات وروابط مشبوهة',
+    checks: [
+      { tok: 'short link', sev: 'medium', en: 'Shortened link', ar: 'رابط مختصر' },
+      { tok: 'eval()', sev: 'high', en: 'Obfuscated code', ar: 'شيفرة مموّهة' },
+      { tok: 'cmd.exe', sev: 'critical', en: 'System command strings', ar: 'نصوص أوامر النظام' },
+    ] },
+  { k: 'structure', icon: 'layers', en: 'Structure', ar: 'الهيكل', enD: 'Catalog, actions, streams and names', arD: 'الفهرس والإجراءات والتدفقات والأسماء',
+    checks: [
+      { tok: '/JavaScript', sev: 'high', en: 'Embedded JavaScript', ar: 'جافاسكريبت مضمَّن' },
+      { tok: '/OpenAction', sev: 'high', en: 'Runs automatically on open', ar: 'تشغيل تلقائي عند الفتح' },
+      { tok: '/AA', sev: 'medium', en: 'Additional actions', ar: 'إجراءات إضافية' },
+      { tok: '/URI', sev: 'low', en: 'External link', ar: 'رابط خارجي' },
+      { tok: '/SubmitForm', sev: 'high', en: 'Form submission', ar: 'إرسال نموذج' },
+      { tok: '/GoToR', sev: 'medium', en: 'Reaches an outside file', ar: 'يستدعي ملفًا خارجيًا' },
+      { tok: '/EmbeddedFile', sev: 'medium', en: 'Embedded file', ar: 'ملف مضمَّن' },
+      { tok: '/RichMedia', sev: 'medium', en: 'Rich media content', ar: 'وسائط غنية' },
+      { tok: '/XFA', sev: 'medium', en: 'XFA form', ar: 'نموذج XFA' },
+      { tok: '#xx', sev: 'medium', en: 'Hex-escaped names', ar: 'أسماء مشفّرة بالست عشري' },
+      { tok: '%PDF / %%EOF', sev: 'low', en: 'Malformed structure', ar: 'بنية غير سليمة' },
+    ] },
+  { k: 'metadata', icon: 'tag', en: 'Metadata', ar: 'البيانات الوصفية', enD: 'Authoring tool and timestamps', arD: 'أداة الإنشاء والطوابع الزمنية',
+    checks: [
+      { tok: '/Producer', sev: 'high', en: 'Suspicious producer', ar: 'أداة إنشاء مشبوهة' },
+      { tok: '/CreationDate', sev: 'low', en: 'Implausible timestamp', ar: 'طابع زمني غير منطقي' },
+    ] },
+  { k: 'binary', icon: 'cpu', en: 'Binary', ar: 'المحتوى الثنائي', enD: 'Raw launch and execute strings', arD: 'نصوص التشغيل والتنفيذ الخام',
+    checks: [{ tok: '/Launch', sev: 'critical', en: 'Launch action', ar: 'إجراء تشغيل برنامج' }] },
+];
 
-  useEffect(() => {
-    const timers = [700, 1500, 2300].map((t, i) => setTimeout(() => setFound(i + 1), t));
-    return () => timers.forEach(clearTimeout);
-  }, []);
-
-  const markers = [
-    { top: '23%', left: '12%', label: 'JS', delay: '0.7s' },
-    { top: '50%', left: '66%', label: '/Launch', delay: '1.5s' },
-    { top: '73%', left: '26%', label: 'URI', delay: '2.3s' },
-  ];
-
-  return (
-    <div className="relative w-full max-w-md mx-auto">
-      <div className="relative animate-float">
-        <div className="relative">
-          {/* PDF document card */}
-          <div className="relative glass border border-white/10 rounded-2xl p-6 overflow-hidden shadow-[0_30px_80px_-24px_rgba(0,0,0,0.9)]">
-            <div className="flex items-center justify-between mb-5" dir="ltr">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-white/10 border border-white/25 grid place-items-center text-white font-bold text-[11px]">PDF</div>
-                <div>
-                  <div className="h-2.5 w-24 rounded bg-white/20" />
-                  <div className="h-2 w-16 rounded bg-white/10 mt-1.5" />
-                </div>
-              </div>
-              <Icon.scan className="w-5 h-5 text-brand-400 animate-pulse" />
-            </div>
-
-            <div className="space-y-3">
-              {[100, 92, 97, 78, 88, 70, 95, 83, 90].map((w, i) => (
-                <div key={i} className="h-2.5 rounded bg-white/10" style={{ width: w + '%' }} />
-              ))}
-            </div>
-
-            {/* threat markers */}
-            {markers.map((m, i) => (
-              <div key={i} className="absolute animate-pop-in" style={{ top: m.top, left: m.left, animationDelay: m.delay }}>
-                <div className="flex items-center gap-1.5" dir="ltr">
-                  <span className="relative flex h-3 w-3">
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-60 animate-ping" />
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-white animate-blip" />
-                  </span>
-                  <span className="text-[10px] font-mono font-bold text-white bg-white/10 border border-white/25 rounded px-1.5 py-0.5">{m.label}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* floating live-count chip */}
-          <div className="absolute -bottom-5 -right-4 glass border border-white/10 rounded-2xl px-4 py-2.5 flex items-center gap-2.5 shadow-2xl" dir="ltr">
-            <div className="grid place-items-center w-8 h-8 rounded-2xl bg-white/10 border border-white/25 text-white">
-              <Icon.alert className="w-4 h-4" />
-            </div>
-            <div className="text-left">
-              <div className="text-lg font-display font-bold text-white leading-none transition-all">{found}</div>
-              <div className="text-[10px] text-slate-400 uppercase tracking-wider">{isAr ? 'تهديدات' : 'threats'}</div>
-            </div>
-          </div>
-
-          {/* floating "secured" chip */}
-          <div className="absolute -top-4 -left-4 glass border border-white/10 rounded-2xl px-3 py-2 flex items-center gap-2 shadow-2xl animate-float" style={{ animationDelay: '1.5s' }} dir="ltr">
-            <Icon.shieldCheck className="w-4 h-4 text-brand-400" />
-            <span className="text-xs text-slate-300 font-medium">Deep scan</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+const DET_ICONS = {
+  file: ['M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z', 'M14 3v5h5'],
+  code: ['M10 20l4-16M18 8l4 4-4 4M6 16l-4-4 4-4'],
+  layers: ['M12 3l9 5-9 5-9-5 9-5z', 'M3 12l9 5 9-5M3 16l9 5 9-5'],
+  tag: ['M20 12l-8 8-9-9V4h7l10 8z', 'M7.5 7.5h.01'],
+  cpu: ['M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3'],
 };
+
+const DetIcon = ({ n, className }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    {n === 'cpu' && <rect x="6" y="6" width="12" height="12" rx="2" />}
+    {DET_ICONS[n].map((d) => <path key={d} d={d} />)}
+  </svg>
+);
+
+const SEV_DOT = { critical: 'bg-danger-dot', high: 'bg-orange-dot', medium: 'bg-warn-dot', low: 'bg-info-dot' };
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
@@ -272,6 +232,20 @@ const CATEGORY_TEXT = {
   not_specified:   { en: 'NOT SPECIFIED',   ar: 'غير محدد' },
 };
 
+const fmtSize = (n) => {
+  if (n == null) return '—';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+};
+
+const sha256Hex = async (file) => {
+  const buf = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+};
+
+const DET_CATEGORY = { text: 'text_extraction', content: 'content', structure: 'structure', metadata: 'metadata', binary: 'binary' };
+
 const categoryLabel = (key, isAr) =>
   (CATEGORY_TEXT[key] || {})[isAr ? 'ar' : 'en'] || String(key || '').replace(/_/g, ' ').toUpperCase();
 
@@ -282,9 +256,12 @@ function App() {
   const [terminalLines, setTerminalLines] = useState([]);
   const [uploadError, setUploadError] = useState(null);
   const [scanResult, setScanResult] = useState(null);
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [dots, setDots] = useState('');
+  const [langFading, setLangFading] = useState(false);
+  const [openDet, setOpenDet] = useState(null);
+  const [scanStep, setScanStep] = useState(0);
+  const [resultTab, setResultTab] = useState('findings');
+  const [copiedSha, setCopiedSha] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [fileName, setFileName] = useState('');
   const [sharing, setSharing] = useState(false);
@@ -294,25 +271,22 @@ function App() {
 
   useEffect(() => {
     setTimeout(() => setIsLoaded(true), 100);
-    const handleScroll = () => setIsScrolled(window.scrollY > 50);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   useEffect(() => {
-    if (appState !== 'scanning') return;
-    const interval = setInterval(() => setDots(prev => (prev.length >= 3 ? '' : prev + '.')), 150);
-    return () => {
-      clearInterval(interval);
-      setDots('');
-    };
-  }, [appState]);
+    if (appState !== 'scanning' || scanFailed) return undefined;
+    const interval = setInterval(() => setScanStep((prev) => Math.min(prev + 1, 4)), 700);
+    return () => clearInterval(interval);
+  }, [appState, scanFailed]);
 
   const processFile = async (file) => {
     setAppState('scanning');
+    setScanStep(0);
     setTerminalLines([]);
     setFileName(file.name);
     setScanFailed(false);
+    let fileSha = null;
+    sha256Hex(file).then((h) => { fileSha = h; }).catch(() => { /* hashing unavailable */ });
 
     const lines = ['secure', 'upload', 'analyze'];
 
@@ -372,10 +346,15 @@ function App() {
 
         setScanResult({
           status: fileStatus,
+          size: file.size,
+          scannedAt: Date.now(),
+          sha: fileSha,
+          riskLevel: data.risk_level || '',
           overallScore: data.risk_percentage || 0,
           threats: parsedThreats,
           extractedScripts: data.extracted_scripts || [],
         });
+        setResultTab('findings');
         setAppState('result');
       }, (lines.length * 800) + 1000);
     } catch (error) {
@@ -408,6 +387,24 @@ function App() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop, onDropRejected, multiple: false, accept: { 'application/pdf': ['.pdf'] },
   });
+
+  const onHeroFile = (files) => {
+    onDrop(files);
+    if (files[0] && files[0].size <= MAX_UPLOAD_BYTES) {
+      document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const toggleLang = () => {
+    if (langFading) return;
+    const next = isAr ? 'en' : 'ar';
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setLang(next); return; }
+    setLangFading(true);
+    setTimeout(() => {
+      setLang(next);
+      requestAnimationFrame(() => requestAnimationFrame(() => setLangFading(false)));
+    }, 220);
+  };
 
   const copyCode = (code, idx) => {
     try {
@@ -453,7 +450,7 @@ function App() {
       const { toBlob } = await import('html-to-image');
       const blob = await toBlob(node, {
         pixelRatio: 2,
-        backgroundColor: '#0d0d10',
+        backgroundColor: '#F2F2F2',
         cacheBust: true,
         width: node.scrollWidth,
         height: node.scrollHeight,
@@ -493,132 +490,47 @@ function App() {
   };
 
   const tones = {
-    safe: { text: 'text-safe', ring: 'ring-safe/30', bg: 'bg-safe/5', border: 'border-safe/25', pill: 'bg-safe/10 border-safe/30 text-safe', glow: '' },
-    warning: { text: 'text-warn', ring: 'ring-warn/30', bg: 'bg-warn/5', border: 'border-warn/25', pill: 'bg-warn/10 border-warn/30 text-warn', glow: '' },
-    danger: { text: 'text-danger', ring: 'ring-danger/30', bg: 'bg-danger/5', border: 'border-danger/25', pill: 'bg-danger/10 border-danger/30 text-danger', glow: '' },
+    safe: { text: 'text-safe', pill: 'bg-safe-bg border-transparent text-safe' },
+    warning: { text: 'text-warn', pill: 'bg-warn-bg border-transparent text-warn' },
+    danger: { text: 'text-danger', pill: 'bg-danger-bg border-transparent text-danger' },
+  };
+  const sevPill = (risk, fallback) => {
+    const k = String(risk || '').toLowerCase();
+    if (k.includes('crit')) return 'bg-danger-bg text-danger';
+    if (k.includes('high')) return 'bg-orange-bg text-orange';
+    if (k.includes('med')) return 'bg-warn-bg text-warn';
+    if (k.includes('low')) return 'bg-info-bg text-info';
+    return fallback;
   };
 
+
   return (
-    <div className="relative min-h-screen bg-ink text-white font-sans selection:bg-brand selection:text-white overflow-x-hidden" dir={isAr ? 'rtl' : 'ltr'}>
+    <div className={`relative min-h-screen bg-page text-ink font-sans selection:bg-brand selection:text-white overflow-x-hidden transition-[opacity,filter] duration-200 ease-out ${langFading ? 'opacity-0 blur-[3px]' : 'opacity-100'}`} dir={isAr ? 'rtl' : 'ltr'}>
 
-      {/* Ambient background */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        {/* square grid */}
-        <div className="absolute inset-0 bg-grid [background-size:92px_92px] opacity-100 [mask-image:linear-gradient(to_bottom,black,transparent_95%)]" />
-      </div>
-
-      {/* Navbar */}
-      <div
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-700 ease-out ${!isLoaded ? '-translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}
-        dir="ltr"
-      >
-        <header className="mx-auto max-w-7xl mt-4 px-5 sm:px-6">
-          <div className={`relative px-4 py-3 flex justify-between items-center transition-all duration-300 ${isScrolled ? 'backdrop-blur-md rounded-2xl border border-white/10' : 'border border-transparent'}`}>
-            <div className="flex items-center gap-2.5">
-              <Icon.logo className="w-8 h-8 text-slate-100" />
-              <div className="text-base sm:text-lg font-display font-bold tracking-tight">
-                Malicious PDF <span className="text-gradient">Detector</span>
-              </div>
-            </div>
-
-            <nav className="hidden sm:flex items-center gap-8 absolute left-1/2 -translate-x-1/2" dir={isAr ? 'rtl' : 'ltr'}>
-              {[
-                { en: 'Home', ar: 'الرئيسية', href: '#' },
-                { en: 'Scan', ar: 'افحص', href: '#workspace' },
-                { en: 'How it works', ar: 'كيف يعمل', href: '#how-it-works' },
-              ].map((l, i) => (
-                <a key={i} href={l.href} className="text-sm font-medium text-slate-300 hover:text-white transition">
-                  {isAr ? l.ar : l.en}
-                </a>
-              ))}
-            </nav>
-
-            <button
-              onClick={() => setLang(isAr ? 'en' : 'ar')}
-              className="group flex items-center justify-center text-slate-300 hover:text-white transition bg-white/5 hover:bg-white/10 px-4 py-2 border border-white/10 rounded-2xl leading-none"
-            >
-              <span className="flex items-center gap-2 translate-y-[2px]">
-                <span className="h-5 w-4 flex items-center justify-center shrink-0 -translate-y-0.5">
-                  <Icon.globe className="w-4 h-4 text-brand-400 group-hover:rotate-12 transition-transform" />
-                </span>
-                <span className="font-display font-medium text-sm leading-none" dir="ltr">{isAr ? 'EN' : 'AR'}</span>
-              </span>
-            </button>
-          </div>
-        </header>
-      </div>
-
-      {/* Hero */}
-      <section className="relative z-10 min-h-screen flex items-center px-5 sm:px-8 pt-28 pb-20">
-        <div className={`mx-auto max-w-7xl w-full transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-          <div className="grid lg:grid-cols-3 gap-4">
-
-            {/* Headline */}
-            <div className="lg:col-span-2 p-2 sm:p-6 flex flex-col justify-center text-center lg:text-start">
-              <h1 className={`text-4xl sm:text-5xl lg:text-6xl font-display font-bold mb-6 ${isAr ? 'leading-[1.5] tracking-normal' : 'leading-[1.07] tracking-tight'}`}>
-                {isAr ? 'اكشف' : 'Detect'}{' '}
-                <br className="hidden sm:block" />
-                <span className={`text-gradient ${isAr ? 'inline-block pb-1.5' : ''}`}>{isAr ? 'ملفات PDF الخبيثة' : 'Malicious PDFs'}</span>{' '}
-                <br className="hidden sm:block" />
-                {isAr ? 'قبل أن تشكل تهديدًا' : 'Before They Strike'}
-              </h1>
-
-              <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                {isAr ? (
-                  <>اكشف عن التهديدات المخفية، الأنماط المشبوهة، والمؤشرات الخبيثة<br className="hidden sm:block" /> داخل مستندات PDF قبل أن تعرض أمانك للخطر.</>
-                ) : (
-                  <>Uncover hidden threats, suspicious patterns, and indicators of compromise<br className="hidden sm:block" /> inside PDF documents before they put your security at risk.</>
-                )}
-              </p>
-
-              <div className="mt-8 flex justify-center lg:justify-start">
-                <a href="#workspace" className="group">
-                  <span className="inline-flex items-center px-10 py-3.5 rounded-2xl bg-brand-gradient text-white font-bold transition-all hover:-translate-y-0.5">
-                    {isAr ? 'ابدأ الفحص الآن' : 'Start Scanning Now'}
-                  </span>
-                </a>
-              </div>
-            </div>
-
-            {/* Illustration */}
-            <div className="p-6 flex items-center justify-center">
-              <ScanIllustration isAr={isAr} />
-            </div>
-
-            {/* Feature tiles */}
-            {[
-              { icon: Icon.scan, ar: 'تحليل الهيكل', en: 'Structure analysis', arD: 'فحص الكائنات وهيكل المستند', enD: 'Objects & document tree' },
-              { icon: Icon.code, ar: 'كشف السكريبتات', en: 'Script detection', arD: 'جافاسكريبت والأكواد المضمّنة', enD: 'JavaScript & embedded code' },
-              { icon: Icon.bolt, ar: 'نتائج فورية', en: 'Instant results', arD: 'تقرير مفصّل خلال ثوانٍ', enD: 'A detailed report in seconds' },
-            ].map((f, i) => {
-              const F = f.icon;
-              return (
-                <div key={i} className={`tile tile-hover p-6 ${isAr ? 'text-right' : ''}`}>
-                  <span className="inline-grid place-items-center w-11 h-11 rounded-xl bg-brand/10 border border-brand/20 text-brand-400 mb-4">
-                    <F className="w-5 h-5" />
-                  </span>
-                  <h3 className="font-display font-bold mb-1">{isAr ? f.ar : f.en}</h3>
-                  <p className="text-sm text-slate-400">{isAr ? f.arD : f.enD}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      {/* Light landing: navbar + hero (see LightHome.jsx) */}
+      <LightHome
+        isAr={isAr}
+        isLoaded={isLoaded}
+        onToggleLang={toggleLang}
+        onFile={onHeroFile}
+        onRejected={onDropRejected}
+        uploadError={uploadError}
+        onDismissError={() => setUploadError(null)}
+      />
 
       {/* Workspace */}
-      <section id="workspace" className="relative z-10 min-h-screen flex flex-col justify-center items-center px-5 py-24 border-t border-white/5">
+      <section id="workspace" className="relative z-10 min-h-screen flex flex-col justify-center items-center px-5 py-24 bg-page">
 
         {/* Upload state */}
         {appState === 'upload' && (
           <div className="w-full max-w-3xl">
             <div className="text-center mb-10">
               <h2 className="text-3xl sm:text-4xl font-display font-bold mb-3">{isAr ? 'ابدأ الفحص الآن' : 'Start Scanning Now'}</h2>
-              <p className="text-slate-400">{isAr ? 'ارفع ملف PDF لفحصه بحثاً عن المخاطر.' : 'Upload a PDF to scan it for risks.'}</p>
+              <p className="text-ink-3">{isAr ? 'ارفع ملف PDF لفحصه بحثاً عن المخاطر.' : 'Upload a PDF to scan it for risks.'}</p>
             </div>
 
             {uploadError && (
-              <div className="mb-6 glass border border-danger/30 text-white px-5 py-4 rounded-2xl flex items-center justify-between gap-4 animate-fade-in">
+              <div className="mb-6 bg-white border border-danger/30 text-ink px-5 py-4 rounded-2xl flex items-center justify-between gap-4 animate-fade-in">
                 <div className="flex items-center gap-3">
                   <Icon.alert className="w-6 h-6 text-danger shrink-0" />
                   <span className="font-medium">
@@ -629,7 +541,7 @@ function App() {
                           : `Sorry, "${uploadError.fileName}" is not supported. Please upload PDF files only.`)}
                   </span>
                 </div>
-                <button onClick={() => setUploadError(null)} className="text-white/60 hover:text-white transition">
+                <button onClick={() => setUploadError(null)} className="text-ink/60 hover:text-brand-ink transition">
                   <Icon.close className="w-5 h-5" />
                 </button>
               </div>
@@ -637,22 +549,22 @@ function App() {
 
             <div
               {...getRootProps()}
-              className={`relative w-full rounded-2xl p-14 sm:p-20 text-center cursor-pointer transition-all duration-300 group overflow-hidden glass
+              className={`relative w-full rounded-[28px] p-14 sm:p-20 text-center cursor-pointer transition-all duration-300 group overflow-hidden bg-white shadow-[0_30px_60px_-30px_rgba(20,20,20,0.16)]
                 border-2 border-dashed
-                ${isDragActive ? 'border-brand bg-brand/10 scale-[1.02]' : 'border-white/15 hover:border-brand/60'}`}
+                ${isDragActive ? 'border-brand bg-brand-soft scale-[1.02]' : 'border-brand-line hover:border-brand'}`}
             >
               <input {...getInputProps()} />
-              <div className="absolute inset-0 bg-brand/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+              <div className="absolute inset-0 bg-brand-soft/60 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
               <div className={`relative mx-auto mb-6 grid place-items-center w-20 h-20 rounded-2xl transition-all duration-300
-                ${isDragActive ? 'bg-brand text-white scale-110' : 'bg-brand/10 text-brand-400 group-hover:scale-105'}`}>
+                ${isDragActive ? 'bg-brand text-white scale-110' : 'bg-brand-soft text-brand-ink group-hover:scale-105'}`}>
                 <Icon.upload className="w-9 h-9" />
               </div>
-              <p className="text-slate-200 text-lg sm:text-xl font-medium relative">
+              <p className="text-ink text-lg sm:text-xl font-medium relative">
                 {isDragActive
                   ? (isAr ? 'أفلت ملف الـ PDF هنا...' : 'Drop the PDF here...')
                   : (isAr ? 'اسحب وأفلت ملف الـ PDF هنا، أو اضغط للاختيار' : 'Drag & drop a PDF here, or click to browse')}
               </p>
-              <p className="text-sm text-brand-400/80 mt-3 font-semibold tracking-wide relative">
+              <p className="text-sm text-brand-ink mt-3 font-semibold tracking-wide relative">
                 {isAr ? 'يدعم ملفات PDF فقط' : 'Supports PDF files only'}
               </p>
             </div>
@@ -660,83 +572,98 @@ function App() {
         )}
 
         {/* Scanning state */}
-        {appState === 'scanning' && (
-          <div className="w-full max-w-3xl animate-fade-in">
-            <div className="flex flex-col items-center mb-8">
-              <div className="relative grid place-items-center w-24 h-24 mb-4">
-                <div className={`absolute inset-0 rounded-full border-2 ${scanFailed ? 'border-danger/40' : 'border-white/10 border-t-brand-400 animate-spin-slow'}`} />
-                <Icon.scan className={`w-9 h-9 ${scanFailed ? 'text-danger' : 'text-slate-300'}`} />
-              </div>
-              <h2 className="text-2xl font-display font-bold">
-                {scanFailed
-                  ? (isAr ? 'فشل الفحص' : 'Scan Failed')
-                  : <>{isAr ? 'جاري الفحص' : 'Scanning'}<span className="text-brand-400">{dots}</span></>}
-              </h2>
-              {fileName && (
-                <div className="mt-3 inline-flex items-center gap-2 max-w-full glass border border-white/10 rounded-xl px-3 py-1.5" dir="ltr">
-                  <Icon.layers className="w-4 h-4 text-brand-400 shrink-0" />
-                  <span className="text-sm text-slate-300 truncate font-mono" title={fileName}>{fileName}</span>
+        {appState === 'scanning' && (() => {
+          const allDone = terminalLines.includes('complete');
+          const step = allDone ? 5 : Math.min(scanStep, 4);
+          const errCode = terminalLines.find((c) => c.startsWith('err_'));
+          const LINES = [96, 88, 92, 70, 94, 84, 90, 66, 80, 90, 58];
+          const label = (st) => (st === 'done' ? (isAr ? 'اكتمل' : 'Done') : st === 'run' ? (isAr ? 'قيد التشغيل' : 'Running') : (isAr ? 'بالانتظار' : 'Waiting'));
+          return (
+            <div className="w-full max-w-5xl animate-fade-in">
+              <div className="grid md:grid-cols-[minmax(220px,320px)_minmax(0,1fr)] gap-10 md:gap-14 items-center">
+                {/* Document preview with scan sweep */}
+                <div className="hidden md:block" dir="ltr">
+                  <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-white border border-line shadow-[0_18px_36px_-24px_rgba(20,20,20,0.16)] p-6 flex flex-col gap-3">
+                    <div className="h-3 w-1/2 rounded bg-line-2 shrink-0" />
+                    {LINES.map((w, i) => <div key={i} className="h-1.5 rounded bg-[#E8E8E8] shrink-0" style={{ width: `${w}%` }} />)}
+                    {!scanFailed && !allDone && (
+                      <div className="absolute inset-x-0 h-14 -mt-14 border-b-[3px] border-brand animate-scan-beam pointer-events-none" />
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <div className="relative glass border border-white/10 rounded-2xl p-6 shadow-2xl font-mono text-sm md:text-base overflow-hidden">
-              <div className={`flex gap-2 mb-4 pb-4 border-b border-white/10 ${isAr ? 'flex-row-reverse' : ''}`}>
-                <div className="w-3 h-3 rounded-full bg-danger/80" />
-                <div className="w-3 h-3 rounded-full bg-warn/80" />
-                <div className="w-3 h-3 rounded-full bg-safe/80" />
-              </div>
-              <div className={`space-y-3 ${isAr ? 'text-right' : 'text-left'}`} dir={isAr ? 'rtl' : 'ltr'}>
-                {terminalLines.map((code, idx) => {
-                  const isError = code.startsWith('err_');
-                  const text = (TERMINAL_TEXT[code] || {})[isAr ? 'ar' : 'en'] || code;
-                  return (
-                    <div key={idx} className="flex items-center gap-2.5 animate-fade-in">
-                      {isError
-                        ? <Icon.alert className="w-4 h-4 text-danger shrink-0" />
-                        : <Icon.check className="w-4 h-4 text-brand-400 shrink-0" />}
-                      <span className={isError ? 'text-danger' : 'text-slate-300'}>{text}</span>
+                <div className={isAr ? 'text-right' : 'text-left'}>
+                  <h2 className="text-3xl sm:text-4xl font-display font-bold">
+                    {scanFailed ? (isAr ? 'فشل الفحص' : 'Scan Failed') : `${isAr ? 'جاري الفحص' : 'Scanning'}…`}
+                  </h2>
+                  {fileName && (
+                    <div className="mt-4 inline-flex items-center gap-2 max-w-full bg-white border border-line rounded-full px-3.5 py-1.5" dir="ltr">
+                      <Icon.layers className="w-4 h-4 text-ink-3 shrink-0" />
+                      <span className="text-sm text-ink-2 truncate font-mono" title={fileName}>{fileName}</span>
                     </div>
-                  );
-                })}
-                {!scanFailed && (
-                  <div className="inline-block text-brand-400 font-bold text-xl tracking-widest min-w-[32px]" dir="ltr">{dots}</div>
-                )}
+                  )}
+
+                  {scanFailed ? (
+                    <div className="mt-6 flex items-start gap-3 rounded-2xl bg-danger-bg text-danger px-4 py-3.5 font-semibold" role="alert">
+                      <Icon.alert className="w-5 h-5 shrink-0 mt-0.5" />
+                      <span>{(TERMINAL_TEXT[errCode] || {})[isAr ? 'ar' : 'en'] || errCode}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-6 h-2 rounded-full bg-white border border-line overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((step / 5) * 100)} dir="ltr">
+                        <div className="h-full rounded-full bg-brand transition-[width] duration-700 ease-out" style={{ width: `${Math.max(6, (step / 5) * 100)}%` }} />
+                      </div>
+                      <ul className="mt-6 space-y-3">
+                        {DETECTORS.map((d, i) => {
+                          const st = i < step ? 'done' : i === step ? 'run' : 'wait';
+                          return (
+                            <li key={d.k} className="flex items-center gap-4 bg-white border border-line rounded-2xl px-5 py-3.5">
+                              <span className={`grid place-items-center w-[26px] h-[26px] rounded-full shrink-0 ${st === 'done' ? 'bg-safe-dot text-white' : st === 'run' ? 'border-[3px] border-brand-line border-t-brand animate-spin' : 'border-2 border-line-2'}`}>
+                                {st === 'done' && <Icon.check className="w-3.5 h-3.5" />}
+                              </span>
+                              <b className="text-lg font-bold flex-1">{isAr ? d.ar : d.en}</b>
+                              <small className={`text-base ${st === 'wait' ? 'text-ink-3' : st === 'run' ? 'text-brand-ink font-semibold' : 'text-ink-3'}`}>{label(st)}</small>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </>
+                  )}
+
+                  {scanFailed && (
+                    <div className="mt-8">
+                      <button
+                        onClick={() => {
+                          setScanFailed(false);
+                          setTerminalLines([]);
+                          setFileName('');
+                          setAppState('upload');
+                          setTimeout(() => {
+                            document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }, 60);
+                        }}
+                        className="inline-flex items-center gap-2 bg-brand hover:bg-brand-600 text-white px-8 py-3.5 rounded-full font-bold transition-all active:translate-y-px"
+                      >
+                        <Icon.scanFrame className="w-5 h-5" />
+                        {isAr ? 'فحص ملف آخر' : 'Scan Another File'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-
-            {scanFailed && (
-              <div className="flex justify-center mt-8">
-                <button
-                  onClick={() => {
-                    setScanFailed(false);
-                    setTerminalLines([]);
-                    setFileName('');
-                    setAppState('upload');
-                    setTimeout(() => {
-                      document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 60);
-                  }}
-                  className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 px-8 py-3.5 rounded-2xl font-bold transition-all hover:-translate-y-0.5"
-                >
-                  <Icon.scanFrame className="w-5 h-5" />
-                  {isAr ? 'فحص ملف آخر' : 'Scan Another File'}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         {/* Results state */}
         {appState === 'result' && scanResult && (
           <div className="w-full max-w-6xl animate-fade-up">
-            <div ref={resultRef} className="bg-ink rounded-2xl p-2 sm:p-4">
+            <div ref={resultRef} className="bg-page rounded-2xl p-2 sm:p-4">
             {/* Brand header — included in the shared image */}
             {capturing && (
               <div className="flex items-center gap-2.5 px-4 pt-2 pb-6" dir="ltr">
-                <Icon.logo className="w-8 h-8 text-slate-100" />
                 <div className="text-lg font-display font-bold tracking-tight">
-                  Malicious PDF <span className="text-gradient">Detector</span>
+                  Malicious PDF <span className="text-brand">Detector</span>
                 </div>
               </div>
             )}
@@ -748,13 +675,13 @@ function App() {
                 <h2 className="relative text-3xl font-display font-bold text-safe mb-3">
                   {isAr ? 'الملف آمن تماماً' : 'File is completely safe'}
                 </h2>
-                <p className="relative text-slate-300 max-w-xl mx-auto">
+                <p className="relative text-ink-2 max-w-xl mx-auto">
                   {isAr ? 'لم يتم العثور على أي تهديدات أو أنماط مشبوهة داخل هذا الملف.' : 'No threats or suspicious patterns were found in this file.'}
                 </p>
                 {fileName && (
-                  <div className="relative mt-5 inline-flex items-center gap-2 max-w-full glass border border-white/10 rounded-xl px-3 py-1.5" dir="ltr">
+                  <div className="relative mt-5 inline-flex items-center gap-2 max-w-full bg-white border border-line rounded-xl px-3 py-1.5" dir="ltr">
                     <Icon.layers className="w-4 h-4 text-safe shrink-0" />
-                    <span className="text-sm text-slate-300 truncate font-mono" title={fileName}>{fileName}</span>
+                    <span className="text-sm text-ink-2 truncate font-mono" title={fileName}>{fileName}</span>
                   </div>
                 )}
               </div>
@@ -783,42 +710,57 @@ function App() {
                           {isAr ? 'تقرير الفحص' : 'Scan Report'}
                         </div>
                         <h2 className={`text-3xl font-display font-bold mb-2 ${t.text}`}>{headline}</h2>
-                        <p className="text-slate-400">{sub}</p>
+                        <p className="text-ink-3">{sub}</p>
                         <div className="flex flex-wrap gap-3 mt-6">
                           {fileName && (
-                            <span className="inline-flex items-center gap-2 max-w-[16rem] text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono" dir="ltr" title={fileName}>
-                              <Icon.layers className="w-4 h-4 text-slate-500 shrink-0" /><span className="truncate">{fileName}</span>
+                            <span className="inline-flex items-center gap-2 max-w-[16rem] text-sm text-ink-2 bg-page border border-line rounded-xl px-3 py-1.5 font-mono" dir="ltr" title={fileName}>
+                              <Icon.layers className="w-4 h-4 text-ink-3 shrink-0" /><span className="truncate">{fileName}</span>
                             </span>
                           )}
-                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.alert className="w-4 h-4 text-slate-500" />{scanResult.threats.length} {scanResult.status === 'safe' ? (isAr ? 'ملاحظات' : 'observations') : (isAr ? 'تهديدات' : 'threats')}</span>
-                          <span className="inline-flex items-center gap-2 text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 font-mono"><Icon.code className="w-4 h-4 text-slate-500" />{scanResult.extractedScripts.length} {isAr ? 'سكريبتات' : 'scripts'}</span>
+                          <span className="inline-flex items-center gap-2 text-sm text-ink-2 bg-page border border-line rounded-xl px-3 py-1.5 font-mono"><Icon.alert className="w-4 h-4 text-ink-3" />{scanResult.threats.length} {scanResult.status === 'safe' ? (isAr ? 'ملاحظات' : 'observations') : (isAr ? 'تهديدات' : 'threats')}</span>
+                          <span className="inline-flex items-center gap-2 text-sm text-ink-2 bg-page border border-line rounded-xl px-3 py-1.5 font-mono"><Icon.code className="w-4 h-4 text-ink-3" />{scanResult.extractedScripts.length} {isAr ? 'سكريبتات' : 'scripts'}</span>
                         </div>
                       </div>
 
                       <div className="tile p-8 flex flex-col items-center justify-center">
                         <RiskGauge score={scanResult.overallScore} tone={scanResult.status === 'safe' ? 'safe' : scanResult.status === 'warning' ? 'warn' : 'danger'} />
-                        <div className="text-xs text-slate-400 uppercase tracking-widest mt-2">{isAr ? 'نسبة الخطورة' : 'Risk Score'}</div>
+                        <div className="text-xs text-ink-3 uppercase tracking-widest mt-2">{isAr ? 'نسبة الخطورة' : 'Risk Score'}</div>
                       </div>
                     </>
                   );
                 })()}
 
-                {/* Threats table tile */}
-                {(() => {
+                {/* Tabs (hidden while capturing the shared image, where all sections are shown) */}
+                {!capturing && (
+                  <div className="md:col-span-3 flex gap-1 border-b border-line-2 overflow-x-auto" role="tablist">
+                    {[
+                      { k: 'findings', en: 'Findings', ar: 'النتائج', n: scanResult.threats.length },
+                      { k: 'scripts', en: 'Scripts', ar: 'السكريبتات', n: scanResult.extractedScripts.length },
+                      { k: 'details', en: 'File details', ar: 'تفاصيل الملف', n: null },
+                    ].map((tb) => (
+                      <button
+                        key={tb.k}
+                        type="button"
+                        role="tab"
+                        aria-selected={resultTab === tb.k}
+                        onClick={() => setResultTab(tb.k)}
+                        className={`flex items-center gap-2 px-4 py-3 -mb-px font-semibold whitespace-nowrap border-b-[3px] transition-colors ${resultTab === tb.k ? 'text-ink border-brand' : 'text-ink-3 border-transparent hover:text-ink'}`}
+                      >
+                        {isAr ? tb.ar : tb.en}
+                        {tb.n !== null && <span className="font-mono text-xs bg-white border border-line rounded-full px-2 leading-5">{tb.n}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Findings */}
+                {(capturing || resultTab === 'findings') && (() => {
                   const t = tones[scanResult.status] || tones.danger;
                   return (
                     <div className="tile md:col-span-3 overflow-hidden">
-                      <div className={`px-6 py-4 border-b border-white/10 flex items-center gap-3 ${isAr ? 'flex-row-reverse text-right' : ''}`}>
-                        <Icon.layers className={`w-5 h-5 ${t.text}`} />
-                        <h3 className="text-lg font-display font-bold">
-                          {scanResult.status === 'safe'
-                            ? (isAr ? 'ملاحظات الفحص' : 'Scan Observations')
-                            : (isAr ? 'التهديدات المكتشفة' : 'Detected Threats')}
-                        </h3>
-                      </div>
                       <div className="overflow-x-auto">
                         <table className="w-full">
-                          <thead className="text-slate-400 text-xs uppercase tracking-wider bg-white/[0.02]">
+                          <thead className="text-ink-3 text-xs uppercase tracking-wider bg-page">
                             <tr>
                               <th className={`px-6 py-4 font-semibold ${isAr ? 'text-right' : 'text-left'}`}>{isAr ? 'التهديد' : 'Threat'}</th>
                               <th className="px-6 py-4 font-semibold text-center">{isAr ? 'التصنيف' : 'Category'}</th>
@@ -826,20 +768,20 @@ function App() {
                               <th className="px-6 py-4 font-semibold text-center">{isAr ? 'الخطورة' : 'Risk'}</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-white/5">
+                          <tbody className="divide-y divide-line">
                             {scanResult.threats.map((threat) => (
-                              <tr key={threat.id} className="hover:bg-white/[0.03] transition">
-                                <td className={`px-6 py-4 font-medium text-white ${isAr ? 'text-right' : 'text-left'}`}>
+                              <tr key={threat.id} className="hover:bg-page transition">
+                                <td className={`px-6 py-4 font-medium text-ink ${isAr ? 'text-right' : 'text-left'}`}>
                                   <ExpandableText text={threat.name} maxLength={120} isAr={isAr} forceExpand={capturing} />
                                 </td>
                                 <td className="px-6 py-4 align-middle whitespace-nowrap text-center">
-                                  <span className={`inline-block whitespace-nowrap text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300 ${isAr ? 'font-sans' : 'font-mono'}`}>
+                                  <span className={`inline-block whitespace-nowrap text-xs px-2.5 py-1 rounded-lg bg-page border border-line text-ink-2 ${isAr ? 'font-sans' : 'font-mono'}`}>
                                     {categoryLabel(threat.categoryKey, isAr)}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-slate-400 font-mono text-sm text-center align-middle" dir="ltr">{threat.offset}</td>
+                                <td className="px-6 py-4 text-ink-3 font-mono text-sm text-center align-middle" dir="ltr">{threat.offset}</td>
                                 <td className="px-6 py-4 text-center align-middle whitespace-nowrap">
-                                  <span className={`inline-block px-3.5 py-1 rounded-full text-xs font-bold tracking-wider border ${t.pill}`} dir="ltr">{threat.risk}</span>
+                                  <span className={`inline-block px-3.5 py-1 rounded-full text-xs font-bold tracking-wider ${sevPill(threat.risk, t.pill)}`} dir="ltr">{threat.risk}</span>
                                 </td>
                               </tr>
                             ))}
@@ -850,39 +792,87 @@ function App() {
                   );
                 })()}
 
-                {/* Extracted scripts tile */}
-                {scanResult.extractedScripts && scanResult.extractedScripts.length > 0 && (
+                {/* Scripts */}
+                {(capturing || resultTab === 'scripts') && (
                   <div className="tile md:col-span-3 overflow-hidden">
-                    <div className={`px-6 py-4 border-b border-white/10 flex items-center gap-3 ${isAr ? 'flex-row-reverse text-right' : ''}`}>
-                      <Icon.code className="w-5 h-5 text-cyan-glow" />
-                      <h3 className="text-lg font-display font-bold text-slate-100">{isAr ? 'السكريبتات المستخرجة' : 'Extracted Scripts'}</h3>
-                    </div>
+                    {scanResult.extractedScripts.length > 0 ? (
+                      <>
                     <div className="p-6 space-y-5">
                       {scanResult.extractedScripts.map((script, index) => (
-                        <div key={index} className="bg-black/30 border border-white/10 rounded-2xl overflow-hidden">
-                          <div className={`flex flex-wrap justify-between items-center gap-3 px-4 py-3 border-b border-white/5 ${isAr ? 'flex-row-reverse' : ''}`}>
-                            <span className="bg-cyan-glow/10 border border-cyan-glow/30 text-cyan-glow px-3 py-1 rounded-lg text-xs font-bold tracking-wider uppercase">
+                        <div key={index} className="bg-page border border-line rounded-2xl overflow-hidden">
+                          <div className={`flex flex-wrap justify-between items-center gap-3 px-4 py-3 border-b border-line ${isAr ? 'flex-row-reverse' : ''}`}>
+                            <span className="bg-brand-soft border border-brand-line text-brand-ink px-3 py-1 rounded-lg text-xs font-bold tracking-wider uppercase">
                               {script.script_type || 'Unknown Type'}
                             </span>
                             <div className="flex items-center gap-3" dir="ltr">
-                              <span className="text-slate-500 text-xs font-mono">{script.locations ? script.locations.join(', ') : 'Unknown Location'}</span>
+                              <span className="text-ink-3 text-xs font-mono">{script.locations ? script.locations.join(', ') : 'Unknown Location'}</span>
                               <button
                                 onClick={() => copyCode(script.code, index)}
-                                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-2.5 py-1 transition"
+                                className="flex items-center gap-1.5 text-xs text-ink-3 hover:text-brand-ink bg-page hover:bg-brand-soft border border-line rounded-lg px-2.5 py-1 transition"
                               >
                                 {copiedIdx === index ? <Icon.check className="w-3.5 h-3.5 text-safe" /> : <Icon.copy className="w-3.5 h-3.5" />}
                                 {copiedIdx === index ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ' : 'Copy')}
                               </button>
                             </div>
                           </div>
-                          <pre className="bg-black/40 p-5 overflow-x-auto" dir="ltr">
-                            <code className="text-white font-mono text-sm leading-relaxed">
+                          <pre className="bg-white p-5 overflow-x-auto" dir="ltr">
+                            <code className="text-ink font-mono text-sm leading-relaxed">
                               <ExpandableText text={script.code} maxLength={300} isAr={isAr} forceExpand={capturing} />
                             </code>
                           </pre>
                         </div>
                       ))}
                     </div>
+                      </>
+                    ) : (
+                      <p className="p-8 text-center text-ink-3">{isAr ? 'لم يتم استخراج أي سكريبتات من هذا الملف.' : 'No scripts were extracted from this file.'}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* File details */}
+                {(capturing || resultTab === 'details') && (
+                  <div className="tile md:col-span-3 overflow-hidden">
+                    <dl className="grid grid-cols-[130px_minmax(0,1fr)] sm:grid-cols-[170px_minmax(0,1fr)] text-sm">
+                      {[
+                        [isAr ? 'اسم الملف' : 'File name', <span className="font-mono break-all" dir="ltr">{fileName || '—'}</span>],
+                        [isAr ? 'الحجم' : 'Size', <bdi>{fmtSize(scanResult.size)}</bdi>],
+                        [isAr ? 'نسبة الخطورة' : 'Risk score', <bdi>{scanResult.overallScore}%{scanResult.riskLevel ? ` · ${scanResult.riskLevel}` : ''}</bdi>],
+                        ['SHA-256', scanResult.sha ? (
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs break-all" dir="ltr">{scanResult.sha}</span>
+                            {!capturing && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  try { navigator.clipboard.writeText(scanResult.sha); setCopiedSha(true); setTimeout(() => setCopiedSha(false), 1500); } catch { /* ignore */ }
+                                }}
+                                className="inline-flex items-center gap-1.5 text-xs text-ink-3 hover:text-brand-ink bg-white border border-line-2 rounded-full px-3 py-1 transition"
+                              >
+                                {copiedSha ? <Icon.check className="w-3.5 h-3.5 text-safe" /> : <Icon.copy className="w-3.5 h-3.5" />}
+                                {copiedSha ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ' : 'Copy')}
+                              </button>
+                            )}
+                          </span>
+                        ) : <span className="text-ink-3">{isAr ? 'غير متاح' : 'Not available'}</span>],
+                        [isAr ? 'وقت الفحص' : 'Scanned', <bdi>{new Date(scanResult.scannedAt).toLocaleString(isAr ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</bdi>],
+                        [isAr ? 'الكواشف' : 'Detectors', (
+                          <span className="flex flex-wrap gap-2">
+                            {DETECTORS.map((d) => (
+                              <span key={d.k} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-line text-[13px]">
+                                <b className="font-semibold">{isAr ? d.ar : d.en}</b>
+                                <span className="font-mono text-xs text-ink-3">{scanResult.threats.filter((x) => x.categoryKey === DET_CATEGORY[d.k]).length}</span>
+                              </span>
+                            ))}
+                          </span>
+                        )],
+                      ].map(([label, value], i, arr) => (
+                        <div key={i} className="contents">
+                          <dt className={`px-5 py-3.5 text-ink-3 bg-page ${i < arr.length - 1 ? 'border-b border-line' : ''}`}>{label}</dt>
+                          <dd className={`px-5 py-3.5 min-w-0 ${i < arr.length - 1 ? 'border-b border-line' : ''}`}>{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
                   </div>
                 )}
               </div>
@@ -890,14 +880,14 @@ function App() {
 
             {/* Page footer — included in the shared image */}
             {capturing && (
-              <div className="mt-6 pt-4 border-t border-white/10 bg-ink text-center text-sm">
-                <p className="text-slate-400">
+              <div className="mt-6 pt-4 border-t border-line bg-page text-center text-sm">
+                <p className="text-ink-3">
                   {isAr ? 'تم تطويره بواسطة ديالى التركي' : 'Developed by Diyala Alturki'}
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-2" dir="ltr">
-                  <span className="flex items-center gap-2 text-slate-400"><span className="h-5 w-4 flex items-center justify-center flex-shrink-0"><Icon.github className="w-4 h-4" /></span> Diiiyala</span>
-                  <span className="text-white/15">|</span>
-                  <span className="flex items-center gap-2 text-slate-400"><span className="h-5 w-4 flex items-center justify-center flex-shrink-0"><Icon.mail className="w-4 h-4" /></span> diyala.alturki@gmail.com</span>
+                  <span className="flex items-center gap-2 text-ink-3"><span className="h-5 w-4 flex items-center justify-center flex-shrink-0"><Icon.github className="w-4 h-4" /></span> Diiiyala</span>
+                  <span className="text-line-2">|</span>
+                  <span className="flex items-center gap-2 text-ink-3"><span className="h-5 w-4 flex items-center justify-center flex-shrink-0"><Icon.mail className="w-4 h-4" /></span> diyala.alturki@gmail.com</span>
                 </div>
               </div>
             )}
@@ -907,7 +897,7 @@ function App() {
               <button
                 onClick={shareResult}
                 disabled={sharing}
-                className={`inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 px-7 py-3.5 rounded-2xl font-bold transition-all hover:-translate-y-0.5 ${sharing ? 'opacity-60 cursor-wait' : ''}`}
+                className={`inline-flex items-center gap-2 bg-white hover:border-brand hover:text-brand-ink text-ink border border-line-2 px-7 py-3.5 rounded-full font-bold transition-all active:translate-y-px ${sharing ? 'opacity-60 cursor-wait' : ''}`}
               >
                 <Icon.share className="w-5 h-5" />
                 {sharing ? (isAr ? 'جارٍ التحضير...' : 'Preparing...') : (isAr ? 'مشاركة النتيجة' : 'Share result')}
@@ -919,7 +909,7 @@ function App() {
                     document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }, 60);
                 }}
-                className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 px-8 py-3.5 rounded-2xl font-bold transition-all hover:-translate-y-0.5"
+                className="inline-flex items-center gap-2 bg-brand hover:bg-brand-600 text-white px-8 py-3.5 rounded-full font-bold transition-all active:translate-y-px"
               >
                 <Icon.scanFrame className="w-5 h-5" />
                 {isAr ? 'فحص ملف آخر' : 'Scan Another File'}
@@ -929,110 +919,126 @@ function App() {
         )}
       </section>
 
-      {/* How it works */}
-      <section id="how-it-works" className="relative z-10 px-5 sm:px-8 py-24 border-t border-white/5">
+      {/* Detectors */}
+      <section id="detectors" className="relative z-10 px-5 sm:px-8 py-24 bg-white border-y border-line">
         <div className="mx-auto max-w-6xl">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-display font-bold mb-3">{isAr ? 'كيف يعمل' : 'How it works'}</h2>
-            <p className="text-slate-400 max-w-2xl mx-auto">
-              {isAr ? 'ثلاث خطوات بسيطة من الرفع إلى التقرير الكامل.' : 'Three simple steps from upload to a full report.'}
+          <div className="text-center max-w-2xl mx-auto mb-9">
+            <h2 className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight">{isAr ? 'ما الذي نفحصه داخل كل ملف' : 'What we look at inside every PDF'}</h2>
+            <p className="text-ink-2 mt-3 text-base">
+              {isAr ? 'خمسة كواشف تعمل معًا. اضغط على أحدها لترى الفحوصات التي يجريها.' : 'Five detectors work together. Tap one to see the checks it runs.'}
             </p>
           </div>
 
-          {/* Bento grid */}
-          <div className="grid md:grid-cols-3 gap-4">
-            {[
-              { n: '01', icon: Icon.upload, enT: 'Upload a PDF', arT: 'ارفع ملف PDF', enD: 'Drag and drop your file or browse to select it.', arD: 'اسحب وأفلت الملف أو اختره من جهازك.' },
-              { n: '02', icon: Icon.scan, enT: 'Deep analysis', arT: 'تحليل عميق', enD: 'The engine inspects structure, scripts, links, and metadata.', arD: 'يفحص المحرك الهيكل والسكريبتات والروابط والبيانات الوصفية.' },
-              { n: '03', icon: Icon.layers, enT: 'Get your report', arT: 'احصل على تقريرك', enD: 'See detected threats, a risk score, and any extracted scripts.', arD: 'اطّلع على التهديدات ودرجة الخطورة والسكريبتات المستخرجة.' },
-            ].map((s, i) => {
-              const S = s.icon;
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
+            {DETECTORS.map((d, i) => {
+              const on = openDet === d.k;
+              const n = d.checks.length;
               return (
-                <div key={i} className={`tile tile-hover p-7 ${isAr ? 'text-right' : ''}`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="grid place-items-center w-11 h-11 rounded-xl border border-white/10 bg-white/[0.04] text-brand-400">
-                      <S className="w-5 h-5" />
-                    </span>
-                    <span className="font-mono text-sm text-brand-400">{s.n}</span>
-                  </div>
-                  <h3 className="text-lg font-display font-bold mb-2">{isAr ? s.arT : s.enT}</h3>
-                  <p className="text-sm text-slate-400 leading-relaxed">{isAr ? s.arD : s.enD}</p>
-                </div>
+                <button
+                  key={d.k}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setOpenDet(on ? null : d.k)}
+                  className={`tile tile-hover flex flex-col gap-2.5 text-start p-[22px] ${i < 3 ? 'md:col-span-2' : 'md:col-span-3'} ${i === 4 ? 'sm:col-span-2' : ''} ${on ? '!border-brand -translate-y-[3px]' : ''}`}
+                >
+                  <span className="grid place-items-center w-12 h-12 rounded-[14px] bg-brand-soft text-brand-ink">
+                    <DetIcon n={d.icon} className="w-6 h-6" />
+                  </span>
+                  <b className="text-lg font-bold">{isAr ? d.ar : d.en}</b>
+                  <span className="text-[14.5px] text-ink-2">{isAr ? d.arD : d.enD}</span>
+                  <span className="mt-auto pt-1.5 text-sm font-bold text-brand-ink">
+                    {on ? (isAr ? 'إخفاء الفحوصات' : 'Hide checks') : (isAr ? 'عرض الفحوصات' : 'See checks')}
+                    {' · '}
+                    {isAr ? `${n} ${n === 1 ? 'فحص' : 'فحوصات'}` : `${n} ${n === 1 ? 'check' : 'checks'}`}
+                  </span>
+                </button>
               );
             })}
+          </div>
 
-            {/* Checks tile */}
-            <div className="tile p-7 md:col-span-2">
-              <h3 className={`text-lg font-display font-bold mb-5 ${isAr ? 'text-right' : 'text-left'}`}>
-                {isAr ? 'ما الذي يفحصه المحرك' : 'What the engine checks for'}
-              </h3>
-              <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
-                {[
-                  { en: 'Document structure and objects', ar: 'هيكل المستند وكائناته' },
-                  { en: 'JavaScript and embedded scripts', ar: 'السكريبتات وأكواد جافاسكريبت' },
-                  { en: 'Suspicious links and URIs', ar: 'الروابط والعناوين المشبوهة' },
-                  { en: 'Launch and embedded-file actions', ar: 'إجراءات التشغيل والملفات المضمّنة' },
-                  { en: 'Metadata and encoding anomalies', ar: 'شذوذ البيانات الوصفية والترميز' },
-                ].map((c, i) => (
-                  <li key={i} className={`flex items-center gap-3 text-slate-300 ${isAr ? 'text-right' : ''}`}>
-                    <Icon.check className="w-4 h-4 text-brand-400 shrink-0" />
-                    <span>{isAr ? c.ar : c.en}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {openDet && (() => {
+            const d = DETECTORS.find((x) => x.k === openDet);
+            return (
+              <div className="mt-[18px] p-[22px] rounded-[20px] bg-white border border-brand-line animate-fade-in">
+                <h3 className="text-base font-bold mb-3">{isAr ? d.ar : d.en}</h3>
+                <div className="flex flex-wrap gap-2">
+                  {d.checks.map((c) => (
+                    <span key={c.tok} className="inline-flex items-center gap-2 max-w-full px-3 py-1.5 rounded-full bg-white border border-line text-[13px] text-ink-2">
+                      <i className={`w-[9px] h-[9px] rounded-full shrink-0 ${SEV_DOT[c.sev]}`} />
+                      <b className="font-semibold text-ink">{isAr ? c.ar : c.en}</b>
+                      <span className="font-mono text-xs text-ink-3" dir="ltr">{c.tok}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </section>
 
-            {/* Privacy tile */}
-            <div className={`tile p-7 flex flex-col justify-center ${isAr ? 'text-right items-start' : ''}`}>
-              <Icon.shieldCheck className="w-7 h-7 text-brand-400 mb-3" />
-              <h3 className="text-lg font-display font-bold mb-2">{isAr ? 'خصوصيتك' : 'Your privacy'}</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                {isAr ? 'تتم معالجة ملفك محليًا ولا يُرسَل إلى أي خادم خارجي.' : 'Your file is processed locally and never sent to any third-party server.'}
-              </p>
-            </div>
+      {/* How it works */}
+      <section id="how-it-works" className="relative z-10 px-5 sm:px-8 py-24 bg-page">
+        <div className="mx-auto max-w-6xl">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <h2 className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight">{isAr ? 'من الرفع إلى الإجابة في ثلاث خطوات' : 'From upload to answer in three steps'}</h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              { enT: 'Upload a PDF', arT: 'ارفع ملف PDF', enD: 'Drag and drop your file or browse to select it.', arD: 'اسحب وأفلت الملف أو اختره من جهازك.' },
+              { enT: 'Deep analysis', arT: 'تحليل عميق', enD: 'The engine inspects structure, scripts, links, and metadata.', arD: 'يفحص المحرك الهيكل والسكريبتات والروابط والبيانات الوصفية.' },
+              { enT: 'Get your report', arT: 'احصل على تقريرك', enD: 'See detected threats, a risk score, and any extracted scripts.', arD: 'اطّلع على التهديدات ودرجة الخطورة والسكريبتات المستخرجة.' },
+            ].map((st, i) => (
+              <div key={i} className="flex flex-col items-center gap-3 text-center">
+                <span className="grid place-items-center w-14 h-14 rounded-full bg-brand text-white font-display font-extrabold text-[22px] shadow-[0_0_0_8px_#EEF1FF]" dir="ltr">{i + 1}</span>
+                <h3 className="text-[19px] font-bold">{isAr ? st.arT : st.enT}</h3>
+                <p className="text-ink-2 max-w-[32ch]">{isAr ? st.arD : st.enD}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 glass border-t border-white/10 py-10 px-5 text-center text-sm">
-        <div className="font-display text-slate-300">
-          Malicious PDF <span className="text-gradient">Detector</span>
+      <footer className="relative z-10 bg-white border-t border-line py-10 px-5 sm:px-8 text-sm">
+        <div className="mx-auto max-w-6xl flex flex-col md:flex-row md:items-center md:justify-between gap-6 text-center md:text-left" dir="ltr">
+        <div dir={isAr ? 'rtl' : 'ltr'} className="md:text-left">
+          <div className="font-display font-bold text-ink-2">
+            Malicious PDF <span className="text-brand">Detector</span>
+          </div>
+          <p className="text-ink-3 mt-1.5">
+            {isAr ? 'تم تطويره بواسطة ديالى التركي' : 'Developed by Diyala Alturki'}
+          </p>
         </div>
-        <p className="text-slate-400 mt-4">
-          {isAr ? 'تم تطويره بواسطة ديالى التركي' : 'Developed by Diyala Alturki'}
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-4" dir="ltr">
+        <div className="flex flex-col items-center md:items-start gap-2" dir="ltr">
           <a
             href="https://github.com/Diiiyala"
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex items-center gap-2 text-slate-400 hover:text-white transition"
+            className="group flex items-center gap-2 text-ink-3 hover:text-brand-ink transition"
           >
             <span className="h-5 w-4 flex items-center justify-center flex-shrink-0">
-              <img src="/github.svg" alt="GitHub" className="w-4 h-4 invert opacity-60 group-hover:opacity-100 transition-opacity" />
+              <img src="/github.svg" alt="GitHub" className="w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity" />
             </span> Diiiyala
           </a>
-          <span className="text-white/15">|</span>
           <a
             href="mailto:diyala.alturki@gmail.com"
-            className="group flex items-center gap-2 text-slate-400 hover:text-white transition"
+            className="group flex items-center gap-2 text-ink-3 hover:text-brand-ink transition"
           >
             <span className="h-5 w-4 flex items-center justify-center flex-shrink-0">
-              <img src="/mail.svg" alt="Email" className="w-4 h-4 invert opacity-60 group-hover:opacity-100 transition-opacity" />
+              <img src="/mail.svg" alt="Email" className="w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity" />
             </span> diyala.alturki@gmail.com
           </a>
-          <span className="text-white/15">|</span>
           <a
             href="https://www.linkedin.com/in/diyala-alturki"
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex items-center gap-2 text-slate-400 hover:text-white transition"
+            className="group flex items-center gap-2 text-ink-3 hover:text-brand-ink transition"
           >
             <span className="h-5 w-4 flex items-center justify-center flex-shrink-0">
-              <img src="/linkedin.svg" alt="LinkedIn" className="w-4 h-4 invert opacity-60 group-hover:opacity-100 transition-opacity" />
+              <img src="/linkedin.svg" alt="LinkedIn" className="w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity" />
             </span> diyala-alturki
           </a>
+        </div>
         </div>
       </footer>
     </div>
