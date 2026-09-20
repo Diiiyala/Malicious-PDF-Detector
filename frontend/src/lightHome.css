@@ -241,3 +241,13 @@
   .lp .nav button{width:132px;justify-content:center;padding-inline:0}
   .lp .lang{width:116px;justify-content:center;padding-inline:0}
 }
+
+.lp .drop.c{padding:38px 40px 38px 44px;gap:20px}
+.lp[dir=rtl] .drop.c{padding:38px 44px 38px 40px}
+.lp .drop.c .up{width:68px;height:68px;border-radius:20px}
+.lp .drop.c .up svg{width:32px;height:32px}
+.lp .drop.c .dtxt b{font-size:18px}
+.lp .drop.c .btn.lg{min-height:46px;padding-inline:22px;font-size:15px}
+@media (max-width:560px){
+  .lp .drop.c{padding-block:28px}
+}
