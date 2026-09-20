@@ -138,11 +138,11 @@ npm install
 npm run dev
 ```
 
-Open the URL shown by Vite.
+Open the URL shown by Vite (usually http://localhost:5173).
 
-Keep both servers running. 
+Keep both servers running.
 
-The frontend sends analysis requests to the backend at `http://localhost:5000`.
+The frontend sends analysis requests to `http://localhost:5000/upload`. This address is hard-coded in `frontend/src/App.jsx`; update it before deploying.
 
 ## API Reference
 
