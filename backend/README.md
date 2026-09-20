@@ -4,7 +4,7 @@ A Flask API that performs static PDF analysis and returns risk scores, categoriz
 
 ## Tech Stack
 
-Python, Flask, Flask-Cors, `pypdf`, `pikepdf`, and `pdfminer.six`.
+Python, Flask, Flask-Cors, Waitress, `pypdf`, `pikepdf`, and `pdfminer.six`.
 
 ## Setup
 
