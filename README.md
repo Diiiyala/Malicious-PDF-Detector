@@ -30,12 +30,12 @@ The detector checks for embedded JavaScript, automatic actions, suspicious links
 
 ## How It Works
 
-1. **Upload**: The frontend sends the PDF to the Flask backend.
-2. **Parse and recover**: The backend parses the file with `pypdf`. If parsing fails, it attempts a repair pass with `pikepdf` and extracts decompressed stream content.
-3. **Extract and normalize**: Text is extracted with `pypdf`, using `pdfminer.six` as a fallback, then normalized to help identify obfuscated content.
-4. **Analyze**: Five detector modules inspect the parsed document, extracted content, and raw bytes in parallel.
-5. **Consolidate and score**: Duplicate findings are merged, and a weighted risk score is calculated.
-6. **Display results**: The frontend presents the risk assessment, categorized findings, and extracted scripts.
+1. **Upload**: The frontend sends the PDF to the Flask backend (`POST /upload`).
+2. **Parse and recover**: `load_pdf` parses the file with `pypdf`. If parsing fails, it attempts a repair pass with `pikepdf`, appends the decompressed stream content (capped at 200 MB) to the bytes that are scanned, and records a finding that the structure was malformed.
+3. **Extract and normalize**: Text, metadata, and `/URI` strings are extracted. Text comes from `pypdf` (with `pdfminer.six` as a fallback), and is then normalized to reveal obfuscated content (PDF `#xx` name escapes, `\uXXXX`/`\xXX`/octal escapes, string concatenation, `atob()`, Base64 layers, and similar).
+4. **Analyze**: Five detector modules inspect the parsed document, extracted content, and raw bytes. They run one after another, and a failure in one detector is logged without stopping the others.
+5. **Consolidate and score**: Duplicate findings are merged (locations and matched values are combined and capped), redundant URI findings already covered by stronger ones are absorbed, and a weighted risk score is calculated.
+6. **Display results**: The frontend presents the risk assessment, categorized findings, extracted scripts, and file details.
 
 ### Detection Modules
 
