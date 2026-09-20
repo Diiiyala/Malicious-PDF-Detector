@@ -1,29 +1,32 @@
 # Malicious PDF Detector
 
-A web application that analyzes PDF files for potentially malicious content and suspicious behavior. Upload a PDF to view its risk score, categorized findings, and extracted scripts through an interactive React interface powered by a Python/Flask analysis engine.
+A web application that statically analyzes PDF files for potentially malicious content and suspicious behavior. Upload a PDF to view its risk score, categorized findings, and extracted scripts through a bilingual (English / Arabic) React interface powered by a Python/Flask analysis engine.
 
-The detector checks for embedded JavaScript, automatic actions, suspicious links, structural evasion techniques, anomalous metadata, and hidden execution indicators.
+The detector checks for embedded JavaScript, automatic actions, suspicious links, embedded executables, structural evasion techniques, hidden text, anomalous metadata, and hidden execution indicators. Files are never opened or executed; all analysis is static.
 
 ![Malicious PDF Detector interface](Frontend.jpg)
 
 ## Key Features
 
-* **Drag-and-drop uploads**: Upload a PDF directly from your browser.
+* **Drag-and-drop uploads**: Upload a PDF (up to 100 MB) directly from your browser.
 * **Five analysis modules**: Inspect text, content, document structure, metadata, and raw bytes.
-* **Obfuscation detection**: Identify encoded PDF names, duplicate dictionary keys, and suspicious character or encoding patterns.
-* **Parsing recovery**: Attempt to repair malformed PDFs and inspect decompressed streams.
+* **Obfuscation detection**: Identify hex-escaped PDF names, octal/hex-encoded URIs, duplicate dictionary keys (parser confusion), Base64 layers, and string-concatenation or charcode tricks.
+* **Parsing recovery**: Attempt to repair malformed PDFs with `pikepdf` and inspect the decompressed streams.
+* **Decompression-bomb protection**: Streams that exceed memory limits are flagged instead of crashing the service.
 * **Consolidated findings**: Merge duplicate indicators while preserving matched values and locations.
 * **Risk assessment**: Display a weighted score, risk level, and status.
-* **Script inspection**: Review extracted script content alongside the findings.
+* **Script inspection**: Review extracted and de-obfuscated script content (JavaScript, XFA/FormCalc, XML/XXE, decoded Base64 payloads) alongside the findings, with one-click copy.
+* **Bilingual UI**: English and Arabic, including right-to-left layout.
+* **Report export**: Save or share the scan result as an A4 PDF report, and copy the file's SHA-256 (computed in the browser).
 
 ## Tech Stack
 
-| Layer          | Technologies                       |
-| -------------- | ---------------------------------- |
-| Backend        | Python, Flask, Flask-Cors          |
-| PDF processing | `pypdf`, `pikepdf`, `pdfminer.six` |
-| Frontend       | React 19, Vite, Tailwind CSS       |
-| UI utilities   | `react-dropzone`, `html-to-image`  |
+| Layer          | Technologies                                        |
+| -------------- | --------------------------------------------------- |
+| Backend        | Python, Flask, Flask-Cors, Waitress                 |
+| PDF processing | `pypdf`, `pikepdf`, `pdfminer.six`                  |
+| Frontend       | React 19, Vite, Tailwind CSS 3                      |
+| UI utilities   | `react-dropzone`, `html-to-image`                   |
 
 ## How It Works
 
