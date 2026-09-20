@@ -263,3 +263,6 @@
 .lp .lang:hover{border-color:transparent}
 .lp .lang img{height:28px;width:auto;display:block;transition:transform .15s,opacity .15s}
 .lp .lang:hover img{transform:scale(1.06)}
+.lp .mkr[data-n="1"]{--c:#F5A524}
+.lp .mkr[data-n="2"]{--c:#EF4B5B}
+.lp .mkr[data-n="3"]{--c:#7C5CF0}
