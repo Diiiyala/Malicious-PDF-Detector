@@ -1,7 +1,7 @@
 import re, logging
 from analysis.utils.models import Threat
 from analysis.detectors.structure.collector import ThreatCollector
-from analysis.signatures import SUSPICIOUS_URI_KEYWORDS, NAVIGATION_ACTIONS, AA_SILENT_TRIGGERS
+from analysis.signatures import SUSPICIOUS_URI_KEYWORDS, NAVIGATION_ACTIONS, AA_SILENT_TRIGGERS, DEST_FIT_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,21 @@ TARGET_PHRASE = {
 CLICKJACK_COVERAGE = 0.9
 TRANSPARENT_WIDGET_MAX_COVERAGE = 0.05
 WIDGET_GRID_THRESHOLD = 3
+
+
+def is_plain_destination(obj) -> bool:
+    if isinstance(obj, list):
+        if len(obj) < 2:
+            return False
+        fit = obj[1].get_object() if hasattr(obj[1], "get_object") else obj[1]
+        if str(fit) not in DEST_FIT_TYPES:
+            return False
+        for item in obj[2:]:
+            item = item.get_object() if hasattr(item, "get_object") else item
+            if isinstance(item, (dict, list)):
+                return False
+        return True
+    return isinstance(obj, str)  # named destination
 
 
 def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=None,
@@ -82,7 +97,15 @@ def perform_action_analysis(reader, root, aggregator=None, conflicting_targets=N
             try:
                 oa_obj = root["/OpenAction"].get_object()
 
-                if isinstance(oa_obj, dict) and "/S" in oa_obj:
+                if is_plain_destination(oa_obj):
+                    action_traced = True
+
+                elif (isinstance(oa_obj, dict) and "/S" in oa_obj
+                      and str(oa_obj.get("/S")) in NAVIGATION_ACTIONS
+                      and "/Next" not in oa_obj):
+                    action_traced = True
+
+                elif isinstance(oa_obj, dict) and "/S" in oa_obj:
                     action_type = str(oa_obj.get("/S")).replace("/", "")
 
                     open_written = obfuscation_note(f"/{action_type}", 12)
