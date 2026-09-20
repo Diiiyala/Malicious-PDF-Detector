@@ -46,107 +46,108 @@ def analyze_binary(content: ExtractedContent, aggregator=None) -> list[Threat]:
     # ------------------------------------------------------------------
     # 3. Content-based detection & Script Aggregation
     # ------------------------------------------------------------------
-    processed_offsets = set() 
     processed_snippets = set()
-    
-    for pattern, (desc, severity, t_id) in CONTENT_PATTERNS.items():
-        matches = list(re.finditer(pattern, file_content, re.IGNORECASE))
+    last_accepted_offset = None
 
-        if not matches: continue
-        for match in matches:
-            start = match.start()
+    all_matches = [
+        (match.start(), pattern, match, desc, severity, t_id)
+        for pattern, (desc, severity, t_id) in CONTENT_PATTERNS.items()
+        for match in re.finditer(pattern, file_content, re.IGNORECASE)
+    ]
+    all_matches.sort(key=lambda m: m[0])
 
-            if not is_structural_match(file_content, start):
+    for start, pattern, match, desc, severity, t_id in all_matches:
+        if not is_structural_match(file_content, start):
+            continue
+
+        # ----------------------------------------------------------
+        # Contextual Detection
+        # ----------------------------------------------------------
+
+        context = detect_pdf_context(file_content, start)
+        context_str = ", ".join(context)
+        keyword_found = match.group(0).decode('utf-8', errors='ignore').strip()
+
+        threats.append(Threat(
+            id=t_id,
+            category="Binary Content",
+            severity=severity,
+            description=f"{desc} (Found: '{keyword_found}')",
+            location=f"Offset: {start} [Context: {context_str}]"
+        ))
+
+        # ----------------------------------------------------------
+        # Aggregator Extraction
+        # ----------------------------------------------------------
+
+        if aggregator and pattern in AGGREGATOR_PATTERNS:
+            detected_type = SCRIPT_TYPE_MAP.get(pattern, "Binary Discovery")
+
+            if last_accepted_offset is not None and abs(start - last_accepted_offset) < 1500:
                 continue
 
-            # ----------------------------------------------------------
-            # Contextual Detection
-            # ----------------------------------------------------------
+            if detected_type in ["XFA/SOAP Payload", "XML/XXE Payload", "Environment Leak Exploit", "XFA/XML-Form", "XSLT/XML"]:
+                raw_chunk = file_content[start:start + 1500]
+                snippet = raw_chunk.decode('utf-8', errors='ignore')
 
-            context = detect_pdf_context(file_content, start)
-            context_str = ", ".join(context)
-            keyword_found = match.group(0).decode('utf-8', errors='ignore').strip()
-            
-            threats.append(Threat(
-                id=t_id,
-                category="Binary Content",
-                severity=severity,
-                description=f"{desc} (Found: '{keyword_found}')",
-                location=f"Offset: {start} [Context: {context_str}]"
-            ))
-                
-            # ----------------------------------------------------------
-            # Aggregator Extraction
-            # ----------------------------------------------------------
+                if "xml-stylesheet" in snippet and "?>" in snippet:
+                    snippet = snippet.split("?>")[0] + "?>"
+                elif "endstream" in snippet:
+                    snippet = snippet.split("endstream")[0] + "endstream"
+                elif "</xdp:xdp>" in snippet:
+                    snippet = snippet.split("</xdp:xdp>")[0] + "</xdp:xdp>"
+                elif "</template>" in snippet:
+                    snippet = snippet.split("</template>")[0] + "</template>"
 
-            if aggregator and pattern in AGGREGATOR_PATTERNS:
-                detected_type = SCRIPT_TYPE_MAP.get(pattern, "Binary Discovery")
-                
-                if any(abs(start - old_offset) < 1500 for old_offset in processed_offsets):
-                    continue
-                
-                if detected_type in ["XFA/SOAP Payload", "XML/XXE Payload", "Environment Leak Exploit", "XFA/XML-Form", "XSLT/XML"]:
-                    raw_chunk = file_content[start:start + 1500]
-                    snippet = raw_chunk.decode('utf-8', errors='ignore')
+                clean_snippet = snippet.strip()
+            else:
+                raw_chunk = file_content[start:start + 1000]
+                paren_start = raw_chunk.find(b'(', 0, INLINE_STRING_WINDOW)
 
-                    if "xml-stylesheet" in snippet and "?>" in snippet:
-                        snippet = snippet.split("?>")[0] + "?>"
-                    elif "endstream" in snippet:
-                        snippet = snippet.split("endstream")[0] + "endstream"
-                    elif "</xdp:xdp>" in snippet:
-                        snippet = snippet.split("</xdp:xdp>")[0] + "</xdp:xdp>"
-                    elif "</template>" in snippet:
-                        snippet = snippet.split("</template>")[0] + "</template>"
-        
-                    clean_snippet = snippet.strip()
+                if paren_start != -1:
+                    depth = 0
+                    chunk_content = bytearray()
+
+                    for i in range(paren_start, len(raw_chunk)):
+                        char = raw_chunk[i]
+                        if char == ord(b'('):
+                            depth += 1
+                            chunk_content.append(char)
+                        elif char == ord(b')'):
+                            depth -= 1
+                            chunk_content.append(char)
+                            if depth == 0:
+                                break
+                            continue
+                        else:
+                            chunk_content.append(char)
+
+                    snippet = chunk_content.decode('utf-8', errors='ignore')
                 else:
-                    raw_chunk = file_content[start:start + 1000]
-                    paren_start = raw_chunk.find(b'(', 0, INLINE_STRING_WINDOW)
-
-                    if paren_start != -1:
-                        depth = 0
-                        chunk_content = bytearray()
-                        
-                        for i in range(paren_start, len(raw_chunk)):
-                            char = raw_chunk[i]
-                            if char == ord(b'('):
-                                depth += 1
-                                chunk_content.append(char)
-                            elif char == ord(b')'):
-                                depth -= 1
-                                chunk_content.append(char)
-                                if depth == 0:
-                                    break
-                                continue
-                            else:
-                                chunk_content.append(char)
-                            
-                        snippet = chunk_content.decode('utf-8', errors='ignore')
-                    else:
-                        continue
-
-                    clean_snippet = snippet.strip()
-                    while True:
-                        prev_len = len(clean_snippet)
-                        clean_snippet = re.sub(r'^(?:/JavaScript|/JS)\b', '', clean_snippet, flags=re.IGNORECASE).strip()
-                        clean_snippet = re.sub(r'^\(\s*', '', clean_snippet).strip()
-                        
-                        if len(clean_snippet) == prev_len:
-                            break
-                
-                    if clean_snippet.endswith(')'):
-                        clean_snippet = clean_snippet[:-1].strip()
-                    
-                normalized_snippet = normalize_all(clean_snippet)     
-                
-                if not is_readable_snippet(normalized_snippet):
                     continue
 
-                if normalized_snippet not in processed_snippets and normalized_snippet.strip():
-                    processed_offsets.add(start)
-                    processed_snippets.add(normalized_snippet)                          
-                    aggregator.add_script(normalized_snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
-                    
+                clean_snippet = snippet.strip()
+                while True:
+                    prev_len = len(clean_snippet)
+                    clean_snippet = re.sub(r'^(?:/JavaScript|/JS)\b', '', clean_snippet, flags=re.IGNORECASE).strip()
+                    clean_snippet = re.sub(r'^\(\s*', '', clean_snippet).strip()
+
+                    if len(clean_snippet) == prev_len:
+                        break
+
+                if clean_snippet.endswith(')'):
+                    clean_snippet = clean_snippet[:-1].strip()
+
+            normalized_snippet = normalize_all(clean_snippet)
+
+            if not is_readable_snippet(normalized_snippet):
+                continue
+
+            if normalized_snippet not in processed_snippets and normalized_snippet.strip():
+                last_accepted_offset = start
+                processed_snippets.add(normalized_snippet)
+                aggregator.add_script(normalized_snippet, f"Raw Binary Scan (Pos: {start})", script_type=detected_type)
+
     return threats
 
 # -----------------------------------------------------------------------
