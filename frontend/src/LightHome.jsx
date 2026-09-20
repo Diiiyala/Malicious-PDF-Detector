@@ -105,7 +105,6 @@ const HeroIllustration = ({ c }) => {
             <div className="pg">
               <div className="ln" style={{ width: '52%', height: '1.6cqw', background: '#CDCDCD' }} />
               {LINES.map((w, i) => <div key={i} className="ln" style={{ width: `${w}%` }} />)}
-              <div className="sweep" />
               {MARKERS.map((m) => (
                 <div key={m.n} className={`mkr${step > 0 && step >= m.n ? ' on' : ''}`} data-n={m.n} data-sev={m.sev} style={m.pos}><em>{m.label}</em></div>
               ))}
