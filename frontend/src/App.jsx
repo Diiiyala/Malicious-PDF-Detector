@@ -138,9 +138,9 @@ const RiskGauge = ({ score = 0, tone = 'danger' }) => {
   const pct = Math.min(100, Math.max(0, score));
   const offset = C - (pct / 100) * C;
   const colors = {
-    safe: '#22A466',
-    warn: '#E3A600',
-    danger: '#D33A3A',
+    safe: '#12B5A6',
+    warn: '#F5A524',
+    danger: '#EF4B5B',
   };
   const stroke = colors[tone] || colors.danger;
   return (
@@ -154,7 +154,7 @@ const RiskGauge = ({ score = 0, tone = 'danger' }) => {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-display font-bold" style={{ color: tone === 'safe' ? '#136B41' : tone === 'warn' ? '#7F5A00' : '#B92626' }}>{pct}%</span>
+        <span className="text-2xl font-display font-bold" style={{ color: stroke }}>{pct}%</span>
       </div>
     </div>
   );
@@ -492,11 +492,8 @@ function App() {
     danger: { text: 'text-danger', pill: 'bg-danger-bg border-transparent text-danger' },
   };
   const sevPill = (risk, fallback) => {
-    const k = String(risk || '').toLowerCase();
-    if (k.includes('crit')) return 'bg-danger-bg text-danger';
-    if (k.includes('high')) return 'bg-orange-bg text-orange';
-    if (k.includes('med')) return 'bg-warn-bg text-warn';
-    if (k.includes('low')) return 'bg-info-bg text-info';
+    if (scanResult?.status === 'warning') return 'bg-[#F5A524] text-white';
+    if (scanResult?.status === 'danger') return 'bg-[#EF4B5B] text-white';
     return fallback;
   };
 
@@ -649,13 +646,13 @@ function App() {
                   return (
                     <div className="tile md:col-span-3 flex flex-col md:flex-row md:items-center md:justify-between">
                       <div className={`px-8 py-6 flex flex-col justify-center items-start ${isAr ? 'text-right' : ''}`}>
-                        <div className={`inline-flex items-center gap-2 ${t.pill} border rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider mb-4`}>
+                        <div className={`inline-flex items-center gap-2 ${scanResult.status === 'safe' ? `${t.pill} border` : 'text-white'} rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider mb-4`} style={scanResult.status === 'safe' ? undefined : { backgroundColor: scanResult.status === 'warning' ? '#F5A524' : '#EF4B5B' }}>
                           {scanResult.status === 'safe'
                             ? <Icon.shieldCheck className="w-3.5 h-3.5" />
                             : <Icon.alert className="w-3.5 h-3.5" />}
                           {isAr ? 'تقرير الفحص' : 'Scan Report'}
                         </div>
-                        <h2 className={`text-3xl font-display font-bold mb-2 ${t.text}`}>{headline}</h2>
+                        <h2 className={`text-3xl font-display font-bold mb-2 ${scanResult.status === 'safe' ? t.text : ''}`} style={scanResult.status === 'safe' ? undefined : { color: scanResult.status === 'warning' ? '#F5A524' : '#EF4B5B' }}>{headline}</h2>
                         <p className="text-ink-3">{sub}</p>
                       </div>
 
