@@ -446,7 +446,7 @@ function App() {
       const { toBlob } = await import('html-to-image');
       const blob = await toBlob(node, {
         pixelRatio: 2,
-        backgroundColor: '#F2F2F2',
+        backgroundColor: '#FFFFFF',
         cacheBust: true,
         width: node.scrollWidth,
         height: node.scrollHeight,
@@ -501,7 +501,7 @@ function App() {
 
 
   return (
-    <div className={`relative min-h-screen bg-page text-ink font-sans selection:bg-brand selection:text-white overflow-x-hidden transition-[opacity,filter] duration-200 ease-out ${langFading ? 'opacity-0 blur-[3px]' : 'opacity-100'}`} dir={isAr ? 'rtl' : 'ltr'}>
+    <div className={`relative min-h-screen bg-white text-ink font-sans selection:bg-brand selection:text-white overflow-x-hidden transition-[opacity,filter] duration-200 ease-out ${langFading ? 'opacity-0 blur-[3px]' : 'opacity-100'}`} dir={isAr ? 'rtl' : 'ltr'}>
 
       {/* Light landing: navbar + hero (see LightHome.jsx) */}
       <LightHome
@@ -516,7 +516,7 @@ function App() {
 
       {/* Workspace */}
       {appState !== 'upload' && (
-      <section id="workspace" className="relative z-10 min-h-screen flex flex-col justify-center items-center px-5 py-24 bg-page">
+      <section id="workspace" className="relative z-10 min-h-screen flex flex-col justify-center items-center px-5 py-24 bg-white">
 
         {/* Scanning state */}
         {appState === 'scanning' && (() => {
@@ -603,7 +603,7 @@ function App() {
         {/* Results state */}
         {appState === 'result' && scanResult && (
           <div className="w-full max-w-6xl animate-fade-up">
-            <div ref={resultRef} className="bg-page rounded-2xl p-2 sm:p-4">
+            <div ref={resultRef} className="bg-white rounded-2xl p-2 sm:p-4">
             {/* Brand header — included in the shared image */}
             {capturing && (
               <div className="flex items-center gap-2.5 px-4 pt-2 pb-6" dir="ltr">
@@ -677,7 +677,7 @@ function App() {
 
                 {/* Tabs (hidden while capturing the shared image, where all sections are shown) */}
                 {!capturing && (
-                  <div className="md:col-span-3 flex gap-1 border-b border-line-2" role="tablist" dir="ltr">
+                  <div className="md:col-span-3 flex gap-1" role="tablist" dir="ltr">
                     {[
                       { k: 'findings', en: 'Findings', ar: 'النتائج', n: scanResult.threats.length },
                       { k: 'scripts', en: 'Scripts', ar: 'السكريبتات', n: scanResult.extractedScripts.length },
@@ -863,8 +863,30 @@ function App() {
       </section>
       )}
 
+      {/* How it works */}
+      <section id="how-it-works" className="relative z-10 px-5 sm:px-8 py-24 bg-white">
+        <div className="mx-auto max-w-6xl">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <h2 className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight">{isAr ? 'من الرفع إلى الإجابة في ثلاث خطوات' : 'From upload to answer in three steps'}</h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              { enT: 'Upload a PDF', arT: 'ارفع ملف PDF', enD: 'Drag and drop your file or browse to select it.', arD: 'اسحب وأفلت الملف أو اختره من جهازك.' },
+              { enT: 'Deep analysis', arT: 'تحليل عميق', enD: 'The engine inspects structure, scripts, links, and metadata.', arD: 'يفحص المحرك الهيكل والسكريبتات والروابط والبيانات الوصفية.' },
+              { enT: 'Get your report', arT: 'احصل على تقريرك', enD: 'See detected threats, a risk score, and any extracted scripts.', arD: 'اطّلع على التهديدات ودرجة الخطورة والسكريبتات المستخرجة.' },
+            ].map((st, i) => (
+              <div key={i} className="flex flex-col items-center gap-3 text-center">
+                <span className="grid place-items-center w-14 h-14 rounded-full bg-brand text-white font-display font-extrabold text-[22px] shadow-[0_0_0_8px_#EEF1FF]" dir="ltr">{i + 1}</span>
+                <h3 className="text-[19px] font-bold">{isAr ? st.arT : st.enT}</h3>
+                <p className="text-ink-2 max-w-[32ch]">{isAr ? st.arD : st.enD}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Detectors */}
-      <section id="detectors" className="relative z-10 px-5 sm:px-8 py-24 bg-white border-y border-line">
+      <section id="detectors" className="relative z-10 px-5 sm:px-8 py-24 bg-white">
         <div className="mx-auto max-w-6xl">
           <div className="text-center max-w-2xl mx-auto mb-9">
             <h2 className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight">{isAr ? 'ما الذي نفحصه داخل كل ملف' : 'What we look at inside every PDF'}</h2>
@@ -920,30 +942,8 @@ function App() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="how-it-works" className="relative z-10 px-5 sm:px-8 py-24 bg-page">
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight">{isAr ? 'من الرفع إلى الإجابة في ثلاث خطوات' : 'From upload to answer in three steps'}</h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { enT: 'Upload a PDF', arT: 'ارفع ملف PDF', enD: 'Drag and drop your file or browse to select it.', arD: 'اسحب وأفلت الملف أو اختره من جهازك.' },
-              { enT: 'Deep analysis', arT: 'تحليل عميق', enD: 'The engine inspects structure, scripts, links, and metadata.', arD: 'يفحص المحرك الهيكل والسكريبتات والروابط والبيانات الوصفية.' },
-              { enT: 'Get your report', arT: 'احصل على تقريرك', enD: 'See detected threats, a risk score, and any extracted scripts.', arD: 'اطّلع على التهديدات ودرجة الخطورة والسكريبتات المستخرجة.' },
-            ].map((st, i) => (
-              <div key={i} className="flex flex-col items-center gap-3 text-center">
-                <span className="grid place-items-center w-14 h-14 rounded-full bg-brand text-white font-display font-extrabold text-[22px] shadow-[0_0_0_8px_#EEF1FF]" dir="ltr">{i + 1}</span>
-                <h3 className="text-[19px] font-bold">{isAr ? st.arT : st.enT}</h3>
-                <p className="text-ink-2 max-w-[32ch]">{isAr ? st.arD : st.enD}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
-      <footer className="relative z-10 bg-white border-t border-line py-10 px-5 sm:px-8 text-sm">
+      <footer className="relative z-10 bg-white py-10 px-5 sm:px-8 text-sm">
         <div className="mx-auto max-w-6xl flex flex-col md:flex-row md:items-center md:justify-between gap-6 text-center md:text-left" dir="ltr">
         <div dir={isAr ? 'rtl' : 'ltr'} className="md:text-left">
           <div className="font-display font-bold text-ink-2">
@@ -953,35 +953,23 @@ function App() {
             {isAr ? 'تم تطويره بواسطة ديالى التركي' : 'Developed by Diyala Alturki'}
           </p>
         </div>
-        <div className="flex flex-col items-center md:items-start gap-2" dir="ltr">
-          <a
-            href="https://github.com/Diiiyala"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center gap-2 text-ink-3 hover:text-brand-ink transition"
-          >
-            <span className="h-5 w-4 flex items-center justify-center flex-shrink-0">
-              <img src="/github.svg" alt="GitHub" className="w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity" />
-            </span> Diiiyala
-          </a>
-          <a
-            href="mailto:diyala.alturki@gmail.com"
-            className="group flex items-center gap-2 text-ink-3 hover:text-brand-ink transition"
-          >
-            <span className="h-5 w-4 flex items-center justify-center flex-shrink-0">
-              <img src="/mail.svg" alt="Email" className="w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity" />
-            </span> diyala.alturki@gmail.com
-          </a>
-          <a
-            href="https://www.linkedin.com/in/diyala-alturki"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center gap-2 text-ink-3 hover:text-brand-ink transition"
-          >
-            <span className="h-5 w-4 flex items-center justify-center flex-shrink-0">
-              <img src="/linkedin.svg" alt="LinkedIn" className="w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity" />
-            </span> diyala-alturki
-          </a>
+        <div className="flex items-center justify-center gap-3" dir="ltr">
+          {[
+            { href: 'https://github.com/Diiiyala', src: '/github.svg', label: 'GitHub', ext: true },
+            { href: 'mailto:diyala.alturki@gmail.com', src: '/mail.svg', label: 'Email' },
+            { href: 'https://www.linkedin.com/in/diyala-alturki', src: '/linkedin.svg', label: 'LinkedIn', ext: true },
+          ].map((s) => (
+            <a
+              key={s.label}
+              href={s.href}
+              aria-label={s.label}
+              title={s.label}
+              {...(s.ext ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              className="group grid place-items-center w-11 h-11 rounded-full bg-[#5271FF] hover:bg-[#3F5AE0] hover:-translate-y-0.5 transition"
+            >
+              <img src={s.src} alt="" className="w-5 h-5 brightness-0 invert" />
+            </a>
+          ))}
         </div>
         </div>
       </footer>
