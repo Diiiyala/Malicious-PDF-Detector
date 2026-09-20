@@ -206,6 +206,22 @@ Each entry in a category's `results` array is a formatted string:
 [Severity: X/15] <description> | Location: <location>
 ```
 
+The `structure` category also includes action/trigger and stream/object findings. The `binary` category also includes network and link findings. `not_specified` collects findings whose category is not mapped to any of the five modules; it is normally empty.
+
+Each entry in `extracted_scripts` describes a script or payload recovered during analysis:
+
+```json
+{
+  "id": "<sha256 of the code>",
+  "script_type": "JavaScript",
+  "code": "app.alert('hello');",
+  "locations": ["Raw Binary Scan (Pos: 1042)"],
+  "source_objects": ["..."]
+}
+```
+
+`source_objects` appears only when the source object is known.
+
 **Error responses**
 
 | Status | Meaning                                                                          |
