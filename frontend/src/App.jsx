@@ -132,6 +132,111 @@ const ExpandableText = ({ text, maxLength = 150, isAr, forceExpand = false }) =>
 };
 
 
+// A4 in PDF points
+const A4_W = 595.28;
+const A4_H = 841.89;
+const PDF_MARGIN = 28;
+
+const findPageBreaks = (canvas, pagePx) => {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const W = canvas.width;
+  const H = canvas.height;
+  const x0 = Math.floor(W * 0.06);
+  const w = Math.floor(W * 0.88);
+  const isBlankRow = (y) => {
+    const d = ctx.getImageData(x0, y, w, 1).data;
+    let min = 255; let max = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = d[i] + d[i + 1] + d[i + 2];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    return max - min <= 36;
+  };
+  const breaks = [0];
+  let y = 0;
+  while (y + pagePx < H) {
+    let cut = Math.floor(y + pagePx);
+    const lowest = Math.floor(y + pagePx * 0.7);
+    for (let r = cut; r > lowest; r -= 1) {
+      if (isBlankRow(r)) { cut = r; break; }
+    }
+    breaks.push(cut);
+    y = cut;
+  }
+  breaks.push(H);
+  return breaks;
+};
+
+const jpegToA4Pdf = (jpegBytes, widthPx, heightPx, breaks) => {
+  const enc = new TextEncoder();
+  const contentW = A4_W - PDF_MARGIN * 2;
+  const scale = contentW / widthPx;
+  const imgH = heightPx * scale;
+  const pages = breaks.length - 1;
+  const chunks = [];
+  const offsets = [];
+  let len = 0;
+  const push = (data) => { const b = typeof data === 'string' ? enc.encode(data) : data; chunks.push(b); len += b.length; };
+  const obj = (n, body) => { offsets[n] = len; push(`${n} 0 obj\n`); body(); push('\nendobj\n'); };
+  const f = (n) => +n.toFixed(2);
+  push('%PDF-1.4\n');
+  obj(1, () => push('<< /Type /Catalog /Pages 2 0 R >>'));
+  obj(2, () => push(`<< /Type /Pages /Kids [${Array.from({ length: pages }, (_, i) => `${4 + i * 2} 0 R`).join(' ')}] /Count ${pages} >>`));
+  obj(3, () => {
+    push(`<< /Type /XObject /Subtype /Image /Width ${widthPx} /Height ${heightPx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`);
+    push(jpegBytes);
+    push('\nendstream');
+  });
+  for (let i = 0; i < pages; i += 1) {
+    const y0 = breaks[i];
+    const sh = (breaks[i + 1] - y0) * scale;
+    const yb = A4_H - PDF_MARGIN - imgH + y0 * scale;
+    const content = `q ${f(PDF_MARGIN)} ${f(A4_H - PDF_MARGIN - sh)} ${f(contentW)} ${f(sh)} re W n ${f(contentW)} 0 0 ${f(imgH)} ${f(PDF_MARGIN)} ${f(yb)} cm /Im0 Do Q`;
+    obj(4 + i * 2, () => push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4_W} ${A4_H}] /Contents ${5 + i * 2} 0 R /Resources << /XObject << /Im0 3 0 R >> >> >>`));
+    obj(5 + i * 2, () => push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`));
+  }
+  const total = 3 + pages * 2;
+  const xref = len;
+  push(`xref\n0 ${total + 1}\n0000000000 65535 f \n`);
+  for (let i = 1; i <= total; i += 1) push(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
+  push(`trailer\n<< /Size ${total + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+  return new Blob(chunks, { type: 'application/pdf' });
+};
+
+const FOOTER_SOCIALS = [
+  { href: 'https://github.com/Diiiyala', src: '/github.svg', label: 'GitHub', ext: true },
+  { href: 'mailto:diyala.alturki@gmail.com', src: '/mail.svg', label: 'Email' },
+  { href: 'https://www.linkedin.com/in/diyala-alturki', src: '/linkedin.svg', label: 'LinkedIn', ext: true },
+];
+
+const FooterInner = ({ isAr, forceRow = false }) => (
+  <div className={`mx-auto max-w-6xl flex ${forceRow ? 'flex-row items-center justify-between text-left' : 'flex-col md:flex-row md:items-center md:justify-between text-center md:text-left'} gap-6`} dir="ltr">
+    <div dir={isAr ? 'rtl' : 'ltr'} className={forceRow ? 'text-left' : 'md:text-left'}>
+      <div className="font-display font-bold text-ink-2">
+        Malicious PDF <span className="text-brand">Detector</span>
+      </div>
+      <p className="text-ink-3 mt-1.5" dir="ltr">
+        © {new Date().getFullYear()} Diyala Alturki. All rights reserved.
+      </p>
+    </div>
+    <div className="flex items-center justify-center gap-3" dir="ltr">
+      {FOOTER_SOCIALS.map((s) => (
+        <a
+          key={s.label}
+          href={s.href}
+          aria-label={s.label}
+          title={s.label}
+          {...(s.ext ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+          className="group grid place-items-center w-11 h-11 rounded-full bg-[#5271FF] hover:bg-[#3F5AE0] hover:-translate-y-0.5 transition"
+        >
+          <img src={s.src} alt="" className="w-5 h-5 brightness-0 invert" />
+        </a>
+      ))}
+    </div>
+  </div>
+);
+
 const RiskGauge = ({ score = 0, tone = 'danger' }) => {
   const R = 52;
   const C = 2 * Math.PI * R;
@@ -444,8 +549,8 @@ function App() {
     await nextFrame();
 
     try {
-      const { toBlob } = await import('html-to-image');
-      const blob = await toBlob(node, {
+      const { toCanvas } = await import('html-to-image');
+      const canvas = await toCanvas(node, {
         pixelRatio: 2,
         backgroundColor: '#FFFFFF',
         cacheBust: true,
@@ -453,10 +558,14 @@ function App() {
         height: node.scrollHeight,
         style: { overflow: 'visible', position: 'static', left: '0', top: '0', margin: '0' },
       });
-      if (!blob) throw new Error('Capture returned no image');
+      const jpeg = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.95));
+      if (!jpeg) throw new Error('Capture returned no image');
+      const pagePx = (A4_H - PDF_MARGIN * 2) / ((A4_W - PDF_MARGIN * 2) / canvas.width);
+      const breaks = findPageBreaks(canvas, pagePx);
+      const blob = jpegToA4Pdf(new Uint8Array(await jpeg.arrayBuffer()), canvas.width, canvas.height, breaks);
 
       const safeName = (fileName || 'result').replace(/\.pdf$/i, '');
-      const file = new File([blob], `scan-${safeName}.png`, { type: 'image/png' });
+      const file = new File([blob], `scan-${safeName}.pdf`, { type: 'application/pdf' });
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file] });
@@ -601,7 +710,7 @@ function App() {
         {/* Results state */}
         {appState === 'result' && scanResult && (
           <div className="w-full max-w-6xl animate-fade-up">
-            <div ref={resultRef} className="bg-white rounded-2xl p-2 sm:p-4">
+            <div ref={resultRef} className={`bg-white rounded-2xl p-2 sm:p-4 ${capturing ? '[&_.tile]:!shadow-none' : ''}`}>
             {/* Brand header — included in the shared image */}
             {capturing && (
               <div className="flex items-center gap-2.5 px-4 pt-2 pb-6" dir="ltr">
@@ -692,9 +801,9 @@ function App() {
                   const t = tones[scanResult.status] || tones.danger;
                   return (
                     <div className="tile md:col-span-3 overflow-hidden">
-                      <div className="overflow-x-auto">
+                      <div className={capturing ? '' : 'overflow-x-auto'}>
                         <table className="w-full">
-                          <thead className="text-ink-3 text-xs uppercase tracking-wider bg-page">
+                          <thead className={`text-ink-3 text-xs uppercase tracking-wider ${capturing ? 'bg-white border-b border-line' : 'bg-page'}`}>
                             <tr>
                               <th className={`px-6 py-4 font-semibold ${isAr ? 'text-right' : 'text-left'}`}>{isAr ? 'التهديد' : 'Threat'}</th>
                               <th className="px-6 py-4 font-semibold text-center">{isAr ? 'التصنيف' : 'Category'}</th>
@@ -727,7 +836,7 @@ function App() {
                 })()}
 
                 {/* Scripts */}
-                {(capturing || resultTab === 'scripts') && (
+                {((capturing && scanResult.extractedScripts.length > 0) || (!capturing && resultTab === 'scripts')) && (
                   <div className="tile md:col-span-3 overflow-hidden">
                     {scanResult.extractedScripts.length > 0 ? (
                       <>
@@ -749,7 +858,7 @@ function App() {
                               </button>
                             </div>
                           </div>
-                          <pre className="bg-white p-5 overflow-x-auto" dir="ltr">
+                          <pre className={`bg-white p-5 ${capturing ? 'whitespace-pre-wrap break-all' : 'overflow-x-auto'}`} dir="ltr">
                             <code className="text-ink font-mono text-sm leading-relaxed">
                               <ExpandableText text={script.code} maxLength={300} isAr={isAr} forceExpand={capturing} />
                             </code>
@@ -802,7 +911,7 @@ function App() {
                         )],
                       ].map(([label, value], i, arr) => (
                         <div key={i} className="contents">
-                          <dt className={`px-5 py-3.5 text-ink-3 bg-page ${i < arr.length - 1 ? 'border-b border-line' : ''}`}>{label}</dt>
+                          <dt className={`px-5 py-3.5 text-ink-3 ${capturing ? 'bg-white' : 'bg-page'} ${i < arr.length - 1 ? 'border-b border-line' : ''}`}>{label}</dt>
                           <dd className={`px-5 py-3.5 min-w-0 ${i < arr.length - 1 ? 'border-b border-line' : ''}`}>{value}</dd>
                         </div>
                       ))}
@@ -812,17 +921,10 @@ function App() {
               </div>
             )}
 
-            {/* Page footer — included in the shared image */}
+            {/* Page footer — same as the site footer, included in the shared image */}
             {capturing && (
-              <div className="mt-6 pt-4 border-t border-line bg-page text-center text-sm">
-                <p className="text-ink-3">
-                  {isAr ? 'تم تطويره بواسطة ديالى التركي' : 'Developed by Diyala Alturki'}
-                </p>
-                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-2" dir="ltr">
-                  <span className="flex items-center gap-2 text-ink-3"><span className="h-5 w-4 flex items-center justify-center flex-shrink-0"><Icon.github className="w-4 h-4" /></span> Diiiyala</span>
-                  <span className="text-line-2">|</span>
-                  <span className="flex items-center gap-2 text-ink-3"><span className="h-5 w-4 flex items-center justify-center flex-shrink-0"><Icon.mail className="w-4 h-4" /></span> diyala.alturki@gmail.com</span>
-                </div>
+              <div className="mt-6 py-8 text-sm">
+                <FooterInner isAr={isAr} forceRow />
               </div>
             )}
             </div>
@@ -947,34 +1049,7 @@ function App() {
 
       {/* Footer */}
       <footer className="relative z-10 bg-white py-10 px-5 sm:px-8 text-sm">
-        <div className="mx-auto max-w-6xl flex flex-col md:flex-row md:items-center md:justify-between gap-6 text-center md:text-left" dir="ltr">
-        <div dir={isAr ? 'rtl' : 'ltr'} className="md:text-left">
-          <div className="font-display font-bold text-ink-2">
-            Malicious PDF <span className="text-brand">Detector</span>
-          </div>
-          <p className="text-ink-3 mt-1.5">
-            {isAr ? 'تم تطويره بواسطة ديالى التركي' : 'Developed by Diyala Alturki'}
-          </p>
-        </div>
-        <div className="flex items-center justify-center gap-3" dir="ltr">
-          {[
-            { href: 'https://github.com/Diiiyala', src: '/github.svg', label: 'GitHub', ext: true },
-            { href: 'mailto:diyala.alturki@gmail.com', src: '/mail.svg', label: 'Email' },
-            { href: 'https://www.linkedin.com/in/diyala-alturki', src: '/linkedin.svg', label: 'LinkedIn', ext: true },
-          ].map((s) => (
-            <a
-              key={s.label}
-              href={s.href}
-              aria-label={s.label}
-              title={s.label}
-              {...(s.ext ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-              className="group grid place-items-center w-11 h-11 rounded-full bg-[#5271FF] hover:bg-[#3F5AE0] hover:-translate-y-0.5 transition"
-            >
-              <img src={s.src} alt="" className="w-5 h-5 brightness-0 invert" />
-            </a>
-          ))}
-        </div>
-        </div>
+        <FooterInner isAr={isAr} />
       </footer>
     </div>
   );
