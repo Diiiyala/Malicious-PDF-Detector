@@ -175,26 +175,12 @@ curl -X POST http://localhost:5000/upload \
   "risk_level": "LOW RISK",
   "status": "safe",
   "findings": {
-    "content": {
-      "results": [],
-      "count": 0
-    },
-    "structure": {
-      "results": [],
-      "count": 0
-    },
-    "metadata": {
-      "results": [],
-      "count": 0
-    },
-    "text_extraction": {
-      "results": [],
-      "count": 0
-    },
-    "binary": {
-      "results": [],
-      "count": 0
-    }
+    "content": { "results": [], "count": 0 },
+    "structure": { "results": [], "count": 0 },
+    "metadata": { "results": [], "count": 0 },
+    "text_extraction": { "results": [], "count": 0 },
+    "binary": { "results": [], "count": 0 },
+    "not_specified": { "results": [], "count": 0 }
   },
   "extracted_scripts": []
 }
