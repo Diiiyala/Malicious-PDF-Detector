@@ -8,24 +8,26 @@ export default {
     extend: {
       colors: {
         // Surfaces
-        ink: '#0d0d10',
-        panel: '#16161a',
-        // Brand — indigo / royal blue
+        page: '#F2F2F2',
+        ink: { DEFAULT: '#141414', 2: '#444444', 3: '#666666' },
+        line: { DEFAULT: '#E0E0E0', 2: '#C6C6C6' },
+        // Brand
         brand: {
-          DEFAULT: '#4f46e5',
-          300: '#818cf8',
-          400: '#6366f1',
-          500: '#4f46e5',
-          600: '#4338ca',
-        },
-        // Secondary accent (indigo, for code/scripts)
-        cyan: {
-          glow: '#6366f1',
+          DEFAULT: '#5271FF',
+          300: '#CBD4FF',
+          400: '#5271FF',
+          500: '#5271FF',
+          600: '#3F5BE8',
+          ink: '#3450D8',
+          soft: '#EEF1FF',
+          line: '#CBD4FF',
         },
         // Semantic
-        safe: '#22c55e',
-        warn: '#f59e0b',
-        danger: '#f43f5e',
+        safe: { DEFAULT: '#136B41', bg: '#E1F4EA', dot: '#22A466' },
+        warn: { DEFAULT: '#7F5A00', bg: '#FFF3D1', dot: '#E3A600' },
+        danger: { DEFAULT: '#B92626', bg: '#FCE9E9', dot: '#D33A3A' },
+        orange: { DEFAULT: '#B84A12', bg: '#FCEDE2', dot: '#E0641F' },
+        info: { DEFAULT: '#245C9C', bg: '#E5EFFB', dot: '#3F82CC' },
       },
       fontFamily: {
         sans: ["Satoshi", "Tajawal", "system-ui", "sans-serif"],
@@ -33,8 +35,6 @@ export default {
         mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
       },
       backgroundImage: {
-        'brand-gradient': 'linear-gradient(120deg, #4338ca 0%, #6366f1 100%)',
-        'grid': 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
       },
       keyframes: {
         'fade-up': {
