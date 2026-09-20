@@ -167,8 +167,8 @@ const DETECTORS = [
   { k: 'content', icon: 'code', en: 'Content', ar: 'المحتوى', enD: 'Suspicious code, keywords and URLs', arD: 'شيفرة وكلمات وروابط مشبوهة',
     checks: [
       { tok: 'short link', sev: 'medium', en: 'Shortened link', ar: 'رابط مختصر' },
-      { tok: 'eval()', sev: 'high', en: 'Obfuscated code', ar: 'شيفرة مموّهة' },
-      { tok: 'cmd.exe', sev: 'critical', en: 'System command strings', ar: 'نصوص أوامر النظام' },
+      { tok: 'eval()', sev: 'high', en: 'Obfuscated code', ar: 'كود مموّه' },
+      { tok: 'cmd.exe', sev: 'critical', en: 'System command strings', ar: 'سلاسل نصية لأوامر النظام' },
     ] },
   { k: 'structure', icon: 'layers', en: 'Structure', ar: 'الهيكل', enD: 'Catalog, actions, streams and names', arD: 'الفهرس والإجراءات والتدفقات والأسماء',
     checks: [
@@ -177,7 +177,7 @@ const DETECTORS = [
       { tok: '/AA', sev: 'medium', en: 'Additional actions', ar: 'إجراءات إضافية' },
       { tok: '/URI', sev: 'low', en: 'External link', ar: 'رابط خارجي' },
       { tok: '/SubmitForm', sev: 'high', en: 'Form submission', ar: 'إرسال نموذج' },
-      { tok: '/GoToR', sev: 'medium', en: 'Reaches an outside file', ar: 'يستدعي ملفًا خارجيًا' },
+      { tok: '/GoToR', sev: 'medium', en: 'Reaches an outside file', ar: 'إستدعاء ملف خارجي' },
       { tok: '/EmbeddedFile', sev: 'medium', en: 'Embedded file', ar: 'ملف مضمَّن' },
       { tok: '/RichMedia', sev: 'medium', en: 'Rich media content', ar: 'وسائط غنية' },
       { tok: '/XFA', sev: 'medium', en: 'XFA form', ar: 'نموذج XFA' },
@@ -666,7 +666,7 @@ function App() {
 
                 {/* Tabs (hidden while capturing the shared image, where all sections are shown) */}
                 {!capturing && (
-                  <div className="md:col-span-3 flex gap-1" role="tablist" dir="ltr">
+                  <div className="md:col-span-3 flex gap-1" role="tablist" dir={isAr ? 'rtl' : 'ltr'}>
                     {[
                       { k: 'findings', en: 'Findings', ar: 'النتائج', n: scanResult.threats.length },
                       { k: 'scripts', en: 'Scripts', ar: 'السكريبتات', n: scanResult.extractedScripts.length },
@@ -856,13 +856,13 @@ function App() {
       <section id="how-it-works" className="relative z-10 px-5 sm:px-8 py-24 bg-white">
         <div className="mx-auto max-w-6xl">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight">{isAr ? 'من الرفع إلى الإجابة في ثلاث خطوات' : 'From upload to answer in three steps'}</h2>
+            <h2 className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight">{isAr ? 'من رفع الملف إلى النتيجة في ثلاث خطوات' : 'From upload to answer in three steps'}</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { enT: 'Upload a PDF', arT: 'ارفع ملف PDF', enD: 'Drag and drop your file or browse to select it.', arD: 'اسحب وأفلت الملف أو اختره من جهازك.' },
-              { enT: 'Deep analysis', arT: 'تحليل عميق', enD: 'The engine inspects structure, scripts, links, and metadata.', arD: 'يفحص المحرك الهيكل والسكريبتات والروابط والبيانات الوصفية.' },
-              { enT: 'Get your report', arT: 'احصل على تقريرك', enD: 'See detected threats, a risk score, and any extracted scripts.', arD: 'اطّلع على التهديدات ودرجة الخطورة والسكريبتات المستخرجة.' },
+              { enT: 'Upload a PDF', arT: 'ارفع ملف PDF', enD: 'Drag and drop your file or browse to select it.', arD: 'اسحب ملفك وأفلته أو تصفّح جهازك لاختياره.' },
+              { enT: 'Deep analysis', arT: 'تحليل عميق', enD: 'The engine inspects structure, scripts, links, and metadata.', arD: 'يفحص المحرك بنية الملف، والبرامج النصية، والروابط، والبيانات الوصفية.' },
+              { enT: 'Get your report', arT: 'احصل على تقريرك', enD: 'See detected threats, a risk score, and any extracted scripts.', arD: 'اطّلع على التهديدات المكتشفة، ودرجة الخطورة، وأي برامج نصية مستخرجة.' },
             ].map((st, i) => (
               <div key={i} className="flex flex-col items-center gap-3 text-center">
                 <span className="grid place-items-center w-14 h-14 rounded-full bg-brand text-white font-display font-extrabold text-[22px] shadow-[0_0_0_8px_#EEF1FF]" dir="ltr">{i + 1}</span>
@@ -880,7 +880,7 @@ function App() {
           <div className="text-center max-w-2xl mx-auto mb-9">
             <h2 className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight">{isAr ? 'ما الذي نفحصه داخل كل ملف' : 'What we look at inside every PDF'}</h2>
             <p className="text-ink-2 mt-3 text-base">
-              {isAr ? 'خمسة كواشف تعمل معًا. اختر أحدها لترى الفحوصات التي يجريها.' : 'Five detectors work together. Pick one to see the checks it runs.'}
+              {isAr ? 'تعمل خمس وحدات كشف معًا. اختر إحداها للاطّلاع على الفحوصات التي تجريها.' : 'Five detectors work together. Pick one to see the checks it runs.'}
             </p>
           </div>
 
