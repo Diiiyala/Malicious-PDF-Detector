@@ -618,7 +618,7 @@ function App() {
                           const st = i < step ? 'done' : i === step ? 'run' : 'wait';
                           return (
                             <li key={d.k} className="flex items-center gap-4 bg-white border border-line rounded-2xl px-5 py-3.5">
-                              <span className={`grid place-items-center w-[26px] h-[26px] rounded-full shrink-0 ${st === 'done' ? 'bg-safe-dot text-white' : st === 'run' ? 'border-[3px] border-brand-line border-t-brand animate-spin' : 'border-2 border-line-2'}`}>
+                              <span className={`grid place-items-center w-[26px] h-[26px] rounded-full shrink-0 ${st === 'done' ? 'bg-[#12B5A6] text-white' : st === 'run' ? 'border-[3px] border-brand-line border-t-brand animate-spin' : 'border-2 border-line-2'}`}>
                                 {st === 'done' && <Icon.check className="w-3.5 h-3.5" />}
                               </span>
                               <b className="text-lg font-bold flex-1">{isAr ? d.ar : d.en}</b>
@@ -669,10 +669,10 @@ function App() {
             )}
             {scanResult.status === 'safe' && scanResult.threats.length === 0 ? (
               <div className="tile p-12 text-center">
-                <div className="relative mx-auto mb-6 grid place-items-center w-24 h-24 rounded-full bg-safe/10 border border-safe/30">
-                  <Icon.shieldCheck className="w-12 h-12 text-safe" />
+                <div className="relative mx-auto mb-6 grid place-items-center w-[88px] h-[88px] rounded-[26px] bg-[#12B5A6] text-white shadow-[0_16px_30px_-12px_rgba(20,20,60,0.4)]">
+                  <Icon.shieldCheck className="w-11 h-11" />
                 </div>
-                <h2 className="relative text-3xl font-display font-bold text-safe mb-3">
+                <h2 className="relative text-3xl font-display font-bold text-[#0B8479] mb-3">
                   {isAr ? 'الملف آمن تماماً' : 'File is completely safe'}
                 </h2>
                 <p className="relative text-ink-2 max-w-xl mx-auto">
@@ -680,7 +680,7 @@ function App() {
                 </p>
                 {fileName && (
                   <div className="relative mt-5 inline-flex items-center gap-2 max-w-full bg-white border border-line rounded-xl px-3 py-1.5" dir="ltr">
-                    <Icon.layers className="w-4 h-4 text-safe shrink-0" />
+                    <Icon.layers className="w-4 h-4 text-[#12B5A6] shrink-0" />
                     <span className="text-sm text-ink-2 truncate font-mono" title={fileName}>{fileName}</span>
                   </div>
                 )}
