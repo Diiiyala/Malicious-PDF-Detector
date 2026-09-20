@@ -173,7 +173,7 @@ export default function LightHome({ isAr, isLoaded, onToggleLang, onFile, onReje
 
   return (
     <div className="lp" dir={isAr ? 'rtl' : 'ltr'}>
-      <header className={`topbar${isLoaded ? '' : ' hide'}`}>
+      <header className={`topbar${isLoaded ? '' : ' hide'}`} dir="ltr">
         <div className="top-in">
           <button type="button" className="brand" aria-label="Malicious PDF Detector" onClick={() => scrollToId(null)}>
             <b>Malicious PDF <span>Detector</span></b>

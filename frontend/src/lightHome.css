@@ -236,3 +236,8 @@
 @media (prefers-reduced-motion:reduce){.lp *,.lp *::before,.lp *::after{animation:none!important;transition:none!important}}
 .lp .vc b,.lp .mkr em{unicode-bidi:plaintext;direction:ltr}
 .lp[dir=rtl] .vc b{direction:rtl}
+
+@media (min-width:761px){
+  .lp .nav button{width:132px;justify-content:center;padding-inline:0}
+  .lp .lang{width:116px;justify-content:center;padding-inline:0}
+}

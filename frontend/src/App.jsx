@@ -732,7 +732,7 @@ function App() {
 
                 {/* Tabs (hidden while capturing the shared image, where all sections are shown) */}
                 {!capturing && (
-                  <div className="md:col-span-3 flex gap-1 border-b border-line-2 overflow-x-auto" role="tablist">
+                  <div className="md:col-span-3 flex gap-1 border-b border-line-2 overflow-x-auto" role="tablist" dir="ltr">
                     {[
                       { k: 'findings', en: 'Findings', ar: 'النتائج', n: scanResult.threats.length },
                       { k: 'scripts', en: 'Scripts', ar: 'السكريبتات', n: scanResult.extractedScripts.length },
