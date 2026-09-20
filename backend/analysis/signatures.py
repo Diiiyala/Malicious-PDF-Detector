@@ -65,6 +65,25 @@ NAVIGATION_ACTIONS = ["/GoTo", "/Named"]
 
 SUSPICIOUS_NAME_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
 
+# 1.5 Embedded-file attachments (filename / payload classification)
+EXECUTABLE_EXTENSIONS = {
+    "exe", "scr", "com", "pif", "bat", "cmd", "vbs", "vbe", "js", "jse", "wsf", "wsh",
+    "ps1", "msi", "jar", "dll", "lnk", "hta", "cpl", "reg", "sh", "elf", "apk",
+}
+MACRO_EXTENSIONS = {"docm", "xlsm", "pptm", "dotm", "xlam", "xlm"}
+DECOY_EXTENSIONS = {
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "rtf", "csv",
+    "jpg", "jpeg", "png", "gif", "zip",
+}
+BIDI_CONTROL_CHARS = "\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+EXECUTABLE_MAGIC = {
+    b"MZ": "Windows executable (MZ)",
+    b"\x7fELF": "Linux executable (ELF)",
+    b"\xcf\xfa\xed\xfe": "macOS executable (Mach-O)",
+    b"\xca\xfe\xba\xbe": "Java class / Mach-O universal binary",
+    b"#!": "Script (shebang)",
+}
+
 DANGEROUS_NAMES = {
     "/launch": 12, "/javascript": 12, "/js": 12, "/openaction": 12,
     "/aa": 11, "/embeddedfile": 11, "/embeddedfiles": 11, "/gotor": 11,
@@ -81,7 +100,7 @@ AA_SILENT_TRIGGERS = ["/WP", "/DP", "/WC", "/WS", "/DS"]
 
 SUSPICIOUS_STREAM_FILTERS = ["/JBIG2Decode", "/Crypt"]
 
-# 1.5 Decoded-payload keyword heuristic
+# 1.6 Decoded-payload keyword heuristic
 
 SUSPICIOUS_KEYS = [
     "eval", "exec", "cmd", "powershell", "http", "https", "script",
