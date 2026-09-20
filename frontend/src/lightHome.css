@@ -1,6 +1,6 @@
 .lp{
   color-scheme:light;
-  --bg:#F2F2F2; --surface:#FFFFFF; --surface-2:#F2F2F2; --line:#E0E0E0; --line-2:#C6C6C6;
+  --bg:#FFFFFF; --surface:#FFFFFF; --surface-2:#F2F2F2; --line:#E0E0E0; --line-2:#C6C6C6;
   --ink:#141414; --ink-2:#444444; --ink-3:#666666; --ink-inv:#FFFFFF;
   --navy:#141414; --navy-2:#2A2A2A;
   --brand:#5271FF; --brand-2:#3F5BE8; --brand-ink:#3450D8; --brand-soft:#EEF1FF; --brand-line:#CBD4FF;
@@ -23,7 +23,7 @@
 .lp select{font:inherit;color:inherit}
 .lp button{cursor:pointer}
 .lp :focus-visible{outline:3px solid var(--brand);outline-offset:2px;border-radius:6px}
-.lp .topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:rgba(255,255,255,.94);backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line)}
+.lp .topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:rgba(255,255,255,.94);backdrop-filter:saturate(1.4) blur(10px)}
 .lp .top-in{max-width:1160px;margin:0 auto;padding:12px 32px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 28px}
 .lp .brand{display:flex;align-items:center;gap:10px;background:none;border:0;padding:0;text-align:start}
 .lp .brand svg{width:34px;height:34px;flex:none;color:var(--brand)}
