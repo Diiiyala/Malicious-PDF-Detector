@@ -32,7 +32,7 @@
 .lp .nav{display:flex;gap:4px;margin-inline-start:8px}
 .lp .nav button{display:flex;align-items:center;gap:8px;padding:8px 14px;border:0;background:none;border-radius:999px;color:var(--ink-2);font-weight:600;font-size:14.5px;white-space:nowrap}
 .lp .nav button svg{width:17px;height:17px;flex:none}
-.lp .nav button:hover{background:var(--brand-soft);color:var(--brand-ink)}
+.lp .nav button:hover{background:none;color:var(--brand-ink)}
 .lp .nav button[aria-current=page]{background:var(--brand-soft);color:var(--brand-ink)}
 .lp .top-r{margin-inline-start:auto;display:flex;align-items:center;gap:10px}
 .lp .lang{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--line-2);background:var(--surface);border-radius:12px;font-weight:600;font-size:14px}
@@ -238,6 +238,10 @@
 
 @media (min-width:761px){
   .lp .nav button{width:132px;justify-content:center;padding-inline:0}
+  .lp .top-in{display:grid;grid-template-columns:1fr auto 1fr;gap:0 28px}
+  .lp .top-in .brand{justify-self:start}
+  .lp .top-in .nav{justify-self:center}
+  .lp .top-in .top-r{justify-self:end;margin:0}
   .lp .lang{width:116px;justify-content:center;padding-inline:0}
 }
 
@@ -255,3 +259,7 @@
 .lp .hero-l .lede{white-space:pre-line;max-width:none}
 .lp .drop .up{background:#5271FF;color:#fff}
 .lp .drop .up svg{stroke-width:2}
+.lp .lang{border:0;background:transparent;padding:0;border-radius:0;width:116px;justify-content:flex-end}
+.lp .lang:hover{border-color:transparent}
+.lp .lang img{height:28px;width:auto;display:block;transition:transform .15s,opacity .15s}
+.lp .lang:hover img{transform:scale(1.06)}
