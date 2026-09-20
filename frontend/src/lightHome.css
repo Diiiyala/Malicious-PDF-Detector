@@ -251,3 +251,5 @@
 @media (max-width:560px){
   .lp .drop.c{padding-block:28px}
 }
+.lp .hero-l h1 .h1l{display:block;white-space:nowrap}
+.lp .hero-l .lede{white-space:pre-line;max-width:none}
