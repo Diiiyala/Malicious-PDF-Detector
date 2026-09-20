@@ -78,7 +78,7 @@ const TILES = [
   { k: 'clip', icon: 'clip', color: '#12B5A6', pos: { left: 0, top: '52%' }, delay: 1.2 },
 ];
 
-const HeroIllustration = ({ c, onTry }) => {
+const HeroIllustration = ({ c }) => {
   const [step, setStep] = useState(4);
 
   useEffect(() => {
@@ -113,12 +113,11 @@ const HeroIllustration = ({ c, onTry }) => {
           </div>
         </div>
 
-        <button type="button" className="vc" onClick={onTry}>
+        <div className="vc">
           <span className="vc-a"><span className="dot" data-status="danger" /><b>{c.verdict} · <bdi dir="ltr">99%</bdi></b></span>
           <span className="vc-s"><span className="spin" /><b>{c.scanning}…</b></span>
           <span className="mini" data-status="danger"><i style={{ width: '99%' }} /></span>
-          <small>{c.tryIt} →</small>
-        </button>
+        </div>
 
         {TILES.map((t) => (
           <span
@@ -209,7 +208,7 @@ export default function LightHome({ isAr, isLoaded, onToggleLang, onFile, onReje
             )}
           </div>
 
-          <HeroIllustration c={c} onTry={open} />
+          <HeroIllustration c={c} />
         </div>
       </section>
     </div>
