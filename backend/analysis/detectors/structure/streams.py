@@ -6,6 +6,16 @@ from analysis.signatures import SUSPICIOUS_STREAM_FILTERS, AA_SILENT_TRIGGERS
 
 logger = logging.getLogger(__name__)
 
+PS_FUNC_MAX_BYTES = 256 * 1024
+PS_SPLIT_PATTERN = re.compile(r"[\s{}\[\]]+")
+PS_NUMBER_PATTERN = re.compile(r"^[+-]?(\d+#[0-9A-Za-z]+|\d+\.?\d*([eE][+-]?\d+)?|\.\d+([eE][+-]?\d+)?)$")
+PS_CALCULATOR_OPERATORS = {
+    "abs", "add", "atan", "ceiling", "cos", "cvi", "cvr", "div", "exp", "floor",
+    "idiv", "ln", "log", "mod", "mul", "neg", "round", "sin", "sqrt", "sub", "truncate",
+    "and", "bitshift", "eq", "false", "ge", "gt", "le", "lt", "ne", "not", "or", "true", "xor",
+    "copy", "dup", "exch", "index", "pop", "roll", "if", "ifelse",
+}
+
 
 def decode_pdf_text(raw: bytes) -> str:
     if raw[:2] in (b"\xfe\xff", b"\xff\xfe"):
@@ -149,7 +159,32 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                     except Exception as e:
                         logger.debug("XFA stream analysis failed: %s", e)
 
-                # 6. Suspicious Compression Filters
+                # 6. PostScript Calculator Function (Type 4) Injection
+                if obj.get("/FunctionType") == 4 and hasattr(obj, "get_data"):
+                    try:
+                        ps_text = decode_pdf_text(obj.get_data()[:PS_FUNC_MAX_BYTES])
+                        ps_tokens = {t for t in PS_SPLIT_PATTERN.split(ps_text) if t}
+                        foreign = sorted(
+                            t for t in ps_tokens
+                            if t not in PS_CALCULATOR_OPERATORS and not PS_NUMBER_PATTERN.match(t)
+                        )
+                        if foreign:
+                            shown = ", ".join(t[:60] for t in foreign[:5])
+                            add_threat("STR-OBJ-PS-FUNC", 12,
+                                       f"Suspicious code was found in a PostScript calculation function (Found: '{shown}')",
+                                       location_label)
+                            if aggregator:
+                                aggregator.add_script(ps_text, location_label, script_type="PostScript Function")
+                        for t in scan_text(ps_text, aggregator=aggregator):
+                            t.category = "Stream/Object"
+                            t.location = f"{location_label} (PostScript Function)"
+                            threats.append(t)
+                    except MemoryError:
+                        add_threat("STR-OBJ-BOMB", 10, "PostScript function stream exceeded memory limits while decompressing (Potential Decompression Bomb)", location_label)
+                    except Exception as e:
+                        logger.debug("PostScript function analysis failed: %s", e)
+
+                # 7. Suspicious Compression Filters
                 filt = obj.get("/Filter")
                 if filt:
                     filt_list = filt if isinstance(filt, list) else [filt]
@@ -159,7 +194,7 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                             if s_filt in f_name:
                                 add_threat("STR-OBJ-SUSP-FILTER", 8, f"Suspicious stream filter ({f_name}) detected", location_label)
 
-                # 7. Deep EmbeddedFile Stream Scan (HTML / JS Carriers)
+                # 8. Deep EmbeddedFile Stream Scan (HTML / JS Carriers)
                 if obj.get("/Type") == "/EmbeddedFile" or "/Subtype" in obj:
                     try:
                         if hasattr(obj, "get_data"):
@@ -184,12 +219,12 @@ def analyze_streams_and_objects(reader, aggregator=None) -> list[Threat]:
                     except Exception as e:
                         logger.debug("Embedded-file stream analysis failed: %s", e)
 
-                # 8. Recursive Traversal of Nested Objects / Arrays
+                # 9. Recursive Traversal of Nested Objects / Arrays
                 for key, value in obj.items():
                     if isinstance(value, dict) or isinstance(value, list):
                         process_obj(value, location_label)
 
-                # 9. Execution Triggers (Zero-Click & Events)
+                # 10. Execution Triggers (Zero-Click & Events)
                 if "/AA" in obj:
                     aa = obj.get("/AA")
                     try:
