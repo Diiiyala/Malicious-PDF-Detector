@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useDropzone } from 'react-dropzone';
 import LightHome from './LightHome.jsx';
 
 
@@ -384,14 +383,11 @@ function App() {
     setUploadError({ type: 'unsupported', fileName: fileRejections[0].file.name });
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop, onDropRejected, multiple: false, accept: { 'application/pdf': ['.pdf'] },
-  });
 
   const onHeroFile = (files) => {
     onDrop(files);
     if (files[0] && files[0].size <= MAX_UPLOAD_BYTES) {
-      document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth' });
+      setTimeout(() => document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth' }), 80);
     }
   };
 
@@ -519,57 +515,8 @@ function App() {
       />
 
       {/* Workspace */}
+      {appState !== 'upload' && (
       <section id="workspace" className="relative z-10 min-h-screen flex flex-col justify-center items-center px-5 py-24 bg-page">
-
-        {/* Upload state */}
-        {appState === 'upload' && (
-          <div className="w-full max-w-3xl">
-            <div className="text-center mb-10">
-              <h2 className="text-3xl sm:text-4xl font-display font-bold mb-3">{isAr ? 'ابدأ الفحص الآن' : 'Start Scanning Now'}</h2>
-              <p className="text-ink-3">{isAr ? 'ارفع ملف PDF لفحصه بحثاً عن المخاطر.' : 'Upload a PDF to scan it for risks.'}</p>
-            </div>
-
-            {uploadError && (
-              <div className="mb-6 bg-white border border-danger/30 text-ink px-5 py-4 rounded-2xl flex items-center justify-between gap-4 animate-fade-in">
-                <div className="flex items-center gap-3">
-                  <Icon.alert className="w-6 h-6 text-danger shrink-0" />
-                  <span className="font-medium">
-                    {uploadError.type === 'too_large'
-                      ? (isAr ? 'الملف كبير جدًا، الحد الأقصى 100 ميجابايت.' : 'File too large, maximum size is 100 MB.')
-                      : (isAr
-                          ? `عذراً، الملف "${uploadError.fileName}" غير مدعوم. يرجى رفع ملفات PDF فقط.`
-                          : `Sorry, "${uploadError.fileName}" is not supported. Please upload PDF files only.`)}
-                  </span>
-                </div>
-                <button onClick={() => setUploadError(null)} className="text-ink/60 hover:text-brand-ink transition">
-                  <Icon.close className="w-5 h-5" />
-                </button>
-              </div>
-            )}
-
-            <div
-              {...getRootProps()}
-              className={`relative w-full rounded-[28px] p-14 sm:p-20 text-center cursor-pointer transition-all duration-300 group overflow-hidden bg-white shadow-[0_30px_60px_-30px_rgba(20,20,20,0.16)]
-                border-2 border-dashed
-                ${isDragActive ? 'border-brand bg-brand-soft scale-[1.02]' : 'border-brand-line hover:border-brand'}`}
-            >
-              <input {...getInputProps()} />
-              <div className="absolute inset-0 bg-brand-soft/60 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-              <div className={`relative mx-auto mb-6 grid place-items-center w-20 h-20 rounded-2xl transition-all duration-300
-                ${isDragActive ? 'bg-brand text-white scale-110' : 'bg-brand-soft text-brand-ink group-hover:scale-105'}`}>
-                <Icon.upload className="w-9 h-9" />
-              </div>
-              <p className="text-ink text-lg sm:text-xl font-medium relative">
-                {isDragActive
-                  ? (isAr ? 'أفلت ملف الـ PDF هنا...' : 'Drop the PDF here...')
-                  : (isAr ? 'اسحب وأفلت ملف الـ PDF هنا، أو اضغط للاختيار' : 'Drag & drop a PDF here, or click to browse')}
-              </p>
-              <p className="text-sm text-brand-ink mt-3 font-semibold tracking-wide relative">
-                {isAr ? 'يدعم ملفات PDF فقط' : 'Supports PDF files only'}
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Scanning state */}
         {appState === 'scanning' && (() => {
@@ -638,9 +585,7 @@ function App() {
                           setTerminalLines([]);
                           setFileName('');
                           setAppState('upload');
-                          setTimeout(() => {
-                            document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                          }, 60);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                         className="inline-flex items-center gap-2 bg-brand hover:bg-brand-600 text-white px-8 py-3.5 rounded-full font-bold transition-all active:translate-y-px"
                       >
@@ -905,9 +850,7 @@ function App() {
               <button
                 onClick={() => {
                   setAppState('upload');
-                  setTimeout(() => {
-                    document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }, 60);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 className="inline-flex items-center gap-2 bg-brand hover:bg-brand-600 text-white px-8 py-3.5 rounded-full font-bold transition-all active:translate-y-px"
               >
@@ -918,6 +861,7 @@ function App() {
           </div>
         )}
       </section>
+      )}
 
       {/* Detectors */}
       <section id="detectors" className="relative z-10 px-5 sm:px-8 py-24 bg-white border-y border-line">
