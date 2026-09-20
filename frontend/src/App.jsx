@@ -717,7 +717,7 @@ function App() {
                             {scanResult.threats.map((threat) => (
                               <tr key={threat.id} className="hover:bg-page transition">
                                 <td className={`px-6 py-4 font-medium text-ink ${isAr ? 'text-right' : 'text-left'}`}>
-                                  <ExpandableText text={threat.name} maxLength={120} isAr={isAr} forceExpand={capturing} />
+                                  <ExpandableText text={threat.name} maxLength={220} isAr={isAr} forceExpand={capturing} />
                                 </td>
                                 <td className="px-6 py-4 align-middle whitespace-nowrap text-center">
                                   <span className={`inline-block whitespace-nowrap text-xs px-2.5 py-1 rounded-lg bg-page border border-line text-ink-2 ${isAr ? 'font-sans' : 'font-mono'}`}>
