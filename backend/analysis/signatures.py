@@ -63,6 +63,8 @@ SUSPICIOUS_URI_KEYWORDS = [
 
 NAVIGATION_ACTIONS = ["/GoTo", "/Named"]
 
+DEST_FIT_TYPES = ["/XYZ", "/Fit", "/FitH", "/FitV", "/FitR", "/FitB", "/FitBH", "/FitBV"]
+
 SUSPICIOUS_NAME_KEYS = ["/Launch", "/SubmitForm", "/GoToE", "/RichMedia", "/XFA"]
 
 # 1.5 Embedded-file attachments (filename / payload classification)
@@ -155,7 +157,7 @@ SYSTEM_THREATS = {
 
 STRUCTURE_PATTERNS = {
     rb"/AA\s*<<\s*/O": ("Silent page trigger (/O or /C)", 12, "BIN-STR-SILENT"),
-    rb"/OpenAction": ("Automatic execution trigger (/OpenAction)", 10, "BIN-STR-OPEN"),
+    rb"/OpenAction(?!\s*\[\s*(?:\d+\s+\d+\s+R|\d+)\s+/(?:XYZ|Fit)[A-Za-z]*\b)": ("Automatic execution trigger (/OpenAction)", 10, "BIN-STR-OPEN"),
     rb"/Launch": ("Annotation (/Launch)", 10, "BIN-STR-LAUNCH")
 }
 
@@ -237,6 +239,7 @@ _ALL_VOCAB = {
     "SUSPICIOUS_SOURCE_INDICATORS": SUSPICIOUS_SOURCE_INDICATORS,
     "SUSPICIOUS_URI_KEYWORDS": SUSPICIOUS_URI_KEYWORDS,
     "NAVIGATION_ACTIONS": NAVIGATION_ACTIONS,
+    "DEST_FIT_TYPES": DEST_FIT_TYPES,
     "SUSPICIOUS_NAME_KEYS": SUSPICIOUS_NAME_KEYS,
     "AA_SILENT_TRIGGERS": AA_SILENT_TRIGGERS,
     "SUSPICIOUS_STREAM_FILTERS": SUSPICIOUS_STREAM_FILTERS,
