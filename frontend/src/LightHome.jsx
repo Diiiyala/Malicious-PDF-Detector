@@ -32,7 +32,7 @@ const COPY = {
     lang: 'العربية',
     h1a: 'Check any PDF ',
     h1b: 'before you open it.',
-    lede: 'Upload a file and get a clear verdict in seconds: a risk score, every suspicious indicator, and where it hides.',
+    lede: 'Upload a file and get a clear verdict in seconds:\na risk score, every suspicious indicator, and where it hides.',
     drop: 'Drag & drop a PDF here',
     dropOver: 'Drop the PDF here...',
     note: 'Supports PDF files only',
@@ -48,7 +48,7 @@ const COPY = {
     lang: 'English',
     h1a: 'افحص أي ملف PDF ',
     h1b: 'قبل أن تفتحه.',
-    lede: 'ارفع الملف واحصل على حكم واضح خلال ثوانٍ: نسبة خطورة وكل مؤشر مشبوه وأين يختبئ.',
+    lede: 'ارفع الملف واحصل على حكم واضح خلال ثوانٍ:\nنسبة خطورة وكل مؤشر مشبوه وأين يختبئ.',
     drop: 'اسحب ملف PDF وأفلته هنا',
     dropOver: 'أفلت ملف الـ PDF هنا...',
     note: 'يدعم ملفات PDF فقط',
@@ -188,7 +188,7 @@ export default function LightHome({ isAr, isLoaded, onToggleLang, onFile, onReje
       <section className={`band hero${isLoaded ? ' ready' : ''}`}>
         <div className="inner">
           <div className="hero-l">
-            <h1>{c.h1a}<mark className="hi">{c.h1b}</mark></h1>
+            <h1><span className="h1l">{c.h1a}</span><mark className="hi">{c.h1b}</mark></h1>
             <p className="lede">{c.lede}</p>
 
             <div {...getRootProps({ className: `drop c${isDragActive ? ' over' : ''}`, onClick: open, role: 'button', tabIndex: 0, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } })}>
