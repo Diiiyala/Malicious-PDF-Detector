@@ -269,3 +269,4 @@
 .lp .vc .dot[data-status=danger],
 .lp .vc .mini[data-status=danger] i{background:#EF4B5B}
 .lp .illo:not(.done) .vc .mini i{background:var(--brand)}
+.lp[dir=rtl] .vc{direction:rtl}
