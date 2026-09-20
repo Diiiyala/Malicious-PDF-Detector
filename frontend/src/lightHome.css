@@ -266,3 +266,6 @@
 .lp .mkr[data-n="1"]{--c:#F5A524}
 .lp .mkr[data-n="2"]{--c:#EF4B5B}
 .lp .mkr[data-n="3"]{--c:#7C5CF0}
+.lp .vc .dot[data-status=danger],
+.lp .vc .mini[data-status=danger] i{background:#EF4B5B}
+.lp .illo:not(.done) .vc .mini i{background:var(--brand)}
