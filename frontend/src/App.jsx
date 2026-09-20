@@ -831,7 +831,7 @@ function App() {
               <button
                 onClick={shareResult}
                 disabled={sharing}
-                className={`inline-flex items-center gap-2 bg-white hover:border-brand hover:text-brand-ink text-ink border border-line-2 px-5 py-2 rounded-full text-sm font-bold transition-all active:translate-y-px ${sharing ? 'opacity-60 cursor-wait' : ''}`}
+                className={`inline-flex items-center gap-2 bg-[#F2F2F2] hover:scale-[1.04] text-[#141414] px-5 py-2 rounded-xl text-sm font-bold transition-all active:scale-100 ${sharing ? 'opacity-60 cursor-wait' : ''}`}
               >
                 <Icon.share className="w-4 h-4" />
                 {sharing ? (isAr ? 'جارٍ التحضير...' : 'Preparing...') : (isAr ? 'مشاركة النتيجة' : 'Share result')}
@@ -841,7 +841,7 @@ function App() {
                   setAppState('upload');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="inline-flex items-center gap-2 bg-brand hover:bg-brand-600 text-white px-5 py-2 rounded-full text-sm font-bold transition-all active:translate-y-px"
+                className="inline-flex items-center gap-2 bg-[#F2F2F2] hover:scale-[1.04] text-[#141414] px-5 py-2 rounded-xl text-sm font-bold transition-all active:scale-100"
               >
                 <Icon.scanFrame className="w-4 h-4" />
                 {isAr ? 'فحص ملف آخر' : 'Scan Another File'}
