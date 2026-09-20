@@ -2,7 +2,7 @@
 
 A bilingual React interface for uploading PDFs and viewing risk scores, categorized findings, and extracted scripts. 
 
-Supports English, Arabic, RTL layouts, and PNG results export.
+Supports English, Arabic, RTL layouts, and exporting results as an A4 PDF report.
 
 ## Tech Stack
 
