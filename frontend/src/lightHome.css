@@ -241,14 +241,17 @@
   .lp .lang{width:116px;justify-content:center;padding-inline:0}
 }
 
-.lp .drop.c{padding:38px 40px 38px 44px;gap:20px}
-.lp[dir=rtl] .drop.c{padding:38px 44px 38px 40px}
-.lp .drop.c .up{width:68px;height:68px;border-radius:20px}
-.lp .drop.c .up svg{width:32px;height:32px}
-.lp .drop.c .dtxt b{font-size:18px}
-.lp .drop.c .btn.lg{min-height:46px;padding-inline:22px;font-size:15px}
+.lp .drop.c{padding:38px 26px 38px 28px;gap:14px}
+.lp[dir=rtl] .drop.c{padding:38px 28px 38px 26px}
+.lp .drop.c .up{width:56px;height:56px;border-radius:17px}
+.lp .drop.c .up svg{width:27px;height:27px}
+.lp .drop.c .dtxt b{white-space:nowrap}
+.lp .drop.c .dtxt b{font-size:16.5px}
+.lp .drop.c .btn.lg{min-height:46px;padding-inline:18px;font-size:14.5px}
 @media (max-width:560px){
   .lp .drop.c{padding-block:28px}
 }
 .lp .hero-l h1 .h1l{display:block;white-space:nowrap}
 .lp .hero-l .lede{white-space:pre-line;max-width:none}
+.lp .drop .up{background:#5271FF;color:#fff}
+.lp .drop .up svg{stroke-width:2}
