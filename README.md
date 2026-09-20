@@ -206,6 +206,17 @@ Each entry in a category's `results` array is a formatted string:
 [Severity: X/15] <description> | Location: <location>
 ```
 
+**Error responses**
+
+| Status | Meaning                                                                          |
+| ------ | -------------------------------------------------------------------------------- |
+| `400`  | No file provided, or the file is not a `.pdf`                                    |
+| `413`  | File exceeds the 100 MB upload limit                                             |
+| `422`  | File rejected because analysis exceeded the memory limit (decompression bomb)    |
+| `500`  | Unexpected internal error during analysis                                        |
+
+All error responses have the form `{ "error": "<message>" }`.
+
 ## Frontend
 
 The interface is a single-page React app with:
