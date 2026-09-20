@@ -177,8 +177,8 @@ export default function LightHome({ isAr, isLoaded, onToggleLang, onFile, onReje
             ))}
           </nav>
           <div className="top-r">
-            <button type="button" className="lang" onClick={onToggleLang}>
-              <Ic n="globe" /><span>{c.lang}</span>
+            <button type="button" className="lang" onClick={onToggleLang} aria-label={c.lang} title={c.lang}>
+              <img src={isAr ? '/en-language-icon.svg' : '/ar-language-icon.svg'} alt="" />
             </button>
           </div>
         </div>
