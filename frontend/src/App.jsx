@@ -208,6 +208,7 @@ const DetIcon = ({ n, className }) => (
   </svg>
 );
 
+const DET_COLORS = { text: '#12B5A6', content: '#F5A524', structure: '#5271FF', metadata: '#7C5CF0', binary: '#EF4B5B' };
 const SEV_DOT = { critical: 'bg-danger-dot', high: 'bg-orange-dot', medium: 'bg-warn-dot', low: 'bg-info-dot' };
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
@@ -257,7 +258,7 @@ function App() {
   const [scanResult, setScanResult] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [langFading, setLangFading] = useState(false);
-  const [openDet, setOpenDet] = useState(null);
+  const [openDet, setOpenDet] = useState('structure');
   const [scanStep, setScanStep] = useState(0);
   const [resultTab, setResultTab] = useState('findings');
   const [copiedSha, setCopiedSha] = useState(false);
@@ -891,50 +892,64 @@ function App() {
           <div className="text-center max-w-2xl mx-auto mb-9">
             <h2 className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight">{isAr ? 'ما الذي نفحصه داخل كل ملف' : 'What we look at inside every PDF'}</h2>
             <p className="text-ink-2 mt-3 text-base">
-              {isAr ? 'خمسة كواشف تعمل معًا. اضغط على أحدها لترى الفحوصات التي يجريها.' : 'Five detectors work together. Tap one to see the checks it runs.'}
+              {isAr ? 'خمسة كواشف تعمل معًا. اختر أحدها لترى الفحوصات التي يجريها.' : 'Five detectors work together. Pick one to see the checks it runs.'}
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
-            {DETECTORS.map((d, i) => {
-              const on = openDet === d.k;
-              const n = d.checks.length;
-              return (
-                <button
-                  key={d.k}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setOpenDet(on ? null : d.k)}
-                  className={`tile tile-hover flex flex-col gap-2.5 text-start p-[22px] ${i < 3 ? 'md:col-span-2' : 'md:col-span-3'} ${i === 4 ? 'sm:col-span-2' : ''} ${on ? '!border-brand -translate-y-[3px]' : ''}`}
-                >
-                  <span className="grid place-items-center w-12 h-12 rounded-[14px] bg-brand-soft text-brand-ink">
-                    <DetIcon n={d.icon} className="w-6 h-6" />
-                  </span>
-                  <b className="text-lg font-bold">{isAr ? d.ar : d.en}</b>
-                  <span className="text-[14.5px] text-ink-2">{isAr ? d.arD : d.enD}</span>
-                  <span className="mt-auto pt-1.5 text-sm font-bold text-brand-ink">
-                    {on ? (isAr ? 'إخفاء الفحوصات' : 'Hide checks') : (isAr ? 'عرض الفحوصات' : 'See checks')}
-                    {' · '}
-                    {isAr ? `${n} ${n === 1 ? 'فحص' : 'فحوصات'}` : `${n} ${n === 1 ? 'check' : 'checks'}`}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {openDet && (() => {
-            const d = DETECTORS.find((x) => x.k === openDet);
+          {(() => {
+            const d = DETECTORS.find((x) => x.k === openDet) || DETECTORS[0];
+            const col = DET_COLORS[d.k];
+            const n = d.checks.length;
             return (
-              <div className="mt-[18px] p-[22px] rounded-[20px] bg-white border border-brand-line animate-fade-in">
-                <h3 className="text-base font-bold mb-3">{isAr ? d.ar : d.en}</h3>
-                <div className="flex flex-wrap gap-2">
-                  {d.checks.map((c) => (
-                    <span key={c.tok} className="inline-flex items-center gap-2 max-w-full px-3 py-1.5 rounded-full bg-white border border-line text-[13px] text-ink-2">
-                      <i className={`w-[9px] h-[9px] rounded-full shrink-0 ${SEV_DOT[c.sev]}`} />
-                      <b className="font-semibold text-ink">{isAr ? c.ar : c.en}</b>
-                      <span className="font-mono text-xs text-ink-3" dir="ltr">{c.tok}</span>
+              <div className="rounded-[32px] bg-page p-3 sm:p-4 grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-3 sm:gap-4">
+                <div className="flex flex-col gap-1.5 md:justify-between" role="tablist">
+                  {DETECTORS.map((x) => {
+                    const on = x.k === d.k;
+                    const c = DET_COLORS[x.k];
+                    return (
+                      <button
+                        key={x.k}
+                        type="button"
+                        role="tab"
+                        aria-selected={on}
+                        onClick={() => setOpenDet(x.k)}
+                        className={`flex items-center gap-4 text-start rounded-[20px] px-4 py-3.5 transition ${on ? 'bg-white shadow-[0_10px_30px_-18px_rgba(20,20,20,0.35)]' : 'hover:bg-white/60'}`}
+                      >
+                        <span className="grid place-items-center w-12 h-12 rounded-[15px] text-white shrink-0" style={{ backgroundColor: c }}>
+                          <DetIcon n={x.icon} className="w-6 h-6" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <b className="block text-[17px] font-bold leading-tight">{isAr ? x.ar : x.en}</b>
+                          <span className="block text-sm text-ink-2 mt-0.5">{isAr ? x.arD : x.enD}</span>
+                        </span>
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${on ? 'bg-page text-ink' : 'text-ink-3'}`}>{x.checks.length}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div key={d.k} className="rounded-[24px] bg-white p-6 sm:p-8 animate-fade-in flex flex-col h-[500px] min-h-0">
+                  <div className="flex items-center gap-4">
+                    <span className="grid place-items-center w-14 h-14 rounded-[18px] text-white shrink-0" style={{ backgroundColor: col }}>
+                      <DetIcon n={d.icon} className="w-7 h-7" />
                     </span>
-                  ))}
+                    <div className="min-w-0">
+                      <h3 className="text-2xl font-display font-extrabold leading-tight">{isAr ? d.ar : d.en}</h3>
+                      <p className="text-ink-2 mt-0.5">{isAr ? d.arD : d.enD}</p>
+                    </div>
+                  </div>
+                  <div className="mt-6 text-xs font-bold uppercase tracking-wider text-ink-3">
+                    {isAr ? `${n} ${n === 1 ? 'فحص' : 'فحوصات'}` : `${n} ${n === 1 ? 'check' : 'checks'}`}
+                  </div>
+                  <ul className="mt-3 grid gap-2 content-start flex-1 min-h-0 overflow-y-auto pe-1 -me-1">
+                    {d.checks.map((c) => (
+                      <li key={c.tok} className="flex items-center gap-3 rounded-2xl px-4 py-3 bg-[#F6F6F6]">
+                        <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${SEV_DOT[c.sev]}`} />
+                        <b className="font-semibold text-ink flex-1 min-w-0">{isAr ? c.ar : c.en}</b>
+                        <span className="font-mono text-xs text-ink-3 truncate max-w-[40%]" dir="ltr">{c.tok}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             );
