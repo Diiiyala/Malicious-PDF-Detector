@@ -30,7 +30,6 @@ const COPY = {
   en: {
     nav: ['Home', 'Scan', 'How it works'],
     lang: 'العربية',
-    eyebrow: 'PDF safety check',
     h1a: 'Check any PDF ',
     h1b: 'before you open it.',
     lede: 'Upload a file and get a clear verdict in seconds: a risk score, every suspicious indicator, and where it hides.',
@@ -38,8 +37,6 @@ const COPY = {
     dropOver: 'Drop the PDF here...',
     note: 'Supports PDF files only',
     choose: 'Choose PDF file',
-    tr1: 'Processed locally, never shared',
-    tr2: 'Five detectors on every file',
     tooLarge: 'File too large, maximum size is 100 MB.',
     unsupported: (n) => `Sorry, "${n}" is not supported. Please upload PDF files only.`,
     illo: 'Live scan preview',
@@ -49,7 +46,6 @@ const COPY = {
   ar: {
     nav: ['الرئيسية', 'افحص', 'كيف يعمل'],
     lang: 'English',
-    eyebrow: 'فحص أمان ملفات PDF',
     h1a: 'افحص أي ملف PDF ',
     h1b: 'قبل أن تفتحه.',
     lede: 'ارفع الملف واحصل على حكم واضح خلال ثوانٍ: نسبة خطورة وكل مؤشر مشبوه وأين يختبئ.',
@@ -57,8 +53,6 @@ const COPY = {
     dropOver: 'أفلت ملف الـ PDF هنا...',
     note: 'يدعم ملفات PDF فقط',
     choose: 'اختر ملف PDF',
-    tr1: 'تُعالج محليًا ولا تُشارك',
-    tr2: 'خمسة كواشف لكل ملف',
     tooLarge: 'الملف كبير جدًا، الحد الأقصى 100 ميجابايت.',
     unsupported: (n) => `عذراً، الملف "${n}" غير مدعوم. يرجى رفع ملفات PDF فقط.`,
     illo: 'معاينة حية للفحص',
@@ -84,7 +78,7 @@ const TILES = [
   { k: 'clip', icon: 'clip', color: '#12B5A6', pos: { left: 0, top: '52%' }, delay: 1.2 },
 ];
 
-const HeroIllustration = ({ c }) => {
+const HeroIllustration = ({ c, onTry }) => {
   const [step, setStep] = useState(4);
 
   useEffect(() => {
@@ -119,12 +113,12 @@ const HeroIllustration = ({ c }) => {
           </div>
         </div>
 
-        <a className="vc" href="#workspace" style={{ display: 'flex' }}>
+        <button type="button" className="vc" onClick={onTry}>
           <span className="vc-a"><span className="dot" data-status="danger" /><b>{c.verdict} · <bdi dir="ltr">99%</bdi></b></span>
           <span className="vc-s"><span className="spin" /><b>{c.scanning}…</b></span>
           <span className="mini" data-status="danger"><i style={{ width: '99%' }} /></span>
           <small>{c.tryIt} →</small>
-        </a>
+        </button>
 
         {TILES.map((t) => (
           <span
@@ -169,7 +163,7 @@ export default function LightHome({ isAr, isLoaded, onToggleLang, onFile, onReje
     ? (uploadError.type === 'too_large' ? c.tooLarge : c.unsupported(uploadError.fileName))
     : null;
 
-  const links = [null, 'workspace', 'how-it-works'];
+  const links = [null, null, 'how-it-works'];
 
   return (
     <div className="lp" dir={isAr ? 'rtl' : 'ltr'}>
@@ -194,7 +188,6 @@ export default function LightHome({ isAr, isLoaded, onToggleLang, onFile, onReje
       <section className={`band hero${isLoaded ? ' ready' : ''}`}>
         <div className="inner">
           <div className="hero-l">
-            <span className="eyebrow"><Ic n="shield" />{c.eyebrow}</span>
             <h1>{c.h1a}<mark className="hi">{c.h1b}</mark></h1>
             <p className="lede">{c.lede}</p>
 
@@ -214,14 +207,9 @@ export default function LightHome({ isAr, isLoaded, onToggleLang, onFile, onReje
                 <button type="button" onClick={onDismissError} aria-label="Close"><Ic n="x" /></button>
               </div>
             )}
-
-            <div className="trust">
-              <span><Ic n="shield" />{c.tr1}</span>
-              <span><Ic n="check" />{c.tr2}</span>
-            </div>
           </div>
 
-          <HeroIllustration c={c} />
+          <HeroIllustration c={c} onTry={open} />
         </div>
       </section>
     </div>
