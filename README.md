@@ -39,46 +39,57 @@ The detector checks for embedded JavaScript, automatic actions, suspicious links
 
 ### Detection Modules
 
-| Module        | What it checks                                                                                                                                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Text**      | Anomalies in the extracted text layer.                                                                                                                                                                             |
-| **Content**   | Suspicious code and keywords, including `eval()` and `exec()`, character-code obfuscation, HTML script tags, potential command-and-control patterns, suspicious URLs, URL shorteners, and hacking-tool references. |
-| **Structure** | Header anomalies, catalog entries, `/OpenAction`, the `/Names` tree, action objects, transparent form widgets, streams, hex-escaped names, and duplicate dictionary keys.                                          |
-| **Metadata**  | Suspicious authoring tools or sources and implausible or potentially tampered timestamps.                                                                                                                          |
-| **Binary**    | Embedded launch, open, and silent-execution strings that may not appear through normal object parsing.                                                                                                             |
-
-Structural checks include actions such as `/Launch`, `/GoToR`, `/SubmitForm`, `/ImportData`, and `/URI`.
+| Module        | What it checks                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Text**      | Hidden text (tiny or zero-scale fonts, text placed far off the page) and pages whose tree is malformed so that text extraction was skipped.                                                                                                                                                                                                                                                                                                                |
+| **Content**   | Execution patterns (`eval()`, `exec()`, `String.fromCharCode`, `app.launchURL`, `app.openDoc`, `new WebSocket()`, `<script>`), logic obfuscation, suspicious links (shorteners, direct IPs, UNC paths, malicious query parameters), ransomware and stealer indicators, registry tampering, security-disabling commands, XXE and XFA/SOAP payloads, environment leaks, cryptocurrency addresses, the EICAR test string, recursive Base64 decoding, high-entropy content, and multi-signal correlations (for example NTLM relay and multi-stage payloads). |
+| **Structure** | Header anomalies (missing, offset, or multiple `%PDF-` headers), catalog entries (Optional Content Groups coupled with scripts or triggers, PDF 2.0 `/AF` associated files), `/OpenAction`, document and page `/AA` triggers, the `/Names` tree (JavaScript and embedded files, with executable-extension, macro, and magic-byte classification of attachments), annotation and form actions (`/Launch`, `/GoToR`, `/GoToE`, `/SubmitForm`, `/ImportData`, `/URI`), clickjacking overlays and transparent widget grids, stored XSS in annotations, streams and objects (metadata XML, font-matrix injection, injected PostScript Type 4 functions, suspicious filters such as `/JBIG2Decode` and `/Crypt`, remote resource references, decompression bombs), encryption, hex-escaped names, and duplicate dictionary keys. |
+| **Metadata**  | Suspicious authoring tools or sources, hacking-tool references, XSS attempts and oversized fields, links inside metadata, and implausible or potentially tampered timestamps.                                                                                                                                                                                                                                                                              |
+| **Binary**    | Launch, open, and silent-execution strings, raw `/JS`, `/JavaScript`, `/SubmitForm`, `/RichMedia`, `/Crypt`, and `/JBIG2Decode` markers, XFA/XXE/XSS patterns, obfuscated or hex-encoded `/URI` values, and suspicious `/F` paths that may not appear through normal object parsing.                                                                                                                                                                      |
 
 ### Risk Scoring
 
-Findings are deduplicated before scoring. Each finding ID contributes at most three times, with a capped severity contribution per finding.
+Findings are deduplicated before scoring. Every finding has a severity from `1` to `15`. Each finding ID contributes at most three times to the score, so a repeated indicator cannot inflate the result without limit.
 
 The assessment includes:
 
-| Field             | Output                                      |
-| ----------------- | ------------------------------------------- |
-| `risk_score`      | Weighted score calculated from the findings |
-| `risk_percentage` | Normalized score from `0` to `100`          |
-| `risk_level`      | `LOW RISK`, `MEDIUM RISK`, or `HIGH RISK`   |
-| `status`          | `safe`, `warning`, or `danger`              |
+| Field             | Output                                                            |
+| ----------------- | ----------------------------------------------------------------- |
+| `risk_score`      | Sum of the severities of the scored findings                      |
+| `risk_percentage` | Score capped to a `0` to `100` scale                              |
+| `risk_level`      | `LOW RISK`, `MEDIUM RISK`, or `HIGH RISK`                         |
+| `status`          | `safe`, `warning`, or `danger`                                    |
 
-Any critical-severity finding forces the risk level to **HIGH RISK**, regardless of the overall score.
+Thresholds:
+
+| Condition                                                                    | Result                          |
+| ---------------------------------------------------------------------------- | ------------------------------- |
+| `risk_percentage` is `70` or more, or any finding has severity `12` or more  | `HIGH RISK` (`danger`)          |
+| `risk_percentage` is `30` to `69`                                            | `MEDIUM RISK` (`warning`)       |
+| Otherwise                                                                    | `LOW RISK`                      |
+| Highest severity is `5` or less and `risk_percentage` is below `30`          | `safe`; otherwise `warning`     |
 
 ## Project Structure
 
-| Path                                 | Purpose                                                     |
-| ------------------------------------ | ----------------------------------------------------------- |
-| `backend/app.py`                     | Flask application and `/upload` endpoint                    |
-| `backend/requirements.txt`           | Python dependencies                                         |
-| `backend/analysis/signatures.py`     | Shared keywords and regex patterns                          |
-| `backend/analysis/core/analyzer.py`  | Analysis pipeline, deduplication, and output assembly       |
-| `backend/analysis/core/extractor.py` | Structured PDF content extraction                           |
-| `backend/analysis/core/risk.py`      | Risk score, level, and status calculation                   |
-| `backend/analysis/detectors/`        | Text, content, metadata, binary, and structural checks      |
-| `backend/analysis/utils/`            | Normalization, script aggregation, text metrics, and models |
-| `frontend/src/App.jsx`               | Upload interface, results view, and risk visualization      |
-| `frontend/src/main.jsx`              | React entry point                                           |
-| `frontend/src/index.css`             | Application styles                                          |
+| Path                                                 | Purpose                                                                          |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `backend/app.py`                                     | Flask app, `/` and `/upload` endpoints, CORS, size limit, memory guard, Waitress |
+| `backend/requirements.txt`                           | Python dependencies                                                              |
+| `backend/analysis/signatures.py`                     | Shared keywords, severities, and regex patterns                                  |
+| `backend/analysis/core/loader.py`                    | PDF parsing, `pikepdf` repair, and decompression-bomb handling                   |
+| `backend/analysis/core/extractor.py`                 | Text, metadata, and URI extraction                                               |
+| `backend/analysis/core/analyzer.py`                  | Analysis pipeline, deduplication, consolidation, and output assembly             |
+| `backend/analysis/core/risk.py`                      | Risk score, level, and status calculation                                        |
+| `backend/analysis/detectors/text.py`                 | Hidden-text and text-extraction anomalies                                        |
+| `backend/analysis/detectors/content.py`              | Pattern, obfuscation, Base64, entropy, and correlation checks                    |
+| `backend/analysis/detectors/metadata.py`             | Metadata and timestamp checks                                                    |
+| `backend/analysis/detectors/binary.py`               | Raw-byte pattern, URI, and path checks                                           |
+| `backend/analysis/detectors/structure/`              | Header, catalog, names, actions, streams, and evasion checks                     |
+| `backend/analysis/utils/`                            | Normalizer, script aggregator, link analysis, text extraction, and models        |
+| `frontend/src/App.jsx`                               | Upload flow, results view, risk gauge, report export, and info sections          |
+| `frontend/src/LightHome.jsx`, `lightHome.css`        | Landing hero, upload dropzone, and animated illustration                         |
+| `frontend/src/main.jsx`, `index.css`                 | React entry point and global styles                                              |
+| `frontend/tailwind.config.js`                        | Design tokens and Tailwind configuration                                         |
 
 ## Getting Started
 
@@ -115,7 +126,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The API runs at http://localhost:5000.
+The API runs at http://localhost:5000. It is served with Waitress when installed and falls back to Flask's development server otherwise. It listens on all network interfaces (`0.0.0.0`), so restrict access with a firewall if the machine is not private.
 
 ### 2. Start the Frontend
 
@@ -197,7 +208,7 @@ Each entry in a category's `results` array is a formatted string:
 
 ## Limitations
 
-This application uses heuristic detection to identify suspicious indicators. 
+This application uses heuristic detection to identify suspicious indicators.
 
 A low-risk result does not guarantee that a PDF is safe, and a flagged finding does not confirm malicious intent.
 
