@@ -402,8 +402,7 @@ function App() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const response = await fetch(`${API_URL}/upload`, { method: "POST", body: formData });
+      const response = await fetch("http://localhost:5000/upload", { method: "POST", body: formData });
       if (!response.ok) {
         let serverMsg = "";
         try { serverMsg = (await response.json())?.error || ""; } catch { /* no JSON body */ }
