@@ -102,12 +102,11 @@ def upload_file():
 if __name__ == "__main__":
 
     web_threads = int(os.environ.get("WEB_THREADS", 8))
-    port = int(os.environ.get("PORT", 5000))
 
     try:
         from waitress import serve
-        logger.info("Starting with waitress, threads=%d, port=%d", web_threads, port)
-        serve(app, host="0.0.0.0", port=port, threads=web_threads)
+        logger.info("Starting with waitress, threads=%d", web_threads)
+        serve(app, host="0.0.0.0", port=5000, threads=web_threads)
     except ImportError:
         logger.warning("waitress not installed, falling back to Flask's dev server")
-        app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+        app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
